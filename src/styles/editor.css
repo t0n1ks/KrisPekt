@@ -242,6 +242,7 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
   caret-color: var(--paper-ui);
+  color: var(--text-color);
   line-height: 1.35;
 }
 

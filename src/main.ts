@@ -1,4 +1,4 @@
 import './styles/index.css';
+import { App } from './app/App';
 
-// Entry point. The app is assembled phase by phase; see README.md for the architecture.
-document.title = 'KrisPekt';
+void App.start();

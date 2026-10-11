@@ -195,5 +195,9 @@
   "language": "Sprache",
   "pl_subj": ["Fach", "Fächer"],
   "pl_nb": ["Heft", "Hefte"],
-  "pl_pg": ["Seite", "Seiten"]
+  "pl_pg": ["Seite", "Seiten"],
+  "fileTooBig": "Die Datei ist zu groß",
+  "wrongFileType": "Dieser Dateityp wird nicht unterstützt",
+  "pdfTooLong": "Das PDF hat mehr als {n} Seiten – das sind zu viele",
+  "badRecords": "Einige Einträge sind beschädigt und wurden übersprungen"
 }

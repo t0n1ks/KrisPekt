@@ -5,6 +5,8 @@ export interface AppEvents {
   'language-changed': Language;
   'page-changed': { index: number; count: number };
   'notebook-saved': Notebook;
+  /** A dropdown menu or sheet opened; transient popovers close themselves. */
+  'menu-opened': undefined;
 }
 
 type Handler<T> = (payload: T) => void;

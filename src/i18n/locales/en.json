@@ -195,5 +195,9 @@
   "language": "Language",
   "pl_subj": ["subject", "subjects"],
   "pl_nb": ["notebook", "notebooks"],
-  "pl_pg": ["page", "pages"]
+  "pl_pg": ["page", "pages"],
+  "fileTooBig": "The file is too large",
+  "wrongFileType": "This file type isn’t supported",
+  "pdfTooLong": "The PDF has more than {n} pages, which is too many",
+  "badRecords": "Some entries are damaged and were skipped"
 }
