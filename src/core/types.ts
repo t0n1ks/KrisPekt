@@ -10,7 +10,10 @@ export type ToolKind = 'pen' | 'hl' | 'eraser' | 'lasso' | 'text';
 /** Stroke flavours: an ink pen (filled outline) or a highlighter (wide translucent centre line). */
 export type StrokeKind = 'pen' | 'hl';
 
-/** Eraser behaviour: cut away part of a stroke, or remove whole strokes. */
+/** Pen brush types. Strokes without a brush id are `ballpoint`. */
+export type BrushKind = 'ballpoint' | 'fountain' | 'fineliner' | 'pencil' | 'brush';
+
+/** Eraser behaviour: cut away part of a stroke ("pixel eraser"), or remove whole strokes. */
 export type EraserMode = 'part' | 'whole';
 
 /** Page dimensions in millimetres. */
@@ -63,6 +66,17 @@ export interface Stroke {
   /** Nominal width in world px. */
   s: number;
   p: Float32Array;
+  /** Brush of a pen stroke; missing means `ballpoint` (all strokes made before brushes existed). */
+  b?: BrushKind;
+}
+
+/** Anything drawable as a stroke; in-progress strokes use a plain number array. */
+export interface StrokeLike {
+  k: StrokeKind;
+  c: string;
+  s: number;
+  p: ArrayLike<number>;
+  b?: BrushKind;
 }
 
 export interface TextItem {
@@ -126,14 +140,24 @@ export interface TextPrefs {
   c: string;
 }
 
+/** Recently used custom colours, newest first; pen and highlighter keep separate lists. */
+export interface RecentColors {
+  pen: string[];
+  hl: string[];
+}
+
 /** User preferences, stored in localStorage under `konspektnik.prefs.v1`. */
 export interface Preferences {
-  pen: PenPrefs;
+  /** The pen's current brush. */
+  brush: BrushKind;
+  /** Colour and size remembered per brush. */
+  brushes: Record<BrushKind, PenPrefs>;
   hl: PenPrefs;
   er: EraserPrefs;
   txt: TextPrefs;
-  /** Up to three pinned pen colours shown in the tray. */
+  /** Up to five pinned pen colours shown in the tray. */
   favs: string[];
+  recent: RecentColors;
   fingerDraw: boolean;
   /** True once the user toggled finger drawing by hand (disables auto-switch on stylus detection). */
   fingerSet: boolean;

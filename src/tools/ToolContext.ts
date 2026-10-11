@@ -1,3 +1,4 @@
+import type { BrushRegistry } from '../canvas/brushes/BrushRegistry';
 import type { Camera } from '../canvas/Camera';
 import type { PageLayout } from '../canvas/PageLayout';
 import type { StrokeGeometry } from '../canvas/StrokeGeometry';
@@ -15,6 +16,7 @@ export interface ToolContext {
   layout: PageLayout;
   session: EditorSession;
   geometry: StrokeGeometry;
+  brushes: BrushRegistry;
   strokes: StrokePainter;
   texts: TextLayout;
   selection: Selection;

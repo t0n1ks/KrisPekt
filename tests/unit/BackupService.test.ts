@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { BRUSH_KINDS } from '../../src/core/constants';
 import { BlobRepository } from '../../src/storage/BlobRepository';
 import { BackupError, BackupService } from '../../src/storage/BackupService';
 import { Database } from '../../src/storage/Database';
@@ -82,6 +83,30 @@ describe('BackupService round trip', () => {
     (raw.subjects as Record<string, unknown>[])[0] = { ...subject(), evil: '<script>' };
     const doc = BackupService.parse(raw);
     expect(Object.keys(doc.subjects[0] ?? {})).toEqual(['id', 'name', 'color', 'order', 'createdAt']);
+  });
+
+  /** A backup whose only page holds one stroke with these extra fields. */
+  function withStroke(fields: Record<string, unknown>): Record<string, unknown> {
+    const stroke = { id: 'st1', k: 'pen', c: '#000000', s: 2, p: [0, 0, 0.5, 4, 4, 0.5], ...fields };
+    return backupJson({ pages: [{ ...page(), strokes: [stroke] }] });
+  }
+
+  it.each(BRUSH_KINDS)('accepts strokes drawn with the %s brush', (b) => {
+    const doc = BackupService.parse(withStroke({ b }));
+    expect(doc.pages[0]?.strokes[0]?.b).toBe(b);
+  });
+
+  it('reads strokes without a brush (older backups) as ballpoint', () => {
+    const stroke = BackupService.parse(withStroke({})).pages[0]?.strokes[0];
+    expect(stroke && 'b' in stroke).toBe(false);
+  });
+
+  it('rejects unknown brushes and brushes on highlighter strokes', () => {
+    expectInvalid(withStroke({ b: 'quill' }));
+    expectInvalid(withStroke({ b: '' }));
+    expectInvalid(withStroke({ b: 3 }));
+    expectInvalid(withStroke({ b: 'constructor' }));
+    expectInvalid(withStroke({ k: 'hl', b: 'pencil' }));
   });
 
   it('keeps markup in names as plain text (it is rendered with textContent)', () => {

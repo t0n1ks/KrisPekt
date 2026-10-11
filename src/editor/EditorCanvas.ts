@@ -1,4 +1,5 @@
 import { BitmapCache } from '../canvas/BitmapCache';
+import { BrushRegistry } from '../canvas/brushes/BrushRegistry';
 import { Camera } from '../canvas/Camera';
 import { LiveLayer } from '../canvas/LiveLayer';
 import { PageCache, type SkipInfo } from '../canvas/PageCache';
@@ -76,8 +77,9 @@ export class EditorCanvas {
   readonly camera = new Camera();
   readonly layout = new PageLayout();
   readonly theme = new ThemeColors();
-  readonly geometry = new StrokeGeometry();
-  readonly strokes = new StrokePainter();
+  readonly brushes = new BrushRegistry();
+  readonly geometry = new StrokeGeometry((stroke) => this.brushes.forStroke(stroke).maxHalfWidth(stroke.s));
+  readonly strokes = new StrokePainter(this.brushes);
   readonly texts = new TextLayout(context2d(document.createElement('canvas')));
   readonly ruler = new Ruler();
   readonly history = new History();
@@ -187,6 +189,7 @@ export class EditorCanvas {
       layout: this.layout,
       session: this.session,
       geometry: this.geometry,
+      brushes: this.brushes,
       strokes: this.strokes,
       texts: this.texts,
       selection: this.selection,

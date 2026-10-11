@@ -1,3 +1,4 @@
+import { BRUSH_KINDS } from '../../core/constants';
 import type { ImageItem, Notebook, NotebookView, Page, Stroke, Subject, TextItem } from '../../core/types';
 import {
   LIMITS,
@@ -79,15 +80,21 @@ function parsePoints(raw: unknown, path: string): Float32Array {
   return out;
 }
 
+/** Strokes without `b` are ballpoint pens; only pen strokes may name a brush. */
 export function parseStroke(raw: unknown, path = 'stroke'): Stroke {
   const o = asRecord(raw, path);
-  return {
+  const stroke: Stroke = {
     id: asId(o.id, `${path}.id`),
     k: asOneOf(o.k, ['pen', 'hl'] as const, `${path}.k`),
     c: asColor(o.c, `${path}.c`),
     s: asNumber(o.s, `${path}.s`, LIMITS.strokeWidth),
     p: parsePoints(o.p, `${path}.p`),
   };
+  if (o.b !== undefined) {
+    if (stroke.k !== 'pen') throw new ValidationError(`${path}.b`, 'only pen strokes have a brush');
+    stroke.b = asOneOf(o.b, BRUSH_KINDS, `${path}.b`);
+  }
+  return stroke;
 }
 
 export function parseText(raw: unknown, path = 'text'): TextItem {

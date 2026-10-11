@@ -17,11 +17,6 @@ function line(x0: number, x1: number, y = 0, size = 2): Stroke {
 }
 
 describe('StrokeGeometry', () => {
-  it('pen width follows pressure', () => {
-    expect(StrokeGeometry.penWidth(2, 0)).toBeCloseTo(0.84);
-    expect(StrokeGeometry.penWidth(2, 1)).toBeCloseTo(2.4);
-  });
-
   it('computes and caches the bounding box with half the width as padding', () => {
     const geo = new StrokeGeometry();
     const st = line(10, 20, 5, 4);
