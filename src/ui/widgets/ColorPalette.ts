@@ -1,12 +1,14 @@
+import { COVER_COLORS } from '../../core/constants';
 import { el, replaceChildren } from '../../core/utils/dom';
 import { ColorLists } from '../../domain/ColorLists';
 import type { I18n } from '../../i18n/I18n';
 
-/** Custom colours: the recent list, the system picker and the hex field. */
+/** Custom colours: the system picker, the hex field and optionally a list of recent ones. */
 export interface CustomColorOptions {
-  recent: readonly string[];
+  /** Recent custom colours; without `recent` and `commit` there is no "Recent" row. */
+  recent?: readonly string[];
   /** A custom colour was confirmed; returns the updated recent list to show. */
-  commit(color: string): readonly string[];
+  commit?(color: string): readonly string[];
 }
 
 export interface ColorPaletteOptions {
@@ -48,6 +50,17 @@ export class ColorPalette {
     this.mark();
   }
 
+  /** The cover and subject palette (24 colours) with the system picker and the hex field. */
+  static cover(i18n: I18n, current: string, onPick: (color: string) => void): ColorPalette {
+    return new ColorPalette(i18n, {
+      colors: COVER_COLORS,
+      names: i18n.list('coverColorNames'),
+      current,
+      onPick,
+      custom: {},
+    });
+  }
+
   /** "Blue" for palette colours, "Colour #RRGGBB" for anything else. */
   static label(i18n: I18n, colors: readonly string[], names: readonly string[], color: string): string {
     const index = colors.findIndex((c) => c.toLowerCase() === color.toLowerCase());
@@ -66,7 +79,7 @@ export class ColorPalette {
 
   private customSection(custom: CustomColorOptions): HTMLElement[] {
     const t = this.i18n;
-    this.renderRecent(custom.recent);
+    if (custom.recent) this.renderRecent(custom.recent);
     const picker = el('input', {
       class: 'palette__picker-input',
       attrs: { type: 'color', value: this.pickerValue(), 'aria-label': t.t('customColor') },
@@ -91,8 +104,7 @@ export class ColorPalette {
     this.picker = picker;
     this.hex = hex;
     return [
-      el('span', { class: 'field__label' }, t.t('recentColors')),
-      this.recentRow,
+      ...(custom.recent ? [el('span', { class: 'field__label' }, t.t('recentColors')), this.recentRow] : []),
       el(
         'div',
         { class: 'palette__custom' },
@@ -124,7 +136,8 @@ export class ColorPalette {
 
   private commit(color: string, syncHex: boolean): void {
     this.pick(color, syncHex);
-    if (this.opts.custom) this.renderRecent(this.opts.custom.commit(color));
+    const commit = this.opts.custom?.commit;
+    if (commit) this.renderRecent(commit(color));
   }
 
   private pick(color: string, syncHex = true): void {

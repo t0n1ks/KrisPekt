@@ -5,7 +5,7 @@ import type { PageSizes } from '../../domain/PageSizes';
 import type { I18n } from '../../i18n/I18n';
 import type { LibraryService, NotebookDraft } from '../../services/LibraryService';
 import { BackgroundPicker } from '../widgets/BackgroundPicker';
-import { ColorRow } from '../widgets/ColorRow';
+import { ColorPalette } from '../widgets/ColorPalette';
 import { field } from '../widgets/field';
 import { SizePicker } from '../widgets/SizePicker';
 import type { DialogFactory } from './DialogFactory';
@@ -81,7 +81,7 @@ export class NotebookDialog {
       select.append(el('option', { attrs: { value: s.id, selected: s.id === draft.subjectId } }, s.name));
     }
     select.addEventListener('change', () => (draft.subjectId = select.value));
-    const colors = new ColorRow(i18n, COVER_COLORS, draft.color, (c) => (draft.color = c), false);
+    const colors = ColorPalette.cover(i18n, draft.color, (c) => (draft.color = c));
     const size = new SizePicker(i18n, sizes, draft.base.w, draft.base.h, (w, h) => (draft.base = { w, h }));
     const bg = new BackgroundPicker(i18n, draft.bg, (b) => (draft.bg = b));
     return el(

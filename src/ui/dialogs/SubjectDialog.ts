@@ -3,7 +3,7 @@ import type { Subject } from '../../core/types';
 import { el } from '../../core/utils/dom';
 import type { I18n } from '../../i18n/I18n';
 import type { LibraryService } from '../../services/LibraryService';
-import { ColorRow } from '../widgets/ColorRow';
+import { ColorPalette } from '../widgets/ColorPalette';
 import { field } from '../widgets/field';
 import type { DialogFactory } from './DialogFactory';
 import type { Toast } from './Toast';
@@ -38,7 +38,7 @@ export class SubjectDialog {
         maxlength: 60,
       },
     });
-    const colors = new ColorRow(i18n, COVER_COLORS, color, (c) => (color = c), false);
+    const colors = ColorPalette.cover(i18n, color, (c) => (color = c));
     this.deps.dialogs.sheet({
       title: subject ? i18n.t('subject') : i18n.t('newSubject'),
       body: el(

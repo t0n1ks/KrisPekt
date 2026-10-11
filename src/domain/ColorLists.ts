@@ -15,6 +15,20 @@ export class ColorLists {
     return HEX_PATTERN.test(value) ? value.toUpperCase() : null;
   }
 
+  /** Relative luminance (WCAG) of a `#RRGGBB` colour, 0 (black) to 1 (white). */
+  static luminance(hex: string): number {
+    const channel = (i: number): number => {
+      const v = (parseInt(hex.slice(i, i + 2), 16) || 0) / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+  }
+
+  /** Light enough that it needs an outline to stand out from a light background. */
+  static isLight(hex: string): boolean {
+    return ColorLists.luminance(hex) > 0.45;
+  }
+
   /** Puts `color` first, drops an earlier copy (case-insensitive) and keeps at most 8. */
   static pushRecent(list: readonly string[], color: string, max = MAX_RECENT_COLORS): string[] {
     return [color, ...list.filter((c) => !same(c, color))].slice(0, max);
