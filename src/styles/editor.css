@@ -132,6 +132,25 @@
   background: var(--dot-color);
   box-shadow: 0 0 0 2px var(--surface);
 }
+.tool-tray__badge {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  background: currentColor;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+/* pixel eraser: a dot; stroke eraser: a short line */
+.tool-tray__badge--dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.tool-tray__badge--line {
+  width: 11px;
+  height: 3px;
+  border-radius: 2px;
+  transform: rotate(-35deg);
+}
 .tool-tray__sep {
   width: 1px;
   height: 24px;
@@ -181,6 +200,10 @@
   }
   .tool-tray__swatch {
     width: 28px;
+  }
+  .tool-tray__swatch-dot {
+    width: 18px;
+    height: 18px;
   }
   .tool-tray {
     top: auto;
@@ -277,6 +300,9 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* max-height is set from the space next to the tray; long options scroll */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .popover__title {
   margin: 0;

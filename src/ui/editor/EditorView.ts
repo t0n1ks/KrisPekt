@@ -3,6 +3,7 @@ import { ZOOM_MAX, ZOOM_MIN } from '../../core/constants';
 import type { Language, Notebook, Page, Preferences, ToolKind } from '../../core/types';
 import { byId } from '../../core/utils/dom';
 import { clamp } from '../../core/utils/math';
+import { ColorLists } from '../../domain/ColorLists';
 import { PageSizePolicy } from '../../domain/PageSizePolicy';
 import type { PageSizes } from '../../domain/PageSizes';
 import { EditorCanvas, type EditorCanvasHooks } from '../../editor/EditorCanvas';
@@ -99,7 +100,9 @@ export class EditorView {
     this.topBar = new TopBar(i18n, sizes, this.topBarHandlers());
     this.tray = new ToolTray(i18n, {
       tool: (kind, button) => this.onToolButton(kind, button),
+      toolOptions: (kind) => this.openToolOptions(kind),
       swatch: (color) => this.onSwatch(color),
+      swatchMenu: (index, button) => this.openSwatchMenu(index, button),
       ruler: () => this.toggleRuler(),
     });
     this.popover = new ToolOptionsPopover(c.stage, c.camera, () => this.tray.rect(), deps.bus);
@@ -420,15 +423,53 @@ export class EditorView {
     this.tray.render(this.canvas.tools.kind, this.deps.prefs, this.canvas.ruler.on);
   }
 
+  /** A tap on a tool: select it, or, if it is active, let it react (eraser) or toggle its options. */
   private onToolButton(kind: ToolKind, button: HTMLButtonElement): void {
-    if (this.canvas.tools.kind === kind) this.popover.toggle(button, this.canvas.tools.current);
-    else this.setTool(kind);
+    const tools = this.canvas.tools;
+    if (tools.kind !== kind) {
+      this.setTool(kind);
+      return;
+    }
+    if (tools.current.onActiveTap()) this.popover.close();
+    else this.popover.toggle(button, tools.current);
+  }
+
+  /** A long press on a tool: select it if needed and open its options. */
+  private openToolOptions(kind: ToolKind): void {
+    if (this.canvas.tools.kind !== kind) this.setTool(kind);
+    const button = this.tray.buttonFor(kind);
+    if (button) this.popover.open(button, this.canvas.tools.current);
   }
 
   private onSwatch(color: string): void {
-    this.deps.prefs.pen.c = color;
+    const { prefs } = this.deps;
+    prefs.brushes[prefs.brush].c = color;
     this.deps.savePrefs();
     this.setTool('pen');
+  }
+
+  /** Long press on a pinned colour: replace it with the current pen colour, or remove it. */
+  private openSwatchMenu(index: number, button: HTMLButtonElement): void {
+    const { prefs, i18n, menu } = this.deps;
+    const current = prefs.brushes[prefs.brush].c;
+    const update = (favs: string[]): void => {
+      prefs.favs = favs;
+      this.deps.savePrefs();
+      this.renderTray();
+    };
+    menu.show(button, [
+      {
+        label: i18n.t('favReplace'),
+        swatch: current,
+        onClick: () => update(ColorLists.replace(prefs.favs, index, current)),
+      },
+      {
+        label: i18n.t('favRemove'),
+        icon: 'trash',
+        danger: true,
+        onClick: () => update(ColorLists.remove(prefs.favs, index)),
+      },
+    ]);
   }
 
   private toggleRuler(): void {

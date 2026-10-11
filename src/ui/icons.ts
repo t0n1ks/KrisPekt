@@ -9,6 +9,19 @@ const PATHS = {
   undo: '<path d="M9 5L4 10l5 5"/><path d="M4 10h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   redo: '<path d="M15 5l5 5-5 5"/><path d="M20 10H9.5a5.5 5.5 0 0 0 0 11H13"/>',
   pen: '<path d="M4 20l1.2-4.8L15.8 4.6a2 2 0 0 1 2.8 0l.8.8a2 2 0 0 1 0 2.8L8.8 18.8z"/><path d="M14 6.5l3.5 3.5"/>',
+  ballpoint:
+    '<path d="M4 20l1.2-4.8L15.8 4.6a2 2 0 0 1 2.8 0l.8.8a2 2 0 0 1 0 2.8L8.8 18.8z"/><path d="M14 6.5l3.5 3.5"/>',
+  fountain:
+    '<path d="M12 21.5l-4.6-9.2L12 2.5l4.6 9.8z"/><path d="M12 21.5v-8"/><circle cx="12" cy="11.3" r="1.5"/>',
+  fineliner:
+    '<path d="M17.2 3.2l3.6 3.6-10 10-3.6-3.6z"/><path d="M7.2 13.2L6 18l4.8-1.2"/><path d="M6 18l-2.5 2.5"/>',
+  pencil:
+    '<path d="M4 20l1.4-5L15.8 4.6l3.6 3.6L9 18.6z"/><path d="M5.4 15L9 18.6"/><path d="M13.6 6.8l3.6 3.6"/><path d="M4 20l2.2-.6-1.6-1.6z" fill="currentColor"/>',
+  brush:
+    '<path d="M20.5 3.5c-3.2 1.4-7.4 5.6-9.6 8.8l1.6 1.6c3.2-2.2 7.4-6.4 8-10.4z"/><path d="M10.2 13.2c-2.6-.2-4.4 1.4-4.6 3.8-.1 1.4-.9 2.6-2.4 2.9 3.2 1.4 7.8.6 8.4-3.2z"/>',
+  eraserPixel:
+    '<circle cx="12" cy="12" r="7.5" stroke-dasharray="2.6 2.4"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>',
+  eraserStroke: '<path d="M3 14.5c2.6-5.5 5.4-5.5 9 0s6.4 5.5 9 0"/><path d="M4.5 5l15 14"/>',
   marker:
     '<path d="M7 14.5l8.6-9.4a2 2 0 0 1 2.9-.1l.5.5a2 2 0 0 1-.1 2.9L9.5 17H7z"/><path d="M7 14.5L4.5 17v2.5H7l2.5-2.5"/><path d="M13 21h7"/>',
   eraser:

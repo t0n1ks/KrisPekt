@@ -27,6 +27,11 @@ export class ToolOptionsPopover {
       this.close();
       return;
     }
+    this.open(anchor, tool);
+  }
+
+  /** Opens the tool's options (replacing any open popover). */
+  open(anchor: HTMLElement, tool: Tool): void {
     this.close();
     const node = el(
       'div',
@@ -39,14 +44,20 @@ export class ToolOptionsPopover {
     this.place(node, anchor);
   }
 
+  /**
+   * Places the card next to the tray and limits its height to the space on that side; longer
+   * options (the pen's palette) scroll inside the card.
+   */
   private place(node: HTMLDivElement, anchor: HTMLElement): void {
     const stage = this.stage.getBoundingClientRect();
     const tray = this.trayRect();
     const a = anchor.getBoundingClientRect();
+    const trayAtBottom = tray.top - stage.top > this.camera.height / 2;
+    const room = trayAtBottom ? tray.top - stage.top - 22 : stage.bottom - tray.bottom - 22;
+    node.style.maxHeight = Math.max(160, room) + 'px';
     const w = node.offsetWidth;
     const h = node.offsetHeight;
     const left = clamp(a.left + a.width / 2 - stage.left - w / 2, 12, this.camera.width - w - 12);
-    const trayAtBottom = tray.top - stage.top > this.camera.height / 2;
     node.style.left = left + 'px';
     node.style.top = (trayAtBottom ? tray.top - stage.top - h - 10 : tray.bottom - stage.top + 10) + 'px';
   }
