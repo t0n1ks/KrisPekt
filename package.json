@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -18,11 +18,12 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.64.0",
+    "@types/node": "24.19.2",
     "eslint": "10.12.0",
     "fake-indexeddb": "6.2.5",
     "globals": "17.13.0",
@@ -40,5 +41,8 @@
     "@fontsource/unbounded": "5.3.0",
     "jspdf": "4.2.1",
     "pdfjs-dist": "6.4.299"
+  },
+  "overrides": {
+    "rollup": "npm:@rollup/wasm-node@4.64.5"
   }
 }
