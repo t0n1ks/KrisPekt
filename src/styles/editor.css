@@ -391,3 +391,8 @@
   width: 34px;
   height: 34px;
 }
+.popover__content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
