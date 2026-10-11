@@ -1,4 +1,4 @@
-import type { Background, Language, Preferences } from './types';
+import type { Background, BrushKind, Language, PenPrefs, Preferences } from './types';
 
 /* ---------- units and layout ---------- */
 
@@ -67,17 +67,64 @@ export const COVER_COLORS = [
   '#1E8C93',
   '#B5527A',
 ] as const;
+/**
+ * Pen palette: a 6 × 5 grid in reading order. Columns are hues (blue, red, green, purple,
+ * orange, teal), the first four rows go from deep to bright, the last row is neutral from black
+ * to light grey. Every colour stays readable on white paper. Names: `penColorNames`.
+ */
 export const PEN_COLORS = [
+  '#172554',
+  '#7F1D1D',
+  '#14532D',
+  '#4C1D95',
+  '#7C2D12',
+  '#134E4A',
   '#1E40AF',
-  '#16181D',
   '#C81E2C',
   '#15803D',
   '#7C3AED',
   '#C2410C',
   '#0E7490',
+  '#2563EB',
+  '#E11D48',
+  '#16A34A',
+  '#9333EA',
+  '#EA580C',
+  '#0891B2',
+  '#3B82F6',
+  '#EF4444',
+  '#65A30D',
+  '#C026D3',
+  '#D97706',
+  '#0D9488',
+  '#000000',
+  '#16181D',
+  '#374151',
+  '#4B5563',
   '#6B7280',
+  '#9CA3AF',
 ] as const;
-export const HL_COLORS = ['#FDE047', '#86EFAC', '#F9A8D4', '#7DD3FC', '#FDBA74'] as const;
+/** Highlighter palette: six neon colours, then their pastel versions. Names: `hlColorNames`. */
+export const HL_COLORS = [
+  '#FDE047',
+  '#4ADE80',
+  '#F472B6',
+  '#38BDF8',
+  '#FB923C',
+  '#C084FC',
+  '#FEF08A',
+  '#86EFAC',
+  '#F9A8D4',
+  '#7DD3FC',
+  '#FDBA74',
+  '#D8B4FE',
+] as const;
+/** Swatch columns of the pen and highlighter palettes. */
+export const PALETTE_COLUMNS = 6;
+/** Pinned colours in the tray. */
+export const MAX_FAVORITES = 5;
+/** Custom colours remembered per tool. */
+export const MAX_RECENT_COLORS = 8;
 export const BACKGROUNDS: readonly Background[] = ['plain', 'grid', 'gridm', 'lines', 'dots'];
 
 /* ---------- languages ---------- */
@@ -107,12 +154,42 @@ export const PREFS_KEY = 'konspektnik.prefs.v1';
 export const BACKUP_APP = 'krispekt';
 export const BACKUP_APP_LEGACY = 'konspektnik';
 
+/* ---------- pen brushes ---------- */
+
+/** Brush ids in the order shown in the pen options. */
+export const BRUSH_KINDS: readonly BrushKind[] = ['ballpoint', 'fountain', 'fineliner', 'pencil', 'brush'];
+
+export interface BrushSpec {
+  /** Colour and size a brush starts with. */
+  defaults: PenPrefs;
+  /** Size slider range in world px. */
+  min: number;
+  max: number;
+  step: number;
+}
+
+export const BRUSH_SPECS: Record<BrushKind, BrushSpec> = {
+  ballpoint: { defaults: { c: '#1E40AF', s: 2 }, min: 0.6, max: 8, step: 0.1 },
+  fountain: { defaults: { c: '#172554', s: 2.4 }, min: 0.8, max: 10, step: 0.1 },
+  fineliner: { defaults: { c: '#16181D', s: 1.2 }, min: 0.4, max: 6, step: 0.1 },
+  pencil: { defaults: { c: '#4B5563', s: 1.6 }, min: 0.6, max: 6, step: 0.1 },
+  brush: { defaults: { c: '#16181D', s: 4 }, min: 1, max: 20, step: 0.5 },
+};
+
 export const DEFAULT_PREFS: Preferences = {
-  pen: { c: '#1E40AF', s: 2 },
+  brush: 'ballpoint',
+  brushes: {
+    ballpoint: { ...BRUSH_SPECS.ballpoint.defaults },
+    fountain: { ...BRUSH_SPECS.fountain.defaults },
+    fineliner: { ...BRUSH_SPECS.fineliner.defaults },
+    pencil: { ...BRUSH_SPECS.pencil.defaults },
+    brush: { ...BRUSH_SPECS.brush.defaults },
+  },
   hl: { c: '#FDE047', s: 18 },
   er: { mode: 'part', r: 16 },
   txt: { fs: 18, c: '#16181D' },
   favs: ['#1E40AF', '#16181D', '#C81E2C'],
+  recent: { pen: [], hl: [] },
   fingerDraw: true,
   fingerSet: false,
   straighten: true,
@@ -133,6 +210,8 @@ export const PALM_REJECT_MS = 500;
 export const PAN_REVOKE_MS = 400;
 /** Holding the stylus still this long straightens the line. */
 export const STRAIGHTEN_HOLD_MS = 650;
+/** Holding a tray button this long opens its menu or options instead of a tap action. */
+export const LONG_PRESS_MS = 500;
 /** Two-finger tap → undo, when shorter than this … */
 export const TWO_FINGER_TAP_MS = 300;
 /** … and moving less than this many px. */

@@ -89,6 +89,7 @@ describe('I18n', () => {
   });
 
   it('returns lists', () => {
-    expect(new I18n('en').list('colors')).toHaveLength(8);
+    expect(new I18n('en').list('penColorNames')).toHaveLength(30);
+    expect(new I18n('de').list('hlColorNames')).toHaveLength(12);
   });
 });

@@ -67,12 +67,43 @@ describe('PreferencesStore', () => {
       }),
     );
     const prefs = new PreferencesStore(localStorage).load();
-    expect(prefs.pen).toEqual({ c: '#123456', s: 8 });
+    // Preferences from before brushes: the single pen becomes the ballpoint.
+    expect(prefs.brush).toBe('ballpoint');
+    expect(prefs.brushes.ballpoint).toEqual({ c: '#123456', s: 8 });
+    expect(prefs.brushes.fountain).toEqual(DEFAULT_PREFS.brushes.fountain);
     expect(prefs.hl).toEqual(DEFAULT_PREFS.hl);
     expect(prefs.er).toEqual({ mode: 'whole', r: 16 });
-    expect(prefs.favs).toEqual(['#111111', '#222222', '#333333']);
+    expect(prefs.favs).toEqual(['#111111', '#222222', '#333333', '#444444']);
     expect(prefs.lang).toBe('de');
     expect(prefs.fingerDraw).toBe(true);
+  });
+
+  it('validates brushes, favourites and recent colours', () => {
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({
+        brush: 'pencil',
+        brushes: { pencil: { c: '#ABCDEF', s: 0.01 }, brush: { c: 'red', s: 12 }, quill: { c: '#000000' } },
+        favs: ['#000001', '#000002', '#000003', '#000004', '#000005', '#000006'],
+        recent: {
+          pen: Array.from({ length: 12 }, (_, i) => `#00000${i.toString(16)}`),
+          hl: ['bad', '#FDE047'],
+        },
+      }),
+    );
+    const prefs = new PreferencesStore(localStorage).load();
+    expect(prefs.brush).toBe('pencil');
+    expect(prefs.brushes.pencil).toEqual({ c: '#ABCDEF', s: 0.6 });
+    expect(prefs.brushes.brush).toEqual({ c: DEFAULT_PREFS.brushes.brush.c, s: 12 });
+    expect(Object.keys(prefs.brushes)).not.toContain('quill');
+    expect(prefs.favs).toHaveLength(5);
+    expect(prefs.recent.pen).toHaveLength(8);
+    expect(prefs.recent.hl).toEqual(['#FDE047']);
+  });
+
+  it('falls back to the ballpoint for an unknown brush', () => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ brush: 'quill' }));
+    expect(new PreferencesStore(localStorage).load().brush).toBe('ballpoint');
   });
 
   it('survives corrupt JSON', () => {

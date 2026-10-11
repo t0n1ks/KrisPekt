@@ -4,6 +4,7 @@ import { clamp } from '../../core/utils/math';
 import type { I18n } from '../../i18n/I18n';
 import type { Menu } from '../dialogs/Menu';
 import { icon, type IconName } from '../icons';
+import { ColorPalette } from '../widgets/ColorPalette';
 
 export interface SelectionBarHandlers {
   recolor(color: string): void;
@@ -56,16 +57,18 @@ export class SelectionBar {
     this.node.style.top = y + 'px';
   }
 
+  /** The full pen palette as a compact grid; picking a colour recolours and closes it. */
   private openColors(anchor: HTMLElement): void {
-    const names = this.i18n.list('colors');
-    this.menu.show(
-      anchor,
-      PEN_COLORS.map((c, i) => ({
-        label: names[i] ?? c,
-        swatch: c,
-        onClick: () => this.handlers.recolor(c),
-      })),
-    );
+    const palette = new ColorPalette(this.i18n, {
+      colors: PEN_COLORS,
+      names: this.i18n.list('penColorNames'),
+      current: '',
+      onPick: (c) => {
+        this.menu.close();
+        this.handlers.recolor(c);
+      },
+    });
+    this.menu.showContent(anchor, palette.node, this.i18n.t('color'));
   }
 
   private button(name: IconName, label: string, onClick: () => void, danger = false): HTMLButtonElement {

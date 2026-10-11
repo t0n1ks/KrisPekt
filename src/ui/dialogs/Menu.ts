@@ -34,11 +34,23 @@ export class Menu {
 
   /** Opens a menu below (or above, if there is no room) `anchor`, right-aligned with it. */
   show(anchor: Element, entries: readonly MenuEntry[]): void {
-    this.close();
-    this.bus.emit('menu-opened', undefined);
     const menu = el('div', { class: 'menu', attrs: { role: 'menu' } });
     for (const entry of entries)
       menu.append(entry === '-' ? el('hr', { class: 'menu__sep' }) : this.item(entry));
+    this.open(anchor, menu);
+  }
+
+  /** Opens arbitrary content (such as a colour grid) in a menu card anchored like {@link show}. */
+  showContent(anchor: Element, content: HTMLElement, label: string): void {
+    this.open(
+      anchor,
+      el('div', { class: 'menu menu--content', attrs: { role: 'dialog', 'aria-label': label } }, content),
+    );
+  }
+
+  private open(anchor: Element, menu: HTMLDivElement): void {
+    this.close();
+    this.bus.emit('menu-opened', undefined);
     document.body.append(menu);
     const r = anchor.getBoundingClientRect();
     const mw = menu.offsetWidth;

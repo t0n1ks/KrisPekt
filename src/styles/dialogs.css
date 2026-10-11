@@ -129,6 +129,9 @@
   padding: 6px;
   box-shadow: 0 22px 50px -20px var(--shadow);
 }
+.menu--content {
+  min-width: 0;
+}
 .menu__item {
   display: flex;
   align-items: center;

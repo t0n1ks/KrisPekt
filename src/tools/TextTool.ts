@@ -1,7 +1,8 @@
 import { PEN_COLORS } from '../core/constants';
 import type { Page, Point, ToolKind } from '../core/types';
 import { el } from '../core/utils/dom';
-import { ColorRow } from '../ui/widgets/ColorRow';
+import { ColorLists } from '../domain/ColorLists';
+import { ColorPalette } from '../ui/widgets/ColorPalette';
 import { Segmented } from '../ui/widgets/Segmented';
 import { Tool } from './Tool';
 
@@ -81,9 +82,23 @@ export class TextTool extends Tool {
         this.ctx.savePrefs();
       },
     );
-    const colors = new ColorRow(i18n, PEN_COLORS, prefs.txt.c, (c) => {
-      prefs.txt.c = c;
-      this.ctx.savePrefs();
+    // Text shares the pen palette and the pen's recent custom colours.
+    const colors = new ColorPalette(i18n, {
+      colors: PEN_COLORS,
+      names: i18n.list('penColorNames'),
+      current: prefs.txt.c,
+      onPick: (c) => {
+        prefs.txt.c = c;
+        this.ctx.savePrefs();
+      },
+      custom: {
+        recent: prefs.recent.pen,
+        commit: (c) => {
+          prefs.recent.pen = ColorLists.pushRecent(prefs.recent.pen, c);
+          this.ctx.savePrefs();
+          return prefs.recent.pen;
+        },
+      },
     });
     return el(
       'div',
