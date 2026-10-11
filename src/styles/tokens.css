@@ -1,0 +1,108 @@
+/*
+ * Design tokens: every colour, font, radius and shadow used by the UI.
+ * Components reference these variables only. The paper colours drawn on the
+ * canvas itself live in src/core/constants.ts.
+ */
+:root {
+  /* surfaces and text */
+  --desk: #e3e7ed;
+  --surface: #ffffff;
+  --surface-2: #f0f2f6;
+  --line: #d2d8e1;
+  --fg: #171c26;
+  --muted: #596273;
+  --accent: #2343b0;
+  --accent-soft: #e2e8fb;
+  --accent-fg: #ffffff;
+  --danger: #c22a36;
+  --warn-soft: #fbebd1;
+  --warn-fg: #7d4c00;
+  --scrim: rgba(16, 22, 34, 0.44);
+  --shadow: rgba(22, 32, 52, 0.18);
+  --ruler: rgba(255, 255, 255, 0.82);
+  --page-label: #7a8494;
+
+  /* typography */
+  --f-display: 'Unbounded', 'Onest', system-ui, sans-serif;
+  --f-body: 'Onest', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* radii */
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 10px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-sheet: 18px;
+  --r-pill: 999px;
+  --r-cover: 3px 9px 9px 3px;
+
+  /* shadows */
+  --shadow-sheet: rgba(0, 0, 0, 0.5);
+  --hairline: rgba(0, 0, 0, 0.18);
+  --hairline-strong: rgba(0, 0, 0, 0.2);
+
+  /* notebook covers (identical in both themes: they imitate printed paper) */
+  --cover-near-shadow: rgba(0, 0, 0, 0.14);
+  --cover-spine: rgba(0, 0, 0, 0.2);
+  --cover-sheen: rgba(255, 255, 255, 0.14);
+  --cover-label-bg: #fafaf6;
+  --cover-label-fg: #1e2330;
+  --cover-label-edge: rgba(0, 0, 0, 0.1);
+  --cover-kicker: #69707f;
+  --cover-sub: #5a6170;
+  --cover-rule: #d8dbe2;
+  --badge-bg: rgba(255, 255, 255, 0.92);
+
+  /* white paper and the overlay colour drawn on it (same in both themes) */
+  --paper: #ffffff;
+  --paper-ui: #2343b0;
+  --paper-grid: #bccde3;
+  --paper-margin: #e47f86;
+  --paper-lines: #b7c9e2;
+  --paper-dots: #93a9c6;
+
+  /* custom colour picker swatch */
+  --rainbow: conic-gradient(#e53935, #fdd835, #43a047, #1e88e5, #8e24aa, #e53935);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --desk: #111418;
+    --surface: #1b1f26;
+    --surface-2: #252a33;
+    --line: #323944;
+    --fg: #e6e9ef;
+    --muted: #9aa3b2;
+    --accent: #8ba7ff;
+    --accent-soft: #25304a;
+    --accent-fg: #0c1226;
+    --danger: #ff6f79;
+    --warn-soft: #3a2e1b;
+    --warn-fg: #f3c47e;
+    --scrim: rgba(0, 0, 0, 0.62);
+    --shadow: rgba(0, 0, 0, 0.55);
+    --ruler: rgba(34, 39, 48, 0.86);
+    --page-label: #7d8696;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --desk: #111418;
+  --surface: #1b1f26;
+  --surface-2: #252a33;
+  --line: #323944;
+  --fg: #e6e9ef;
+  --muted: #9aa3b2;
+  --accent: #8ba7ff;
+  --accent-soft: #25304a;
+  --accent-fg: #0c1226;
+  --danger: #ff6f79;
+  --warn-soft: #3a2e1b;
+  --warn-fg: #f3c47e;
+  --scrim: rgba(0, 0, 0, 0.62);
+  --shadow: rgba(0, 0, 0, 0.55);
+  --ruler: rgba(34, 39, 48, 0.86);
+  --page-label: #7d8696;
+  color-scheme: dark;
+}

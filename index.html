@@ -6,7 +6,66 @@
     <title>KrisPekt</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <section class="library" id="library">
+        <div class="library__inner">
+          <div class="library__head">
+            <div>
+              <h1 class="library__brand">KrisPekt</h1>
+              <p class="library__subtitle" id="libSub"></p>
+            </div>
+            <div class="library__actions">
+              <button class="btn" id="btnAddSubject" type="button"></button>
+              <button class="btn btn--primary" id="btnAddNb" type="button"></button>
+              <button class="pill" id="btnLang" type="button"></button>
+              <button class="icon-btn" id="btnLibMore" type="button"></button>
+            </div>
+          </div>
+          <label class="search" for="q"
+            ><span id="searchIc"></span><input class="search__input" id="q" type="search" autocomplete="off"
+          /></label>
+          <div id="libWarn"></div>
+          <div id="libList"></div>
+        </div>
+      </section>
+
+      <section class="editor" id="editor" hidden>
+        <header class="top-bar">
+          <button class="icon-btn" id="btnBack" type="button"></button>
+          <button class="top-bar__title" id="btnTitle" type="button">
+            <b class="top-bar__title-main" id="edTitle"></b
+            ><span class="top-bar__title-sub" id="edSub"></span>
+          </button>
+          <button class="pill pill--zoom" id="btnZoom" type="button"></button>
+          <button class="pill" id="btnLock" type="button"></button>
+          <button class="pill" id="btnPages" type="button"></button>
+          <button class="icon-btn" id="btnUndo" type="button"></button>
+          <button class="icon-btn" id="btnRedo" type="button"></button>
+          <button class="icon-btn" id="btnEdMore" type="button"></button>
+        </header>
+        <div class="stage" id="stage">
+          <canvas class="stage__canvas" id="cv"></canvas>
+          <canvas class="stage__canvas stage__canvas--live" id="live"></canvas>
+          <div class="ruler" id="ruler" hidden>
+            <canvas class="ruler__canvas"></canvas><span class="ruler__angle">0°</span>
+          </div>
+          <textarea class="text-editor" id="textEd" hidden spellcheck="true"></textarea>
+          <div class="selection-bar" id="selbar" hidden></div>
+          <div class="tool-tray" id="tray" role="toolbar"></div>
+          <button class="fab" id="fab" type="button"></button>
+          <aside class="pages-panel" id="panel" hidden>
+            <div class="pages-panel__head">
+              <h2 class="pages-panel__title" id="panelTitle"></h2>
+              <button class="icon-btn" id="panelClose" type="button"></button>
+            </div>
+            <div class="pages-panel__list" id="plist"></div>
+            <div class="pages-panel__foot">
+              <button class="btn btn--wide" id="panelAdd" type="button"></button>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
