@@ -1,0 +1,5 @@
+# False positives: the localStorage key name 'konspektnik.prefs.v1' (not a secret).
+80f5e4d1896577d46c6798ea1715af7595c78725:src/core/constants.ts:generic-api-key:106
+e05bb6d75c6c4d2b163770cf3c212886cb0c5795:reference/prototype.html:generic-api-key:384
+src/core/constants.ts:generic-api-key:106
+reference/prototype.html:generic-api-key:384
