@@ -53,6 +53,8 @@ export default tseslint.config(
       eqeqeq: ['error', 'smart'],
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
+      // Pure domain rules are grouped as static methods on a class (one class per file).
+      '@typescript-eslint/no-extraneous-class': ['error', { allowStaticOnly: true }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-restricted-syntax': ['error', ...htmlSinks],
     },
