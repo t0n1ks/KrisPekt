@@ -3,12 +3,15 @@ import type { EraserMode, Point, Stroke, ToolKind } from '../core/types';
 import { el } from '../core/utils/dom';
 import type { LiveLayer } from '../canvas/LiveLayer';
 import { StrokeGeometry } from '../canvas/StrokeGeometry';
+import { EraserModes } from '../domain/EraserModes';
+import { icon } from '../ui/icons';
 import { Segmented } from '../ui/widgets/Segmented';
 import { Tool } from './Tool';
 
 /**
- * Eraser: cuts away the part of strokes under the cursor, or removes whole strokes it
- * touches. Each page touched during one drag gets a single undo step.
+ * Eraser with two modes: the pixel eraser cuts away the part of strokes under the cursor, the
+ * stroke eraser removes whole strokes it touches. Both use each brush's real ink width. Each
+ * page touched during one drag gets a single undo step.
  */
 export class EraserTool extends Tool {
   readonly kind: ToolKind = 'eraser';
@@ -87,12 +90,14 @@ export class EraserTool extends Tool {
         out?.push(st);
         continue;
       }
+      const brush = this.ctx.brushes.forStroke(st);
       if (mode === 'whole') {
-        if (StrokeGeometry.hit(st, x, y, r)) out ??= strokes.slice(0, i);
+        if (StrokeGeometry.hit(st, x, y, r, brush.maxHalfWidth(st.s))) out ??= strokes.slice(0, i);
         else out?.push(st);
         continue;
       }
-      const parts = StrokeGeometry.split(st, x, y, r, this.ctx.makeId);
+      const margin = (pressure: number): number => brush.eraseMargin(st.s, pressure);
+      const parts = StrokeGeometry.split(st, x, y, r, this.ctx.makeId, margin);
       if (parts) {
         out ??= strokes.slice(0, i);
         out.push(...parts);
@@ -114,6 +119,16 @@ export class EraserTool extends Tool {
     ctx.stroke();
   }
 
+  /** Tapping the active eraser switches between the pixel and the stroke eraser. */
+  override onActiveTap(): boolean {
+    const { prefs, i18n } = this.ctx;
+    prefs.er.mode = EraserModes.toggle(prefs.er.mode);
+    this.ctx.savePrefs();
+    this.ctx.refreshTray();
+    this.ctx.toast(i18n.t(prefs.er.mode === 'part' ? 'erasePart' : 'eraseWhole'), 1400);
+    return true;
+  }
+
   createOptionsPanel(): HTMLElement {
     const { i18n, prefs } = this.ctx;
     const range = el('input', {
@@ -133,14 +148,16 @@ export class EraserTool extends Tool {
     });
     const mode = new Segmented<EraserMode>(
       [
-        { v: 'part', label: i18n.t('erasePart') },
-        { v: 'whole', label: i18n.t('eraseWhole') },
+        { v: 'part', label: i18n.t('erasePart'), icon: icon('eraserPixel', 26) },
+        { v: 'whole', label: i18n.t('eraseWhole'), icon: icon('eraserStroke', 26) },
       ],
       prefs.er.mode,
       (v) => {
         prefs.er.mode = v;
         this.ctx.savePrefs();
+        this.ctx.refreshTray();
       },
+      true,
     );
     const clear = el(
       'button',
@@ -152,6 +169,7 @@ export class EraserTool extends Tool {
       { class: 'popover__content' },
       el('h3', { class: 'popover__title' }, i18n.t('eraser')),
       mode.node,
+      el('p', { class: 'hint' }, i18n.t('eraserHint')),
       el('div', { class: 'field' }, el('span', { class: 'field__label' }, i18n.t('size')), range),
       clear,
     );

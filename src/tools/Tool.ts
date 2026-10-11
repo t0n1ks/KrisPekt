@@ -67,6 +67,14 @@ export abstract class Tool implements OverlayPainter {
     /* optional */
   }
 
+  /**
+   * The tray button of this tool was tapped while the tool is already active. Returns true if
+   * the tool handled it (the eraser switches modes); otherwise the options popover opens.
+   */
+  onActiveTap(): boolean {
+    return false;
+  }
+
   /** Contents of the options popover shown when the active tool is tapped again. */
   abstract createOptionsPanel(): HTMLElement;
 

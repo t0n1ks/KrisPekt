@@ -1,15 +1,21 @@
 import type { LiveLayer, OverlayPainter } from '../canvas/LiveLayer';
 import type { Point, Preferences, ToolKind } from '../core/types';
+import { EraserModes } from '../domain/EraserModes';
 import type { DrawingTarget } from '../input/InputRouter';
 import type { Tool } from './Tool';
 
 /**
  * Holds the tools and forwards input to the active one. Implements the drawing side of the
  * input router, so routing code never needs to know which tool is selected.
+ *
+ * A stylus pressed with its eraser end or eraser button erases (in the current eraser mode)
+ * for that one operation, whatever tool is selected.
  */
 export class ToolManager implements DrawingTarget, OverlayPainter {
   private readonly tools: Map<ToolKind, Tool>;
   private active: Tool;
+  /** The tool running the operation in progress when it is not the selected one. */
+  private temporary: Tool | null = null;
 
   constructor(
     tools: readonly Tool[],
@@ -34,17 +40,23 @@ export class ToolManager implements DrawingTarget, OverlayPainter {
   select(kind: ToolKind): void {
     const tool = this.tools.get(kind);
     if (!tool) return;
-    if (this.active.activePointer !== null) this.active.onPointerCancel();
+    if (this.operating.activePointer !== null) this.operating.onPointerCancel();
+    this.temporary = null;
     this.active = tool;
     this.onChange(tool);
   }
 
+  /** The tool that receives pointer events of the operation in progress. */
+  private get operating(): Tool {
+    return this.temporary ?? this.active;
+  }
+
   get activePointer(): number | null {
-    return this.active.activePointer;
+    return this.operating.activePointer;
   }
 
   get activeByTouch(): boolean {
-    return this.active.activeByTouch;
+    return this.operating.activeByTouch;
   }
 
   /** Fingers draw when finger drawing is on, or where the tool itself wants touch (selection drag). */
@@ -53,23 +65,29 @@ export class ToolManager implements DrawingTarget, OverlayPainter {
   }
 
   begin(e: PointerEvent, pt: Point): void {
-    this.active.onPointerDown(e, pt);
+    const eraser = this.tools.get('eraser');
+    this.temporary = EraserModes.isStylusEraser(e) && eraser && eraser !== this.active ? eraser : null;
+    this.operating.onPointerDown(e, pt);
+    if (this.temporary && this.temporary.activePointer === null) this.temporary = null;
   }
 
   move(e: PointerEvent): void {
-    this.active.onPointerMove(e);
+    this.operating.onPointerMove(e);
   }
 
   end(e: PointerEvent): void {
-    this.active.onPointerUp(e);
+    this.operating.onPointerUp(e);
+    this.temporary = null;
   }
 
   cancel(): void {
-    this.active.onPointerCancel();
+    this.operating.onPointerCancel();
+    this.temporary = null;
   }
 
   interrupt(): void {
-    this.active.onInterrupt();
+    this.operating.onInterrupt();
+    if (this.temporary?.activePointer === null) this.temporary = null;
   }
 
   tap(pt: Point): void {
@@ -77,6 +95,6 @@ export class ToolManager implements DrawingTarget, OverlayPainter {
   }
 
   renderOverlay(ctx: CanvasRenderingContext2D, live: LiveLayer): void {
-    this.active.renderOverlay(ctx, live);
+    this.operating.renderOverlay(ctx, live);
   }
 }
