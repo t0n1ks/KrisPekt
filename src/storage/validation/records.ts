@@ -63,6 +63,7 @@ export function parseNotebook(raw: unknown, path = 'notebook'): Notebook {
     view: parseView(o.view, `${path}.view`),
   };
   if (o.sample !== undefined) notebook.sample = asBoolean(o.sample, `${path}.sample`);
+  if (o.order !== undefined) notebook.order = asNumber(o.order, `${path}.order`, LIMITS.order);
   return notebook;
 }
 

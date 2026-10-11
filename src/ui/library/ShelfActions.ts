@@ -1,4 +1,4 @@
-import type { Language, Notebook, Subject } from '../../core/types';
+import type { AutoBackupInterval, Language, Notebook, Subject } from '../../core/types';
 import type { I18n } from '../../i18n/I18n';
 import type { LibraryService } from '../../services/LibraryService';
 import type { DialogFactory } from '../dialogs/DialogFactory';
@@ -22,6 +22,7 @@ export interface ShelfActionsDeps {
   openNotebook: (nb: Notebook) => void;
   exportPdf: (nb: Notebook) => void;
   setLanguage: (language: Language) => void;
+  setAutoBackup: (interval: AutoBackupInterval) => void;
   rerender: () => void;
   onError: (error: unknown) => void;
 }
@@ -95,5 +96,31 @@ export class ShelfActions implements LibraryActions {
 
   setLanguage(language: Language): void {
     this.deps.setLanguage(language);
+  }
+
+  setAutoBackup(interval: AutoBackupInterval): void {
+    this.deps.setAutoBackup(interval);
+  }
+
+  moveSubject(subject: Subject, delta: -1 | 1): void {
+    void this.persistOrder(() => this.deps.library.moveSubject(subject, delta));
+  }
+
+  reorderSubjects(ids: readonly string[]): void {
+    void this.persistOrder(() => this.deps.library.reorderSubjects(ids));
+  }
+
+  moveNotebook(nb: Notebook, delta: -1 | 1): void {
+    void this.persistOrder(() => this.deps.library.moveNotebook(nb, delta));
+  }
+
+  /** Saves a new order at once and redraws the shelf (also after a failed write). */
+  private async persistOrder(write: () => Promise<void>): Promise<void> {
+    try {
+      await write();
+    } catch (error) {
+      this.deps.onError(error);
+    }
+    this.deps.rerender();
   }
 }

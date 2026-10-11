@@ -29,6 +29,39 @@
   color: var(--muted);
   font-size: 13.5px;
 }
+.library__backup {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+/* old backup and unsaved changes */
+.library__backup--stale {
+  color: var(--warn-fg);
+  font-weight: 600;
+}
+
+/* shown after an automatic backup */
+.backup-banner {
+  margin-top: 16px;
+  padding: 10px 10px 10px 14px;
+  border-radius: var(--r-lg);
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.backup-banner__text {
+  margin: 0;
+  flex: 1 1 220px;
+  font-size: 14px;
+}
+.backup-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
 .library__actions {
   margin-left: auto;
   display: flex;
@@ -133,6 +166,42 @@
   margin-left: auto;
 }
 
+/* subject reordering */
+.subject__handle {
+  width: 32px;
+  height: 36px;
+  margin-right: -6px;
+  color: var(--muted);
+  cursor: grab;
+  /* the handle itself never scrolls the page: a long press starts the drag */
+  touch-action: none;
+}
+.subject--dragging {
+  position: fixed;
+  z-index: 20;
+  margin: 0;
+  padding: 8px 12px 12px;
+  background: var(--desk);
+  border-radius: var(--r-xl);
+  box-shadow: 0 24px 48px -20px var(--shadow);
+  opacity: 0.94;
+}
+.subject--dragging .subject__handle {
+  cursor: grabbing;
+}
+.subject-placeholder {
+  margin-top: 34px;
+  border: 2px dashed var(--line);
+  border-radius: var(--r-xl);
+}
+.library__list--dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.subject__spine--light {
+  box-shadow: inset 0 0 0 1px var(--swatch-ring);
+}
+
 .shelf {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
@@ -195,6 +264,11 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(120deg, var(--cover-sheen), transparent 45%);
+}
+.notebook-card__cover--light {
+  /* a very light cover still shows its edge on a light desk */
+  outline: 1px solid var(--swatch-ring);
+  outline-offset: -1px;
 }
 .notebook-card__cover:hover {
   transform: translateY(-2px);

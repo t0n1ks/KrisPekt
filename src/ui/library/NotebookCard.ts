@@ -2,15 +2,31 @@ import type { Notebook, Subject } from '../../core/types';
 import { el } from '../../core/utils/dom';
 import { formatDate } from '../../core/utils/format';
 import type { I18n } from '../../i18n/I18n';
-import type { Menu } from '../dialogs/Menu';
+import { ColorLists } from '../../domain/ColorLists';
+import type { Menu, MenuEntry } from '../dialogs/Menu';
 import { icon } from '../icons';
 import type { LibraryActions } from './LibraryActions';
+
+/** Where a card sits among its subject's notebooks (for the "up" / "down" menu items). */
+export interface CardPosition {
+  isFirst: boolean;
+  isLast: boolean;
+  /** False while searching: the shelf cannot be reordered then. */
+  canMove: boolean;
+}
 
 /** A notebook on the shelf: a school-notebook cover with a paper label, and a meta line with a ⋯ menu. */
 export class NotebookCard {
   readonly node: HTMLDivElement;
 
-  constructor(nb: Notebook, subject: Subject, i18n: I18n, menu: Menu, actions: LibraryActions) {
+  constructor(
+    nb: Notebook,
+    subject: Subject,
+    position: CardPosition,
+    i18n: I18n,
+    menu: Menu,
+    actions: LibraryActions,
+  ) {
     const more = el(
       'button',
       {
@@ -19,11 +35,17 @@ export class NotebookCard {
       },
       icon('more', 20),
     );
+    const moves: MenuEntry[] = [];
+    if (position.canMove && !position.isFirst)
+      moves.push({ label: i18n.t('up'), icon: 'up', onClick: () => actions.moveNotebook(nb, -1) });
+    if (position.canMove && !position.isLast)
+      moves.push({ label: i18n.t('down'), icon: 'down', onClick: () => actions.moveNotebook(nb, 1) });
     more.addEventListener('click', () =>
       menu.show(more, [
         { label: i18n.t('open'), icon: 'page', onClick: () => actions.openNotebook(nb) },
         { label: i18n.t('nbSettings'), icon: 'edit', onClick: () => actions.editNotebook(nb) },
         { label: i18n.t('savePdf'), icon: 'download', onClick: () => actions.exportPdf(nb) },
+        ...moves,
         '-',
         {
           label: i18n.t('deleteNotebook'),
@@ -36,7 +58,8 @@ export class NotebookCard {
     const cover = el(
       'button',
       {
-        class: 'notebook-card__cover',
+        // Very light covers get a visible edge on light backgrounds.
+        class: 'notebook-card__cover' + (ColorLists.isLight(nb.color) ? ' notebook-card__cover--light' : ''),
         attrs: { type: 'button', 'aria-label': i18n.t('openNb', { n: nb.title }) },
         style: { '--cover-color': nb.color },
         on: { click: () => actions.openNotebook(nb) },

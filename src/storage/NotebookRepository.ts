@@ -39,6 +39,7 @@ export class NotebookRepository {
       view: nb.view ? { pageId: nb.view.pageId, z: nb.view.z } : null,
     };
     if (nb.sample) record.sample = true;
+    if (nb.order !== undefined) record.order = nb.order;
     return record;
   }
 }
