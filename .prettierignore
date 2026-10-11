@@ -1,0 +1,11 @@
+dist/
+dev-dist/
+coverage/
+playwright-report/
+test-results/
+reference/
+package-lock.json
+INSTRUCTIONS_FOR_CLAUDE.md
+TZ_KrisPekt_GitHub_Pages.md
+CLAUDE.md
+LICENSE

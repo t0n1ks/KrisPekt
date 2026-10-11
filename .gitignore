@@ -1,0 +1,52 @@
+# Dependencies and build output
+node_modules/
+dist/
+dev-dist/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.vite/
+.cache/
+.eslintcache
+*.tsbuildinfo
+
+# Secrets (the app needs none)
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Personal data: backups, documents, photos, exports
+krispekt-*.json
+konspekty-*.json
+konspektnik-*.json
+*.pdf
+*.jpg
+*.jpeg
+*.heic
+screenshots/
+exports/
+
+# Editor, OS and tool clutter
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log
+*.tmp
+*.local
+*.swp
+
+# Throwaway scripts and scratch files
+scripts/tmp/
+scratch/
+tools/gen-icons.*
+
+# Owner's brief files (kept locally only)
+INSTRUCTIONS_FOR_CLAUDE.md
+TZ_KrisPekt_GitHub_Pages.md
