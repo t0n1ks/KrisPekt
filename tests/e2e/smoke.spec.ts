@@ -66,6 +66,25 @@ async function dragDown(page: Page, x: number, y0: number, y1: number): Promise<
   await page.mouse.up();
 }
 
+/** Subject names in stored order, straight from IndexedDB. */
+function storedSubjectNames(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () =>
+      new Promise<string[]>((resolve) => {
+        const req = indexedDB.open('konspektnik', 1);
+        req.onsuccess = () => {
+          const all = req.result.transaction('subjects').objectStore('subjects').getAll();
+          all.onsuccess = () =>
+            resolve(
+              (all.result as { name: string; order: number }[])
+                .sort((a, b) => a.order - b.order)
+                .map((s) => s.name),
+            );
+        };
+      }),
+  );
+}
+
 test('shelf, notebook, drawing, persistence and language', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -167,4 +186,79 @@ test('brushes, eraser modes and persistence', async ({ page }) => {
   await expect(page.locator('[data-tool="eraser"] .tool-tray__badge--dot')).toBeVisible();
 
   expect(errors).toEqual([]);
+});
+
+test('automatic backup downloads when due, and the file restores', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('./');
+  await expect(page.locator('.notebook-card')).toHaveCount(2);
+  await expect(page.locator('#libBackup')).toHaveText('Последняя копия: ещё не было');
+
+  // Pretend the last backup is 4 days old and something changed since.
+  await page.evaluate(() => {
+    const key = 'konspektnik.prefs.v1';
+    const prefs = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
+    const day = 24 * 60 * 60 * 1000;
+    prefs.lastBackupAt = Date.now() - 4 * day;
+    prefs.lastChangeAt = Date.now() - 60 * 60 * 1000;
+    localStorage.setItem(key, JSON.stringify(prefs));
+  });
+  await expect(page.locator('#libBackup')).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.reload();
+  await expect(page.locator('#libBackup')).toHaveText('Последняя копия: 4 дня назад');
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^krispekt-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  await expect(page.locator('.toast')).toHaveText('Резервная копия сохранена в Загрузки');
+  await expect(page.locator('.backup-banner')).toBeVisible();
+  await expect(page.locator('#libBackup')).toHaveText('Последняя копия: сегодня');
+  const file = await download.path();
+
+  // The automatic file restores like a manual backup.
+  await page.click('.backup-banner .icon-btn');
+  await expect(page.locator('.backup-banner')).toHaveCount(0);
+  await page.click('#btnLibMore');
+  const chooserPromise = page.waitForEvent('filechooser');
+  await page.click('.menu__item:has-text("Восстановить")');
+  await (await chooserPromise).setFiles(file);
+  await page.click('.sheet__foot .btn--primary');
+  await expect(page.locator('.toast')).toHaveText('Копия восстановлена');
+  await expect(page.locator('.notebook-card')).toHaveCount(2);
+
+  // Only one automatic download per session, and not again after a reload (nothing changed).
+  let extra = 0;
+  page.on('download', () => extra++);
+  await page.reload();
+  await page.waitForTimeout(3000);
+  expect(extra).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('subjects reorder with the menu and by dragging, and the order persists', async ({ page }) => {
+  await page.goto('./');
+  const names = page.locator('.subject__name');
+  await expect(names).toHaveCount(2);
+  const [first, second] = await names.allTextContents();
+
+  await page.locator('.subject').first().locator('.subject__more').click();
+  await page.click('.menu__item:has-text("Ниже")');
+  await expect(names).toHaveText([second ?? '', first ?? '']);
+  await page.reload();
+  await expect(names).toHaveText([second ?? '', first ?? '']);
+
+  // Drag the second subject's handle above the first one.
+  const handle = page.locator('.subject').nth(1).locator('.subject__handle');
+  const box = await handle.boundingBox();
+  const target = await page.locator('.subject').first().boundingBox();
+  if (!box || !target) throw new Error('missing layout');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, target.y + 5, { steps: 12 });
+  await page.mouse.up();
+  await expect(names).toHaveText([first ?? '', second ?? '']);
+  // The drop updates the shelf at once; wait until the new order is stored.
+  await expect.poll(() => storedSubjectNames(page)).toEqual([first, second]);
+  await page.reload();
+  await expect(names).toHaveText([first ?? '', second ?? '']);
 });
