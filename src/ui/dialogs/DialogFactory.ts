@@ -5,14 +5,28 @@ import { Sheet, type SheetOptions } from './Sheet';
 
 /** Opens sheets and confirmation dialogs; shared by every view. */
 export class DialogFactory {
+  private openSheets = 0;
+
   constructor(
     private readonly i18n: I18n,
     private readonly bus: EventBus,
   ) {}
 
+  /** Whether any sheet is open (the automatic backup waits until none is). */
+  get hasOpenSheet(): boolean {
+    return this.openSheets > 0;
+  }
+
   /** Opens a sheet. */
   sheet(options: SheetOptions): Sheet {
-    return new Sheet(this.i18n, this.bus, options).open();
+    this.openSheets++;
+    return new Sheet(this.i18n, this.bus, {
+      ...options,
+      onClose: () => {
+        this.openSheets--;
+        options.onClose?.();
+      },
+    }).open();
   }
 
   /**

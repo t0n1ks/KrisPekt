@@ -1,4 +1,5 @@
 import {
+  AUTO_BACKUP_INTERVALS,
   BRUSH_KINDS,
   BRUSH_SPECS,
   DEFAULT_PREFS,
@@ -17,6 +18,9 @@ export const PREF_RANGES = {
   eraser: [6, 60],
   textSize: [6, 200],
 } as const;
+
+/** Latest accepted timestamp (the ECMAScript date limit). */
+const MAX_TIMESTAMP = 8.64e15;
 
 function color(raw: unknown, fallback: string): string {
   return typeof raw === 'string' && COLOR_PATTERN.test(raw) ? raw : fallback;
@@ -123,6 +127,10 @@ export class PreferencesStore {
       fingerSet: bool(raw.fingerSet, d.fingerSet),
       straighten: bool(raw.straighten, d.straighten),
       seeded: bool(raw.seeded, d.seeded),
+      autoBackup: AUTO_BACKUP_INTERVALS.find((v) => v === raw.autoBackup) ?? d.autoBackup,
+      lastBackupAt: toClampedNumber(raw.lastBackupAt, 0, MAX_TIMESTAMP, d.lastBackupAt),
+      lastBackupBytes: toClampedNumber(raw.lastBackupBytes, 0, Number.MAX_SAFE_INTEGER, d.lastBackupBytes),
+      lastChangeAt: toClampedNumber(raw.lastChangeAt, 0, MAX_TIMESTAMP, d.lastChangeAt),
     };
     if (isLanguage(raw.lang)) prefs.lang = raw.lang;
     return prefs;

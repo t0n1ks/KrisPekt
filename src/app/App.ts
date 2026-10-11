@@ -1,4 +1,4 @@
-import type { Language, Notebook, Preferences } from '../core/types';
+import type { AutoBackupInterval, Language, Notebook, Preferences } from '../core/types';
 import { safeFileName } from '../core/utils/format';
 import { uid } from '../core/utils/id';
 import { PageSizePolicy } from '../domain/PageSizePolicy';
@@ -9,6 +9,7 @@ import { ImageEncoder } from '../features/images/ImageEncoder';
 import { PdfImporter } from '../features/pdf/PdfImporter';
 import { PdfLoader } from '../features/pdf/PdfLoader';
 import { I18n } from '../i18n/I18n';
+import { AutoBackupScheduler } from '../services/AutoBackupScheduler';
 import { LibraryService } from '../services/LibraryService';
 import { BackupService } from '../storage/BackupService';
 import { BlobRepository } from '../storage/BlobRepository';
@@ -60,9 +61,12 @@ export class App {
   private readonly pdfImporter: PdfImporter;
   private readonly subjectDialog: SubjectDialog;
   private readonly notebookDialog: NotebookDialog;
+  private readonly backupFlow: BackupFlow;
+  private readonly autoBackup: AutoBackupScheduler;
   private readonly editor: EditorView;
   private readonly libraryView: LibraryView;
   private corruptToastPending = false;
+  private hiddenAt = 0;
 
   private constructor(private readonly db: Database) {
     this.prefs = this.prefsStore.load();
@@ -78,14 +82,26 @@ export class App {
       pages: new PageRepository(db, reader),
       blobs: new BlobRepository(db, reader),
     };
-    this.library = new LibraryService(this.repos, uid);
-    this.saveQueue = new SaveQueue(this.repos.pages, this.repos.notebooks, () => this.storageError());
+    this.library = new LibraryService(this.repos, uid, () => this.contentChanged());
+    this.saveQueue = new SaveQueue(
+      this.repos.pages,
+      this.repos.notebooks,
+      () => this.storageError(),
+      () => this.contentChanged(),
+    );
     this.pdfImporter = new PdfImporter({
       loader: new PdfLoader(),
       blobs: this.repos.blobs,
       i18n: this.i18n,
       makeId: uid,
       notify: (m, ms) => this.toast.show(m, ms),
+    });
+    this.backupFlow = this.createBackupFlow();
+    this.autoBackup = new AutoBackupScheduler({
+      state: () => this.prefs,
+      now: () => Date.now(),
+      dialogOpen: () => this.dialogs.hasOpenSheet,
+      run: () => this.backupFlow.saveAuto(),
     });
     this.subjectDialog = this.createSubjectDialog();
     this.notebookDialog = this.createNotebookDialog();
@@ -161,9 +177,8 @@ export class App {
     });
   }
 
-  private createLibraryView(): LibraryView {
-    const rerender = (): void => this.libraryView.render();
-    const backup = new BackupFlow({
+  private createBackupFlow(): BackupFlow {
+    return new BackupFlow({
       i18n: this.i18n,
       backup: new BackupService(this.db, this.repos, (blob) => this.imageEncoder.reencode(blob)),
       library: this.library,
@@ -171,8 +186,14 @@ export class App {
       dialogs: this.dialogs,
       toast: this.toast,
       flush: () => this.saveQueue.flush(),
-      onRestored: rerender,
+      onRestored: () => this.libraryView.render(),
+      onSaved: (bytes, auto) => this.backupSaved(bytes, auto),
     });
+  }
+
+  private createLibraryView(): LibraryView {
+    const rerender = (): void => this.libraryView.render();
+    const backup = this.backupFlow;
     const actions = new ShelfActions({
       i18n: this.i18n,
       library: this.library,
@@ -186,10 +207,18 @@ export class App {
       openNotebook: (nb) => void this.openNotebook(nb),
       exportPdf: (nb) => void this.exportPdf(nb),
       setLanguage: (l) => this.setLanguage(l),
+      setAutoBackup: (interval) => this.setAutoBackup(interval),
       rerender,
       onError: () => this.storageError(),
     });
-    return new LibraryView({ i18n: this.i18n, library: this.library, menu: this.menu, actions });
+    return new LibraryView({
+      i18n: this.i18n,
+      library: this.library,
+      menu: this.menu,
+      actions,
+      backupState: () => this.prefs,
+      now: () => Date.now(),
+    });
   }
 
   /* ---------- lifecycle ---------- */
@@ -214,14 +243,44 @@ export class App {
     }
     this.libraryView.show();
     this.watchLifecycle();
+    this.autoBackup.appOpened();
   }
 
-  /** Saves pending edits whenever the page may be closed or frozen. */
+  /**
+   * Saves pending edits whenever the page may be closed or frozen, and lets the automatic
+   * backup check again when the app comes back after a long time in the background.
+   */
   private watchLifecycle(): void {
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') void this.saveQueue.flush(true);
+      if (document.visibilityState === 'hidden') {
+        this.hiddenAt = Date.now();
+        void this.saveQueue.flush(true);
+      } else if (this.hiddenAt) this.autoBackup.appResumed(Date.now() - this.hiddenAt);
     });
     window.addEventListener('pagehide', () => void this.saveQueue.flush(true));
+  }
+
+  /* ---------- backups ---------- */
+
+  /** A page, notebook or subject was written: there is something new to back up. */
+  private contentChanged(): void {
+    this.prefs.lastChangeAt = Date.now();
+    this.prefsStore.save(this.prefs);
+  }
+
+  /** A backup file was handed to the browser. */
+  private backupSaved(bytes: number, auto: boolean): void {
+    const at = Date.now();
+    this.prefs.lastBackupAt = at;
+    this.prefs.lastBackupBytes = bytes;
+    this.prefsStore.save(this.prefs);
+    if (auto) this.libraryView.showAutoBackupNotice({ at, bytes });
+    this.libraryView.refreshBackupStatus();
+  }
+
+  private setAutoBackup(interval: AutoBackupInterval): void {
+    this.prefs.autoBackup = interval;
+    this.prefsStore.save(this.prefs);
   }
 
   private async openNotebook(nb: Notebook): Promise<void> {

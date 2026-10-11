@@ -18,21 +18,45 @@ export interface BackupFlowDeps {
   flush: () => Promise<void>;
   /** Redraws the shelf after a restore. */
   onRestored: () => void;
+  /** A backup file was handed to the browser (`auto` for the automatic one). */
+  onSaved: (bytes: number, auto: boolean) => void;
 }
 
 /** The user-facing steps of saving and restoring a backup. */
 export class BackupFlow {
   constructor(private readonly deps: BackupFlowDeps) {}
 
+  /** The backup the user asked for (a tap, so the download is never blocked). */
   async save(): Promise<void> {
     const { i18n, toast } = this.deps;
-    await this.deps.flush();
     toast.show(i18n.t('collecting'), 0);
+    const blob = await this.build();
+    if (!blob) return;
+    await this.deps.files.save(`krispekt-${dateStamp()}.json`, blob);
+    this.deps.onSaved(blob.size, false);
+  }
+
+  /**
+   * The automatic backup: the same file as {@link save}, named `krispekt-backup-YYYY-MM-DD.json`.
+   * The page cannot tell whether the browser kept the download, so the shelf also offers a
+   * one-tap save afterwards.
+   */
+  async saveAuto(): Promise<void> {
+    const blob = await this.build();
+    if (!blob) return;
+    await this.deps.files.save(`krispekt-backup-${dateStamp()}.json`, blob);
+    this.deps.toast.show(this.deps.i18n.t('autoBackupDone'), 4000);
+    this.deps.onSaved(blob.size, true);
+  }
+
+  /** Writes pending edits, then collects the backup; null (with a toast) if that fails. */
+  private async build(): Promise<Blob | null> {
     try {
-      const blob = await this.deps.backup.createBackup();
-      await this.deps.files.save(`krispekt-${dateStamp()}.json`, blob);
+      await this.deps.flush();
+      return await this.deps.backup.createBackup();
     } catch {
-      toast.show(i18n.t('backupFail'));
+      this.deps.toast.show(this.deps.i18n.t('backupFail'));
+      return null;
     }
   }
 

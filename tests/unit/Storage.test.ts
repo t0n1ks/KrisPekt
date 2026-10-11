@@ -121,8 +121,22 @@ describe('SaveQueue', () => {
     const pages = new PageRepository(db, reader);
     const notebooks = new NotebookRepository(db, reader);
     const onError = vi.fn();
-    return { pages, notebooks, onError, queue: new SaveQueue(pages, notebooks, onError) };
+    const onSaved = vi.fn();
+    return { pages, notebooks, onError, onSaved, queue: new SaveQueue(pages, notebooks, onError, onSaved) };
   }
+
+  it('reports content changes, but not a forced flush with nothing changed', async () => {
+    const { onSaved, queue } = setup();
+    const nb = notebook({ updatedAt: 5 });
+    queue.setNotebook(nb);
+    await queue.flush(true);
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(nb.updatedAt).toBe(5);
+    queue.markPageDirty(page());
+    await queue.flush();
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(nb.updatedAt).toBeGreaterThan(5);
+  });
 
   it('writes dirty pages after the debounce delay', async () => {
     vi.useFakeTimers();

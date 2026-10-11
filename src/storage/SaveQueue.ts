@@ -18,6 +18,8 @@ export class SaveQueue {
     private readonly pages: PageRepository,
     private readonly notebooks: NotebookRepository,
     private readonly onError: (error: unknown) => void,
+    /** Content was written (pages or notebook metadata changed); not called for forced no-op flushes. */
+    private readonly onSaved: () => void = () => undefined,
   ) {}
 
   /** Sets the notebook whose metadata is written on flush (null when the editor is closed). */
@@ -49,14 +51,16 @@ export class SaveQueue {
     const pages = [...this.dirtyPages];
     this.dirtyPages.clear();
     const nb = this.notebook;
-    if (!pages.length && !this.notebookDirty && !force) return;
+    const changed = pages.length > 0 || this.notebookDirty;
+    if (!changed && !force) return;
     this.notebookDirty = false;
     try {
       if (pages.length) await this.pages.save(...pages);
       if (nb) {
-        nb.updatedAt = Date.now();
+        if (changed) nb.updatedAt = Date.now();
         await this.notebooks.save(nb);
       }
+      if (changed) this.onSaved();
     } catch (error) {
       for (const p of pages) this.dirtyPages.add(p);
       this.onError(error);

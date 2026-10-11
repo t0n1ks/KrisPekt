@@ -13,6 +13,9 @@ export type StrokeKind = 'pen' | 'hl';
 /** Pen brush types. Strokes without a brush id are `ballpoint`. */
 export type BrushKind = 'ballpoint' | 'fountain' | 'fineliner' | 'pencil' | 'brush';
 
+/** How often the app saves a backup file by itself. */
+export type AutoBackupInterval = 'daily' | '3days' | 'weekly' | 'off';
+
 /** Eraser behaviour: cut away part of a stroke ("pixel eraser"), or remove whole strokes. */
 export type EraserMode = 'part' | 'whole';
 
@@ -51,6 +54,8 @@ export interface Notebook {
   createdAt: number;
   updatedAt: number;
   sample?: boolean;
+  /** Position among the subject's notebooks; older notebooks without it sort by creation time. */
+  order?: number;
   view: NotebookView | null;
 }
 
@@ -164,6 +169,14 @@ export interface Preferences {
   straighten: boolean;
   seeded: boolean;
   lang?: Language;
+  /** Automatic backup interval. */
+  autoBackup: AutoBackupInterval;
+  /** When the last backup (manual or automatic) was saved, ms since epoch; 0 = never. */
+  lastBackupAt: number;
+  /** Size of the last backup in bytes (large backups are saved automatically less often). */
+  lastBackupBytes: number;
+  /** When content (a page, notebook or subject) was last written, ms since epoch; 0 = never. */
+  lastChangeAt: number;
 }
 
 /** A point in screen (stage-local CSS px) or world coordinates. */

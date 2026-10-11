@@ -1,4 +1,4 @@
-import type { Background, BrushKind, Language, PenPrefs, Preferences } from './types';
+import type { AutoBackupInterval, Background, BrushKind, Language, PenPrefs, Preferences } from './types';
 
 /* ---------- units and layout ---------- */
 
@@ -57,15 +57,36 @@ export const THEME_FALLBACK = {
 
 /* ---------- palettes ---------- */
 
+/**
+ * Cover and subject colours: a 6 × 4 grid of deep and muted shades that suit the white cover
+ * label, with pastels in the last row. The first eight are the original palette, so existing
+ * covers still show as selected. Names: `coverColorNames`.
+ */
 export const COVER_COLORS = [
   '#2F5DA8',
   '#2E7D5B',
+  '#1E8C93',
   '#B23A48',
   '#C9822B',
   '#6B4FA0',
-  '#3D4451',
-  '#1E8C93',
   '#B5527A',
+  '#3D4451',
+  '#1F3A68',
+  '#1F5A3D',
+  '#7A2234',
+  '#7B5236',
+  '#C9A227',
+  '#155E63',
+  '#5E6B2E',
+  '#4A2B5E',
+  '#4C6A92',
+  '#1C1F26',
+  '#A9C4E8',
+  '#B5D8B8',
+  '#F1C0CF',
+  '#F3E3A1',
+  '#CDBDE8',
+  '#E3CBA8',
 ] as const;
 /**
  * Pen palette: a 6 × 5 grid in reading order. Columns are hues (blue, red, green, purple,
@@ -194,7 +215,35 @@ export const DEFAULT_PREFS: Preferences = {
   fingerSet: false,
   straighten: true,
   seeded: false,
+  autoBackup: '3days',
+  lastBackupAt: 0,
+  lastBackupBytes: 0,
+  lastChangeAt: 0,
 };
+
+/* ---------- automatic backup ---------- */
+
+export const AUTO_BACKUP_INTERVALS: readonly AutoBackupInterval[] = ['daily', '3days', 'weekly', 'off'];
+export const DAY_MS = 24 * 60 * 60 * 1000;
+/** Days between automatic backups for each setting. */
+export const AUTO_BACKUP_DAYS: Record<Exclude<AutoBackupInterval, 'off'>, number> = {
+  daily: 1,
+  '3days': 3,
+  weekly: 7,
+};
+/** Backups larger than this are downloaded automatically at most once a week. */
+export const LARGE_BACKUP_BYTES = 50 * 1024 * 1024;
+export const LARGE_BACKUP_MIN_DAYS = 7;
+/** Wait after start-up before an automatic backup, so it does not compete with the first render. */
+export const AUTO_BACKUP_DELAY_MS = 2000;
+/** While a dialog is open the automatic backup waits and retries after this long. */
+export const AUTO_BACKUP_RETRY_MS = 3000;
+/** Coming back after this long in the background counts as opening the app again. */
+export const AUTO_BACKUP_RESUME_MS = 60 * 60 * 1000;
+/** The shelf's backup status turns amber when the last backup is older than this and there are changes. */
+export const BACKUP_STALE_DAYS = 7;
+/** Holding a subject's drag handle this long starts dragging on touch screens. */
+export const DRAG_LONG_PRESS_MS = 300;
 
 /** Debounce before dirty pages are written. */
 export const SAVE_DELAY_PAGE_MS = 700;

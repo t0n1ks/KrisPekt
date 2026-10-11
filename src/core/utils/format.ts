@@ -39,3 +39,20 @@ export function safeFileName(name: string, fallback: string): string {
       .slice(0, 80) || fallback
   );
 }
+
+/**
+ * "today", "yesterday", "3 days ago", "2 months ago" in the interface language, counted in
+ * calendar days. Uses the browser's Intl data; falls back to a short date if it is missing.
+ */
+export function formatRelativeDay(ts: number, i18n: I18n, nowDate: Date = new Date()): string {
+  // A timestamp from the future (clock changed) reads as "today".
+  const days = Math.max(0, Math.round((startOfDay(nowDate) - startOfDay(new Date(ts))) / DAY_MS));
+  try {
+    const rtf = new Intl.RelativeTimeFormat(i18n.locale, { numeric: 'auto' });
+    if (days < 30) return rtf.format(-days, 'day');
+    if (days < 365) return rtf.format(-Math.round(days / 30.44), 'month');
+    return rtf.format(-Math.round(days / 365.25), 'year');
+  } catch {
+    return formatDate(ts, i18n, nowDate);
+  }
+}
