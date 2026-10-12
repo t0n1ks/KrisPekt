@@ -262,3 +262,189 @@ test('subjects reorder with the menu and by dragging, and the order persists', a
   await page.reload();
   await expect(names).toHaveText([first ?? '', second ?? '']);
 });
+
+/** The y values (world px) of every stroke on the first page of a notebook, straight from IndexedDB. */
+function strokeYs(page: Page, title: string): Promise<number[][]> {
+  return page.evaluate(
+    (nbTitle) =>
+      new Promise<number[][]>((resolve) => {
+        const req = indexedDB.open('konspektnik', 1);
+        req.onsuccess = () => {
+          const tx = req.result.transaction(['notebooks', 'pages']);
+          const nbs = tx.objectStore('notebooks').getAll();
+          nbs.onsuccess = () => {
+            const nb = (nbs.result as { title: string; pageIds: string[] }[]).find(
+              (n) => n.title === nbTitle,
+            );
+            const pg = tx.objectStore('pages').get(nb?.pageIds[0] ?? '');
+            pg.onsuccess = () =>
+              resolve(
+                ((pg.result as { strokes: { p: ArrayLike<number> }[] } | undefined)?.strokes ?? []).map((s) =>
+                  Array.from(s.p).filter((_, i) => i % 3 === 1),
+                ),
+              );
+          };
+        };
+      }),
+    title,
+  );
+}
+
+/** Creates a notebook in the first subject and opens it. */
+async function openNewNotebook(page: Page, title: string): Promise<void> {
+  await page.goto('./');
+  await page.locator('.subject').first().locator('.shelf__add').click();
+  await page.fill('#nb-title', title);
+  await page.click('.sheet__foot .btn--primary');
+  await expect(page.locator('#editor')).toBeVisible();
+}
+
+/** A horizontal mouse stroke at screen height y: its world y shows where the camera is. */
+async function probeStroke(page: Page, y: number): Promise<void> {
+  await page.mouse.move(250, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) await page.mouse.move(250 + i * 15, y);
+  await page.mouse.up();
+}
+
+const average = (values: number[]): number => values.reduce((a, b) => a + b, 0) / (values.length || 1);
+
+test('palm rejection: a palm moving while the pen writes does not scroll', async ({ page }) => {
+  await openNewNotebook(page, 'Palm');
+  await probeStroke(page, 300);
+  await expect.poll(() => strokeCount(page, 'Palm')).toBe(1);
+
+  await page.evaluate(async () => {
+    const canvas = document.getElementById('cv');
+    if (!canvas) throw new Error('no canvas');
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const fire = (type: string, init: PointerEventInit) =>
+      canvas.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, ...init }));
+    const palm = { pointerId: 21, pointerType: 'touch', width: 60, height: 45, buttons: 1, pressure: 0.6 };
+    const small = { pointerId: 22, pointerType: 'touch', width: 12, height: 12, buttons: 1, pressure: 0.5 };
+    const pen = { pointerId: 5, pointerType: 'pen', width: 1, height: 1, buttons: 1, pressure: 0.5 };
+
+    // 1. A large palm lands and drifts while the pen writes.
+    fire('pointerdown', { ...palm, clientX: 700, clientY: 600 });
+    for (let i = 1; i <= 5; i++) {
+      fire('pointermove', { ...palm, clientX: 700, clientY: 600 - i * 20 });
+      await wait(16);
+    }
+    fire('pointerdown', { ...pen, clientX: 300, clientY: 420 });
+    for (let i = 1; i <= 20; i++) {
+      fire('pointermove', { ...pen, clientX: 300 + i * 10, clientY: 420 });
+      fire('pointermove', { ...palm, clientX: 700, clientY: 500 - i * 10 });
+      await wait(16);
+    }
+    fire('pointerup', { ...pen, buttons: 0, clientX: 500, clientY: 420 });
+    fire('pointerup', { ...palm, buttons: 0, clientX: 700, clientY: 300 });
+    await wait(1700);
+
+    // 2. A palm reported as small lands first and scrolls a little; the pen-down puts the page back.
+    fire('pointerdown', { ...small, clientX: 700, clientY: 600 });
+    for (let i = 1; i <= 8; i++) {
+      await wait(20);
+      fire('pointermove', { ...small, clientX: 700, clientY: 600 - i * 15 });
+    }
+    fire('pointerdown', { ...pen, clientX: 300, clientY: 520 });
+    for (let i = 1; i <= 10; i++) {
+      fire('pointermove', { ...pen, clientX: 300 + i * 10, clientY: 520 });
+      fire('pointermove', { ...small, clientX: 700, clientY: 480 - i * 10 });
+      await wait(16);
+    }
+    fire('pointerup', { ...pen, buttons: 0, clientX: 400, clientY: 520 });
+    fire('pointerup', { ...small, buttons: 0, clientX: 700, clientY: 380 });
+  });
+
+  await probeStroke(page, 300);
+  await expect.poll(() => strokeCount(page, 'Palm')).toBe(4);
+  const [before, penLine, penLine2, after] = await strokeYs(page, 'Palm');
+  if (!before || !penLine || !penLine2 || !after) throw new Error('missing strokes');
+  // The camera ends where it started …
+  expect(Math.abs(average(after) - average(before))).toBeLessThan(0.5);
+  // … and each pen line stayed straight: the page did not move under the pen.
+  expect(Math.max(...penLine) - Math.min(...penLine)).toBeLessThan(0.5);
+  expect(Math.max(...penLine2) - Math.min(...penLine2)).toBeLessThan(0.5);
+  expect(average(penLine2) - average(penLine)).toBeGreaterThan(0);
+});
+
+test('palm rejection: a finger swipe without the pen scrolls', async ({ page }) => {
+  await openNewNotebook(page, 'Swipe');
+  // Fingers scroll (instead of drawing) once finger drawing is off.
+  await page.click('#btnEdMore');
+  await page.click('.menu__item:has-text("Рисовать пальцем")');
+  await probeStroke(page, 300);
+  await expect.poll(() => strokeCount(page, 'Swipe')).toBe(1);
+
+  await page.evaluate(async () => {
+    const canvas = document.getElementById('cv');
+    if (!canvas) throw new Error('no canvas');
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const fire = (type: string, init: PointerEventInit) =>
+      canvas.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, ...init }));
+    const finger = { pointerId: 31, pointerType: 'touch', width: 10, height: 10, buttons: 1, pressure: 0.5 };
+    fire('pointerdown', { ...finger, clientX: 600, clientY: 650 });
+    for (let i = 1; i <= 20; i++) {
+      await wait(16);
+      fire('pointermove', { ...finger, clientX: 600, clientY: 650 - i * 15 });
+    }
+    fire('pointerup', { ...finger, buttons: 0, clientX: 600, clientY: 350 });
+    // Let inertia settle.
+    await wait(1500);
+  });
+
+  await probeStroke(page, 300);
+  await expect.poll(() => strokeCount(page, 'Swipe')).toBe(2);
+  const [before, after] = await strokeYs(page, 'Swipe');
+  if (!before || !after) throw new Error('missing strokes');
+  expect(average(after) - average(before)).toBeGreaterThan(150);
+});
+
+test('touch settings persist, and the input diagnostics overlay lists pointer events', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
+  await openNewNotebook(page, 'Settings');
+  const undoItem = '.menu__item:has-text("Отмена касанием двумя пальцами")';
+  const scrollItem = '.menu__item:has-text("Листать только двумя пальцами")';
+
+  await page.click('#btnEdMore');
+  await expect(page.locator(undoItem).locator('.menu__check svg')).toHaveCount(1);
+  await expect(page.locator(scrollItem).locator('.menu__check svg')).toHaveCount(0);
+  await page.click(undoItem);
+  await expect(page.locator('.toast')).toContainText('Отмена двумя пальцами выключена');
+  await page.click('#btnEdMore');
+  await page.click(scrollItem);
+
+  await page.reload();
+  await page.locator('.notebook-card__title', { hasText: 'Settings' }).click();
+  await page.click('#btnEdMore');
+  await expect(page.locator(undoItem).locator('.menu__check svg')).toHaveCount(0);
+  await expect(page.locator(scrollItem).locator('.menu__check svg')).toHaveCount(1);
+
+  // Hidden overlay: long press (right click on desktop) on "Draw with finger".
+  await page.click('.menu__item:has-text("Рисовать пальцем")', { button: 'right' });
+  await expect(page.locator('#inputDiag')).toBeVisible();
+  await page.evaluate(() => {
+    const canvas = document.getElementById('cv');
+    const init = {
+      pointerId: 41,
+      pointerType: 'touch',
+      width: 50,
+      height: 40,
+      buttons: 1,
+      clientX: 600,
+      clientY: 500,
+    };
+    canvas?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, ...init }));
+    canvas?.dispatchEvent(
+      new PointerEvent('pointerup', { bubbles: true, cancelable: true, ...init, buttons: 0 }),
+    );
+  });
+  await expect(page.locator('#inputDiag')).toContainText('touch #41 50×40');
+  await expect(page.locator('#inputDiag')).toContainText('→ palm');
+
+  expect(errors).toEqual([]);
+});
