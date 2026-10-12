@@ -21,10 +21,14 @@
   --shadow: rgba(22, 32, 52, 0.18);
   --ruler: rgba(255, 255, 255, 0.82);
   --page-label: #7a8494;
+  /* input diagnostics overlay: dark glass in both themes */
+  --diag-bg: rgba(16, 22, 34, 0.84);
+  --diag-fg: #e6e9ef;
 
   /* typography */
   --f-display: 'Unbounded', 'Onest', system-ui, sans-serif;
   --f-body: 'Onest', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --f-mono: ui-monospace, 'Roboto Mono', 'Cascadia Mono', Consolas, monospace;
 
   /* radii */
   --r-xs: 2px;

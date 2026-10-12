@@ -19,6 +19,8 @@ const TICK_START = 14;
  *
  * Pens (and Alt + mouse) are not handled here: their pointer-down is forwarded to the input
  * router, which captures the pointer on the canvas so the stroke can run along the edge.
+ * Palm contacts (too large, or while the pen is down) are ignored, and a finger that spreads
+ * into a palm mid-drag is dropped, so the hand resting on the ruler does not move it.
  */
 export class RulerWidget {
   private readonly node = byId('ruler');
@@ -35,6 +37,7 @@ export class RulerWidget {
     private readonly theme: ThemeColors,
     private readonly i18n: I18n,
     private readonly forwardPen: (e: PointerEvent) => void,
+    private readonly isPalm: (e: PointerEvent) => boolean,
   ) {
     this.node.addEventListener('pointerdown', (e) => this.down(e));
     this.node.addEventListener('pointermove', (e) => this.move(e));
@@ -113,6 +116,7 @@ export class RulerWidget {
       return;
     }
     e.stopPropagation();
+    if (this.isPalm(e)) return;
     try {
       this.node.setPointerCapture(e.pointerId);
     } catch {
@@ -124,6 +128,10 @@ export class RulerWidget {
 
   private move(e: PointerEvent): void {
     if (!this.pointers.has(e.pointerId) || !this.gesture) return;
+    if (this.isPalm(e)) {
+      this.up(e);
+      return;
+    }
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const r = this.ruler;
     const g = this.gesture;

@@ -24,6 +24,7 @@ import { PageSettingsDialog } from '../dialogs/PageSettingsDialog';
 import type { Toast } from '../dialogs/Toast';
 import { icon } from '../icons';
 import { languageMenu, languageShort } from '../widgets/languageMenu';
+import { InputDiagnosticsOverlay } from './InputDiagnosticsOverlay';
 import { PagesPanel } from './PagesPanel';
 import { RulerWidget } from './RulerWidget';
 import { SelectionBar } from './SelectionBar';
@@ -76,9 +77,11 @@ export class EditorView {
   private readonly pageSettings: PageSettingsDialog;
   private readonly images: ImageInserter;
   private readonly exporter: PdfExporter;
+  private readonly diagnostics: InputDiagnosticsOverlay;
 
   constructor(private readonly deps: EditorViewDeps) {
     const { i18n, sizes, menu } = deps;
+    this.diagnostics = new InputDiagnosticsOverlay(i18n);
     this.canvas = new EditorCanvas({
       i18n,
       prefs: deps.prefs,
@@ -112,7 +115,14 @@ export class EditorView {
       remove: () => c.selection.remove(),
       deselect: () => c.selection.clear(),
     });
-    this.rulerWidget = new RulerWidget(c.ruler, c.camera, c.theme, i18n, (e) => c.router.down(e));
+    this.rulerWidget = new RulerWidget(
+      c.ruler,
+      c.camera,
+      c.theme,
+      i18n,
+      (e) => c.router.down(e),
+      (e) => c.router.isPalmTouch(e),
+    );
     this.pageOps = this.createPageOperations();
     this.panel = this.createPagesPanel();
     this.pageSettings = new PageSettingsDialog({
@@ -167,6 +177,7 @@ export class EditorView {
       onTwoFingerTap: () => {
         if (this.canvas.undo.undo()) d.toast.show(d.i18n.t('undone'), 1000);
       },
+      onInputSample: (sample) => this.diagnostics.record(sample),
       settle: () => this.settle(),
       hiddenTextOn: (page) => this.textEditor.hiddenOn(page),
       editText: (page, item, x, y) => this.textEditor.start(page, item, x, y),
@@ -518,6 +529,19 @@ export class EditorView {
         icon: 'hand',
         check: prefs.fingerDraw,
         onClick: () => this.toggleFingerDraw(),
+        onLongPress: () => this.toggleDiagnostics(),
+      },
+      {
+        label: i18n.t('twoFingerUndo'),
+        icon: 'undo',
+        check: prefs.twoFingerUndo,
+        onClick: () => this.toggleTwoFingerUndo(),
+      },
+      {
+        label: i18n.t('twoFingerScroll'),
+        icon: 'scroll',
+        check: prefs.twoFingerScroll,
+        onClick: () => this.toggleTwoFingerScroll(),
       },
       { label: i18n.t('nbSettings'), icon: 'edit', onClick: () => actions.editNotebook(nb) },
       {
@@ -542,6 +566,27 @@ export class EditorView {
     prefs.fingerSet = true;
     this.deps.savePrefs();
     this.deps.toast.show(prefs.fingerDraw ? i18n.t('fingerOn') : i18n.t('fingerOff'));
+  }
+
+  private toggleTwoFingerUndo(): void {
+    const { prefs, i18n } = this.deps;
+    prefs.twoFingerUndo = !prefs.twoFingerUndo;
+    this.deps.savePrefs();
+    this.deps.toast.show(i18n.t(prefs.twoFingerUndo ? 'twoFingerUndoOn' : 'twoFingerUndoOff'));
+  }
+
+  private toggleTwoFingerScroll(): void {
+    const { prefs, i18n } = this.deps;
+    prefs.twoFingerScroll = !prefs.twoFingerScroll;
+    this.deps.savePrefs();
+    this.deps.toast.show(i18n.t(prefs.twoFingerScroll ? 'twoFingerScrollOn' : 'twoFingerScrollOff'));
+  }
+
+  /** Hidden: a long press on "Draw with finger" shows the input diagnostics overlay. */
+  private toggleDiagnostics(): void {
+    const on = !this.diagnostics.visible;
+    this.diagnostics.setVisible(on);
+    this.deps.toast.show(this.deps.i18n.t(on ? 'inputDiagOn' : 'inputDiagOff'));
   }
 
   private openPageSettings(page: Page | undefined): void {

@@ -12,12 +12,15 @@ import { StrokeGeometry } from '../canvas/StrokeGeometry';
 import { StrokePainter } from '../canvas/StrokePainter';
 import { TextLayout } from '../canvas/TextLayout';
 import { ThemeColors } from '../canvas/ThemeColors';
-import type { Page, Point, Preferences, Stroke, TextItem, ToolKind } from '../core/types';
+import type { Page, Preferences, Stroke, TextItem, ToolKind } from '../core/types';
 import { byId, context2d } from '../core/utils/dom';
 import { History } from '../domain/History';
+import { TouchClassifier } from '../domain/TouchClassifier';
 import type { I18n } from '../i18n/I18n';
 import { GestureController } from '../input/GestureController';
+import type { InputSample } from '../input/InputLog';
 import { InputRouter } from '../input/InputRouter';
+import { TouchSizeProbe } from '../input/TouchSizeProbe';
 import type { BlobRepository } from '../storage/BlobRepository';
 import type { SaveQueue } from '../storage/SaveQueue';
 import { EraserTool } from '../tools/EraserTool';
@@ -46,6 +49,8 @@ export interface EditorCanvasHooks {
   beforePointerDown(): boolean;
   onPenSeen(): void;
   onTwoFingerTap(): void;
+  /** Every routed pointer event, for the input diagnostics overlay. */
+  onInputSample(sample: InputSample): void;
   /** Finish text editing and drop the selection. */
   settle(): void;
   hiddenTextOn(page: Page): string | null;
@@ -121,15 +126,31 @@ export class EditorCanvas {
     this.selection = this.createSelection();
     this.tools = this.createTools();
     this.live.setPainters([this.tools, this.selection]);
-    this.gestures = this.createGestures();
-    this.router = new InputRouter({
+    this.gestures = new GestureController({
+      camera: this.camera,
+      layout: this.layout,
+      renderer: this.renderer,
+    });
+    this.router = this.createRouter();
+  }
+
+  private createRouter(): InputRouter {
+    const { hooks, prefs } = this.deps;
+    return new InputRouter({
       canvas: this.mainCanvas,
       stage: this.stage,
       camera: this.camera,
       gestures: this.gestures,
       tools: this.tools,
+      classifier: new TouchClassifier({
+        twoFingerScroll: () => prefs.twoFingerScroll,
+        twoFingerUndo: () => prefs.twoFingerUndo,
+      }),
+      sizes: new TouchSizeProbe(this.stage),
       beforePointerDown: () => hooks.beforePointerDown(),
       onPenSeen: () => hooks.onPenSeen(),
+      onTwoFingerTap: () => hooks.onTwoFingerTap(),
+      onSample: (sample) => hooks.onInputSample(sample),
     });
   }
 
@@ -208,23 +229,6 @@ export class EditorCanvas {
       setTool: (kind) => hooks.setTool(kind),
       refreshTray: () => hooks.refreshTray(),
     };
-  }
-
-  private createGestures(): GestureController {
-    return new GestureController({
-      camera: this.camera,
-      layout: this.layout,
-      renderer: this.renderer,
-      releaseCapture: (id) => {
-        try {
-          this.mainCanvas.releasePointerCapture(id);
-        } catch {
-          /* already released */
-        }
-      },
-      onTwoFingerTap: () => this.deps.hooks.onTwoFingerTap(),
-      onTap: (pt: Point) => this.tools.tap(pt),
-    });
   }
 
   /** Adds a finished stroke and draws it onto the cached page bitmap without a full repaint. */

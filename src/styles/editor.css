@@ -423,3 +423,23 @@
   flex-direction: column;
   gap: 14px;
 }
+
+/* input diagnostics (hidden; long press on "Draw with finger" in ⋯) */
+.input-diag {
+  position: absolute;
+  left: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  max-width: calc(100% - 96px);
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--diag-bg);
+  color: var(--diag-fg);
+  border-radius: var(--r-md);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 7;
+}

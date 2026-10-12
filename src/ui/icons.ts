@@ -43,6 +43,7 @@ const PATHS = {
   upload: '<path d="M12 16V5M7 9.5l5-5 5 5M5 20h14"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   hand: '<path d="M8 13.5V6.5a1.5 1.5 0 0 1 3 0V12M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14c0 4-2.6 7-6.5 7-3 0-4.8-1.6-6-4l-1.3-2.8a1.5 1.5 0 0 1 2.6-1.5L8 14.5"/>',
+  scroll: '<path d="M12 3v18M8.5 6.5L12 3l3.5 3.5M8.5 17.5L12 21l3.5-3.5"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
   up: '<path d="M6 15l6-6 6 6"/>',
   grip: '<circle cx="9" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none"/>',

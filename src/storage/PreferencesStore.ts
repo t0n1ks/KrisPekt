@@ -125,6 +125,8 @@ export class PreferencesStore {
       },
       fingerDraw: bool(raw.fingerDraw, d.fingerDraw),
       fingerSet: bool(raw.fingerSet, d.fingerSet),
+      twoFingerUndo: bool(raw.twoFingerUndo, d.twoFingerUndo),
+      twoFingerScroll: bool(raw.twoFingerScroll, d.twoFingerScroll),
       straighten: bool(raw.straighten, d.straighten),
       seeded: bool(raw.seeded, d.seeded),
       autoBackup: AUTO_BACKUP_INTERVALS.find((v) => v === raw.autoBackup) ?? d.autoBackup,

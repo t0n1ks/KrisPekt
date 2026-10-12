@@ -213,6 +213,8 @@ export const DEFAULT_PREFS: Preferences = {
   recent: { pen: [], hl: [] },
   fingerDraw: true,
   fingerSet: false,
+  twoFingerUndo: true,
+  twoFingerScroll: false,
   straighten: true,
   seeded: false,
   autoBackup: '3days',
@@ -253,10 +255,29 @@ export const UNDO_LIMIT = 150;
 
 /* ---------- input timing ---------- */
 
-/** Touches are ignored while the pen is down and this long after any pen activity (palm rejection). */
-export const PALM_REJECT_MS = 500;
-/** A pen-down revokes a touch pan that started less than this long ago. */
-export const PAN_REVOKE_MS = 400;
+/**
+ * Palm rejection (see `TouchClassifier`). A touch contact wider or taller than this many CSS px
+ * is a palm. Tune with the input diagnostics overlay on the real tablet.
+ */
+export const PALM_SIZE_PX = 28;
+/** A writing session lasts this long after the last pen event (down, move or hover). */
+export const PEN_SESSION_MS = 1500;
+/** A single finger starts scrolling only after moving more than this many px … */
+export const PAN_START_SLOP_PX = 10;
+/** … and no sooner than this long after it landed. */
+export const PAN_START_DELAY_MS = 80;
+/** A pen-down this soon after a single-finger pan ended puts the camera back where the pan started. */
+export const PAN_REVERT_MS = 700;
+/** A two-finger tap does not undo if the pen was active this recently. */
+export const UNDO_PEN_QUIET_MS = 1000;
+/** This many simultaneous touches are a palm or a grip and are all ignored. */
+export const MAX_TOUCH_CONTACTS = 3;
+/** A single-finger touch shorter than this … */
+export const TAP_MAX_MS = 400;
+/** … that moved less than this many px is a tap for the active tool. */
+export const TAP_SLOP_PX = 8;
+/** Pointer events kept by the input diagnostics overlay. */
+export const INPUT_LOG_SIZE = 20;
 /** Holding the stylus still this long straightens the line. */
 export const STRAIGHTEN_HOLD_MS = 650;
 /** Holding a tray button this long opens its menu or options instead of a tap action. */

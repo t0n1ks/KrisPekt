@@ -166,6 +166,10 @@ export interface Preferences {
   fingerDraw: boolean;
   /** True once the user toggled finger drawing by hand (disables auto-switch on stylus detection). */
   fingerSet: boolean;
+  /** A quick two-finger tap undoes. */
+  twoFingerUndo: boolean;
+  /** A single finger never scrolls: scrolling and zoom need two fingers. */
+  twoFingerScroll: boolean;
   straighten: boolean;
   seeded: boolean;
   lang?: Language;

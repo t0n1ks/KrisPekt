@@ -2,6 +2,7 @@ import type { EventBus } from '../../app/EventBus';
 import { el } from '../../core/utils/dom';
 import { clamp } from '../../core/utils/math';
 import { icon, type IconName } from '../icons';
+import { LongPress } from '../widgets/LongPress';
 
 export interface MenuItem {
   label: string;
@@ -12,6 +13,8 @@ export interface MenuItem {
   check?: boolean;
   /** A colour dot before the label (used by the recolour menu). */
   swatch?: string;
+  /** A long press (or right click) runs this instead of `onClick`; used for hidden extras. */
+  onLongPress?: () => void;
 }
 
 /** `'-'` draws a separator. */
@@ -83,6 +86,13 @@ export class Menu {
         },
       },
     });
+    const onLongPress = entry.onLongPress;
+    if (onLongPress) {
+      LongPress.attach(button, () => {
+        this.close();
+        onLongPress();
+      });
+    }
     if (entry.swatch) {
       button.append(
         el('span', { class: 'color-dot color-dot--small', style: { '--dot-color': entry.swatch } }),
