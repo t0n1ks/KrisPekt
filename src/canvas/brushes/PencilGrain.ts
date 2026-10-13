@@ -52,6 +52,15 @@ export class PencilGrain {
     return out;
   }
 
+  /**
+   * Average ink coverage of the grain tile. Vector output has no texture, so it fills pencil
+   * strokes with this share of their opacity to keep the same overall tone.
+   */
+  static meanCoverage(): number {
+    const coverage = PencilGrain.coverage();
+    return coverage.reduce((sum, v) => sum + v, 0) / coverage.length;
+  }
+
   /** A repeating grain pattern in `color` for this context, or null if patterns are unavailable. */
   patternFor(ctx: CanvasRenderingContext2D, color: string): CanvasPattern | null {
     let perContext = this.patterns.get(ctx);

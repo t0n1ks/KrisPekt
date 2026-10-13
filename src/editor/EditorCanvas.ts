@@ -4,6 +4,7 @@ import { Camera } from '../canvas/Camera';
 import { LiveLayer } from '../canvas/LiveLayer';
 import { PageCache, type SkipInfo } from '../canvas/PageCache';
 import { PageLayout } from '../canvas/PageLayout';
+import { PencilGrain } from '../canvas/brushes/PencilGrain';
 import { PagePainter } from '../canvas/PagePainter';
 import { PatternPainter } from '../canvas/PatternPainter';
 import { Renderer } from '../canvas/Renderer';
@@ -84,7 +85,7 @@ export class EditorCanvas {
   readonly theme = new ThemeColors();
   readonly brushes = new BrushRegistry();
   readonly geometry = new StrokeGeometry((stroke) => this.brushes.forStroke(stroke).maxHalfWidth(stroke.s));
-  readonly strokes = new StrokePainter(this.brushes);
+  readonly strokes = new StrokePainter(this.brushes, new PencilGrain());
   readonly texts = new TextLayout(context2d(document.createElement('canvas')));
   readonly ruler = new Ruler();
   readonly history = new History();

@@ -1,8 +1,8 @@
 import type { StrokeLike } from '../../core/types';
+import type { DrawSink } from '../draw/DrawSink';
 import { BrushRenderer } from './BrushRenderer';
 import { Outline } from './Outline';
 import type { PathSink, ShapePart } from './PathSink';
-import type { PencilGrain } from './PencilGrain';
 
 /** Opacity at zero pressure … */
 const ALPHA_MIN = 0.45;
@@ -17,10 +17,6 @@ const ALPHA_STEP = 0.05;
  * their boundary edges, so a harder press darkens the line without overlapping seams.
  */
 export class PencilBrush extends BrushRenderer {
-  constructor(private readonly grain: PencilGrain) {
-    super();
-  }
-
   /** Opacity for a pressure, rounded to {@link ALPHA_STEP}. */
   static alpha(pressure: number): number {
     const raw = ALPHA_MIN + ALPHA_RANGE * Math.min(1, Math.max(0, pressure));
@@ -61,19 +57,13 @@ export class PencilBrush extends BrushRenderer {
     return out;
   }
 
-  /** Fills each band with the grain pattern in the stroke colour. */
-  override draw(
-    ctx: CanvasRenderingContext2D,
+  /** Fills each band with the paper grain in the stroke colour. */
+  override paint<P extends PathSink>(
+    sink: DrawSink<P>,
     stroke: StrokeLike,
-    parts: readonly ShapePart<Path2D>[],
+    parts: readonly ShapePart<P>[],
   ): void {
-    const base = ctx.globalAlpha;
-    ctx.save();
-    ctx.fillStyle = this.grain.patternFor(ctx, stroke.c) ?? stroke.c;
-    for (const part of parts) {
-      ctx.globalAlpha = base * part.alpha;
-      ctx.fill(part.path);
-    }
-    ctx.restore();
+    for (const part of parts)
+      sink.fillPath(part.path, { color: stroke.c, alpha: part.alpha, texture: 'pencil' });
   }
 }

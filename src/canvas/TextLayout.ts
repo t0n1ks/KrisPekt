@@ -1,5 +1,6 @@
 import { TEXT_FONT, TEXT_LINE_HEIGHT } from '../core/constants';
 import type { Box, TextItem } from '../core/types';
+import type { TextRun } from './draw/DrawSink';
 
 /** Measures text; a canvas context in the app, a stub in tests. */
 export interface TextMeasurer {
@@ -8,8 +9,9 @@ export interface TextMeasurer {
 }
 
 /**
- * Word-wraps text boxes and draws them. Wrapped lines are cached per item object; the cache
- * is reset when fonts finish loading or the language changes (metrics may differ).
+ * Word-wraps text boxes and positions their lines. Wrapped lines are cached per item object;
+ * the cache is reset when fonts finish loading or the language changes (metrics may differ).
+ * The screen and every export use the same lines and positions.
  */
 export class TextLayout {
   private cache = new WeakMap<TextItem, string[]>();
@@ -52,14 +54,21 @@ export class TextLayout {
     return { x0: item.x, y0: item.y, x1: item.x + item.w, y1: item.y + n * item.fs * TEXT_LINE_HEIGHT };
   }
 
-  /** Draws a text item with `fillText` (never as markup). */
-  draw(ctx: CanvasRenderingContext2D, item: TextItem): void {
-    ctx.font = TextLayout.font(item.fs);
-    ctx.fillStyle = item.c;
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
+  /** The wrapped lines of a text item as runs, each centred vertically in its line box. */
+  runs(item: TextItem): TextRun[] {
     const lh = item.fs * TEXT_LINE_HEIGHT;
     const off = (lh - item.fs) / 2;
-    this.lines(item).forEach((line, i) => ctx.fillText(line, item.x, item.y + i * lh + off));
+    return this.lines(item).map((text, i) => ({
+      text,
+      x: item.x,
+      top: item.y + i * lh + off,
+      size: item.fs,
+      color: item.c,
+    }));
+  }
+
+  /** Emits a text item's lines (drawn as text, never as markup). */
+  emit(sink: { text(run: TextRun): void }, item: TextItem): void {
+    for (const run of this.runs(item)) sink.text(run);
   }
 }

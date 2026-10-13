@@ -1,11 +1,13 @@
 import type { StrokeLike } from '../../core/types';
+import type { DrawSink } from '../draw/DrawSink';
 import type { PathSink, ShapePart } from './PathSink';
 
 /**
  * Base class of the stroke renderers: the five pen brushes and the highlighter. A renderer
- * turns stroke points into paths ({@link shape}, pure geometry) and paints them ({@link draw}).
- * Rendering depends only on the stroke's data, so a stroke looks the same live, after reload,
- * in page thumbnails and in exported PDFs.
+ * turns stroke points into paths ({@link shape}, pure geometry) and emits the commands that
+ * paint them ({@link paint}). Rendering depends only on the stroke's data and both steps are
+ * backend-independent, so a stroke looks the same live, after reload, in page thumbnails, in
+ * PNG export and as vector paths in exported PDFs.
  */
 export abstract class BrushRenderer {
   /**
@@ -34,20 +36,8 @@ export abstract class BrushRenderer {
     return this.halfWidth(size, pressure) * 0.7;
   }
 
-  /** The shape as Path2D objects, ready to cache and draw. */
-  buildPath(points: ArrayLike<number>, size: number): ShapePart<Path2D>[] {
-    return this.shape(points, size, () => new Path2D());
-  }
-
-  /** Paints a stroke's prepared shape in the current transform. */
-  draw(ctx: CanvasRenderingContext2D, stroke: StrokeLike, parts: readonly ShapePart<Path2D>[]): void {
-    const base = ctx.globalAlpha;
-    ctx.save();
-    ctx.fillStyle = stroke.c;
-    for (const part of parts) {
-      ctx.globalAlpha = base * part.alpha;
-      ctx.fill(part.path);
-    }
-    ctx.restore();
+  /** Emits the commands that paint a stroke's prepared shape: each part filled in the ink colour. */
+  paint<P extends PathSink>(sink: DrawSink<P>, stroke: StrokeLike, parts: readonly ShapePart<P>[]): void {
+    for (const part of parts) sink.fillPath(part.path, { color: stroke.c, alpha: part.alpha });
   }
 }

@@ -287,8 +287,9 @@ export class Selection implements OverlayPainter {
       const bm = this.deps.bitmaps.get(im.blob);
       if (bm) ctx.drawImage(bm, im.x, im.y, im.w, im.h);
     }
-    for (const st of p.strokes) if (s.ids.has(st.id)) this.deps.strokes.draw(ctx, st);
-    for (const t of p.texts) if (s.ids.has(t.id)) this.deps.texts.draw(ctx, t);
+    const backend = this.deps.strokes.canvasBackend(ctx);
+    for (const st of p.strokes) if (s.ids.has(st.id)) this.deps.strokes.emit(backend, st);
+    for (const t of p.texts) if (s.ids.has(t.id)) this.deps.texts.emit(backend, t);
     ctx.restore();
     this.drawFrame(ctx, live);
   }

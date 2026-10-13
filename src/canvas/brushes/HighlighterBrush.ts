@@ -1,6 +1,10 @@
 import type { StrokeLike } from '../../core/types';
+import type { DrawSink } from '../draw/DrawSink';
 import { BrushRenderer } from './BrushRenderer';
 import type { PathSink, ShapePart } from './PathSink';
+
+/** Highlighter opacity. */
+const ALPHA = 0.55;
 
 /**
  * The highlighter: a smoothed centre line stroked wide and translucent with `multiply`, so the
@@ -35,19 +39,20 @@ export class HighlighterBrush extends BrushRenderer {
     return [{ path, alpha: 1 }];
   }
 
-  override draw(
-    ctx: CanvasRenderingContext2D,
+  override paint<P extends PathSink>(
+    sink: DrawSink<P>,
     stroke: StrokeLike,
-    parts: readonly ShapePart<Path2D>[],
+    parts: readonly ShapePart<P>[],
   ): void {
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.strokeStyle = stroke.c;
-    ctx.lineWidth = stroke.s;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    for (const part of parts) ctx.stroke(part.path);
-    ctx.restore();
+    for (const part of parts) {
+      sink.strokePath(part.path, {
+        color: stroke.c,
+        alpha: ALPHA,
+        width: stroke.s,
+        cap: 'round',
+        join: 'round',
+        blend: 'multiply',
+      });
+    }
   }
 }

@@ -73,7 +73,7 @@ export class PdfExporter {
     canvas.height = Math.round(page.h * MM * sc);
     const ctx = context2d(canvas);
     ctx.setTransform(sc, 0, 0, sc, 0, 0);
-    this.deps.painter.paint(ctx, page, sc, null, bitmaps);
+    this.deps.painter.paint(ctx, page, sc, null, { source: bitmaps });
     const data = canvas.toDataURL('image/jpeg', PDF_EXPORT_JPEG_QUALITY);
     canvas.width = 0;
     canvas.height = 0;

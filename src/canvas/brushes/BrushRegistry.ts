@@ -6,7 +6,6 @@ import { FountainBrush } from './FountainBrush';
 import { HighlighterBrush } from './HighlighterBrush';
 import { PaintBrush } from './PaintBrush';
 import { PencilBrush } from './PencilBrush';
-import { PencilGrain } from './PencilGrain';
 
 /**
  * Picks the renderer for a stroke: the highlighter for `hl` strokes, otherwise the pen brush
@@ -17,12 +16,12 @@ export class BrushRegistry {
   private readonly pens: Record<BrushKind, BrushRenderer>;
   private readonly highlighter = new HighlighterBrush();
 
-  constructor(grain = new PencilGrain()) {
+  constructor() {
     this.pens = {
       ballpoint: new BallpointBrush(),
       fountain: new FountainBrush(),
       fineliner: new FinelinerBrush(),
-      pencil: new PencilBrush(grain),
+      pencil: new PencilBrush(),
       brush: new PaintBrush(),
     };
   }
