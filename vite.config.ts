@@ -105,6 +105,8 @@ export default defineConfig({
           // Only the font subsets the four interface languages (and symbols such as ⋯ and ↔) need.
           '**/*-{latin,cyrillic,cyrillic-ext,math,symbols}-{400,500,600}-normal-*.woff2',
           'pdfjs/**/*.{js,pfb,ttf}',
+          // The text font embedded in vector PDF export.
+          'fonts/*.ttf',
         ],
         // jsPDF's optional HTML/SVG renderers are never used by the app.
         globIgnores: ['**/html2canvas*', '**/purify*', '**/index.es-*'],
