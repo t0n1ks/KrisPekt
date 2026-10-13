@@ -44,7 +44,7 @@ export class NotebookCard {
       menu.show(more, [
         { label: i18n.t('open'), icon: 'page', onClick: () => actions.openNotebook(nb) },
         { label: i18n.t('nbSettings'), icon: 'edit', onClick: () => actions.editNotebook(nb) },
-        { label: i18n.t('savePdf'), icon: 'download', onClick: () => actions.exportPdf(nb) },
+        { label: i18n.t('exportMenu'), icon: 'download', onClick: () => actions.exportNotebook(nb) },
         ...moves,
         '-',
         {

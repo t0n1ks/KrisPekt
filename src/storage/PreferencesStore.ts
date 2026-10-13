@@ -2,12 +2,23 @@ import {
   AUTO_BACKUP_INTERVALS,
   BRUSH_KINDS,
   BRUSH_SPECS,
+  DEFAULT_EXPORT,
   DEFAULT_PREFS,
   MAX_FAVORITES,
   MAX_RECENT_COLORS,
+  PNG_SCALES,
   PREFS_KEY,
+  RASTER_DPIS,
 } from '../core/constants';
-import type { BrushKind, EraserMode, PenPrefs, Preferences } from '../core/types';
+import type {
+  BrushKind,
+  EraserMode,
+  ExportFormat,
+  ExportPrefs,
+  ExportScope,
+  PenPrefs,
+  Preferences,
+} from '../core/types';
 import { toClampedNumber } from '../core/utils/math';
 import { isLanguage } from '../i18n/I18n';
 import { COLOR_PATTERN, isRecord, type UnknownRecord } from './validation/guards';
@@ -63,6 +74,20 @@ function brushPrefs(raw: UnknownRecord): Record<BrushKind, PenPrefs> {
   const out = {} as Record<BrushKind, PenPrefs>;
   for (const kind of BRUSH_KINDS) out[kind] = entry(kind);
   return out;
+}
+
+/** The last export choices; anything unknown falls back to the default. */
+function exportPrefs(raw: UnknownRecord): ExportPrefs {
+  const d = DEFAULT_EXPORT;
+  const formats: readonly ExportFormat[] = ['pdf', 'pdfRaster', 'png'];
+  const scopes: readonly ExportScope[] = ['current', 'all', 'range'];
+  return {
+    format: formats.find((v) => v === raw.format) ?? d.format,
+    dpi: RASTER_DPIS.find((v) => v === raw.dpi) ?? d.dpi,
+    scale: PNG_SCALES.find((v) => v === raw.scale) ?? d.scale,
+    transparent: bool(raw.transparent, d.transparent),
+    pages: scopes.find((v) => v === raw.pages) ?? d.pages,
+  };
 }
 
 /**
@@ -133,6 +158,7 @@ export class PreferencesStore {
       lastBackupAt: toClampedNumber(raw.lastBackupAt, 0, MAX_TIMESTAMP, d.lastBackupAt),
       lastBackupBytes: toClampedNumber(raw.lastBackupBytes, 0, Number.MAX_SAFE_INTEGER, d.lastBackupBytes),
       lastChangeAt: toClampedNumber(raw.lastChangeAt, 0, MAX_TIMESTAMP, d.lastChangeAt),
+      exp: exportPrefs(section(raw, 'exp')),
     };
     if (isLanguage(raw.lang)) prefs.lang = raw.lang;
     return prefs;

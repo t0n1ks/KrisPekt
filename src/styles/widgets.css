@@ -275,3 +275,82 @@
   hyphens: auto;
   overflow-wrap: break-word;
 }
+
+/* vertical list of exclusive choices with hints (export format, PNG size) */
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.choice-list__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  text-align: left;
+}
+.choice-list__item--active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.choice-list__mark {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+}
+.choice-list__item--active .choice-list__mark {
+  border: 5px solid var(--accent);
+}
+.choice-list__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.choice-list__label {
+  font-size: 14.5px;
+  font-weight: 500;
+}
+.choice-list__hint {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* a checkbox with its label */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 14px;
+}
+.check-row__box {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+/* page range "from … to" */
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.range-row__input {
+  width: 76px;
+  height: 40px;
+  font-variant-numeric: tabular-nums;
+}
+.range-row__error {
+  color: var(--danger);
+}

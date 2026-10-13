@@ -20,7 +20,7 @@ export interface ShelfActionsDeps {
   backup: BackupFlow;
   persistent: () => boolean;
   openNotebook: (nb: Notebook) => void;
-  exportPdf: (nb: Notebook) => void;
+  exportNotebook: (nb: Notebook) => void;
   setLanguage: (language: Language) => void;
   setAutoBackup: (interval: AutoBackupInterval) => void;
   rerender: () => void;
@@ -35,8 +35,8 @@ export class ShelfActions implements LibraryActions {
     this.deps.openNotebook(nb);
   }
 
-  exportPdf(nb: Notebook): void {
-    this.deps.exportPdf(nb);
+  exportNotebook(nb: Notebook): void {
+    this.deps.exportNotebook(nb);
   }
 
   newSubject(): void {

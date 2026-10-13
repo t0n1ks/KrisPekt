@@ -1,30 +1,57 @@
-import type { BitmapCache } from '../../canvas/BitmapCache';
+import { PencilGrain } from '../../canvas/brushes/PencilGrain';
 import type { PagePainter } from '../../canvas/PagePainter';
-import { MM, PDF_EXPORT_JPEG_QUALITY, PDF_EXPORT_SCALE } from '../../core/constants';
-import type { Page } from '../../core/types';
-import { context2d } from '../../core/utils/dom';
+import { MM, PDF_FONT_NAME, PDF_PATTERN_SCALE, PT_PER_PX } from '../../core/constants';
+import type { Page, RasterDpi } from '../../core/types';
+import { ExportSizing } from '../../domain/ExportSizing';
 import type { I18n } from '../../i18n/I18n';
+import type { PageRasterizer } from '../export/PageRasterizer';
+import { PdfFont } from './PdfFont';
+import type { PdfImages } from './PdfImages';
+import { PdfVectorBackend } from './PdfVectorBackend';
 
 type JsPdfModule = typeof import('jspdf');
 type JsPdfDocument = InstanceType<JsPdfModule['jsPDF']>;
 
-/** PDF points per millimetre. */
-const PT_PER_MM = 72 / 25.4;
+/** Vector paths and text (default), or every page as a lossless image. */
+export type PdfMode = { kind: 'vector' } | { kind: 'raster'; dpi: RasterDpi };
+
+/** A page rendered at a lower resolution than asked for, to stay within memory. */
+export interface LoweredPage {
+  /** 1-based position in the exported set. */
+  index: number;
+  dpi: number;
+}
+
+export interface PdfResult {
+  blob: Blob;
+  lowered: LoweredPage[];
+}
 
 export interface PdfExporterDeps {
   painter: PagePainter;
-  bitmaps: BitmapCache;
+  rasterizer: PageRasterizer;
+  images: PdfImages;
+  font: PdfFont;
   i18n: I18n;
   notify: (message: string, ms?: number) => void;
 }
 
 /**
- * Exports a notebook to PDF: every page is rendered at 2× as a JPEG (quality 0.9) onto a PDF
- * page of the same size and orientation. jsPDF is loaded on first use and is only ever given
- * images the app rendered itself.
+ * Exports pages to PDF, each on a PDF page of its exact size and orientation.
+ *
+ * Vector (default): strokes become filled outlines or stroked paths, patterns become thin
+ * rectangles, text is real text in the embedded Onest font, and images are embedded at their
+ * stored resolution. Everything comes from the same drawing commands as the screen, so the
+ * PDF stays sharp at any zoom. Raster: every page as a PNG at 300 or 600 dpi.
+ *
+ * jsPDF is loaded on first use and is only ever given content the app produced itself.
  */
 export class PdfExporter {
   private module: Promise<JsPdfModule> | null = null;
+  /** Measured once: where text sits relative to the top of its em box. */
+  private baseline: number | undefined;
+  /** Computed once: the pencil grain's average coverage. */
+  private pencilTone: number | undefined;
 
   constructor(private readonly deps: PdfExporterDeps) {}
 
@@ -38,9 +65,13 @@ export class PdfExporter {
     return this.module;
   }
 
-  /** Builds the PDF; null if jsPDF failed to load or there are no pages (a toast says why). */
-  async export(pages: readonly Page[]): Promise<Blob | null> {
+  /** Builds the PDF; null if a module or the font failed to load, or there are no pages (a toast says why). */
+  async export(pages: readonly Page[], mode: PdfMode): Promise<PdfResult | null> {
     const { i18n, notify } = this.deps;
+    if (!pages.length) {
+      notify(i18n.t('noPages'));
+      return null;
+    }
     notify(i18n.t('pdfPreparing'), 0);
     let jspdf: JsPdfModule;
     try {
@@ -49,40 +80,83 @@ export class PdfExporter {
       notify(i18n.t('pdfModuleFail'), 4000);
       return null;
     }
-    let doc: JsPdfDocument | null = null;
-    for (let i = 0; i < pages.length; i++) {
-      const page = pages[i];
-      if (!page) continue;
-      notify(i18n.t('pdfExportProgress', { i: i + 1, n: pages.length }), 0);
-      doc = await this.addPage(jspdf, doc, page);
-      // Yield so the progress toast can paint.
-      await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      return await this.build(jspdf, pages, mode);
+    } finally {
+      this.deps.images.clear();
     }
-    if (!doc) {
-      notify(i18n.t('noPages'));
-      return null;
-    }
-    return doc.output('blob');
   }
 
-  private async addPage(jspdf: JsPdfModule, doc: JsPdfDocument | null, page: Page): Promise<JsPdfDocument> {
-    const bitmaps = await this.deps.bitmaps.loadForPage(page);
-    const sc = PDF_EXPORT_SCALE;
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(page.w * MM * sc);
-    canvas.height = Math.round(page.h * MM * sc);
-    const ctx = context2d(canvas);
-    ctx.setTransform(sc, 0, 0, sc, 0, 0);
-    this.deps.painter.paint(ctx, page, sc, null, { source: bitmaps });
-    const data = canvas.toDataURL('image/jpeg', PDF_EXPORT_JPEG_QUALITY);
-    canvas.width = 0;
-    canvas.height = 0;
-    const w = page.w * PT_PER_MM;
-    const h = page.h * PT_PER_MM;
+  private async build(jspdf: JsPdfModule, pages: readonly Page[], mode: PdfMode): Promise<PdfResult | null> {
+    const { i18n, notify } = this.deps;
+    const lowered: LoweredPage[] = [];
+    let doc: JsPdfDocument | null = null;
+    let page: Page | undefined;
+    for (let i = 0; (page = pages[i]); i++) {
+      notify(i18n.t('pdfExportProgress', { i: i + 1, n: pages.length }), 0);
+      const fresh = !doc;
+      doc = PdfExporter.addPage(jspdf, doc, page);
+      if (mode.kind === 'vector') {
+        if (fresh && !(await this.registerFont(doc))) return null;
+        await this.addVectorPage(jspdf, doc, page);
+      } else {
+        const dpi = await this.addRasterPage(doc, page, mode.dpi);
+        if (dpi < mode.dpi) lowered.push({ index: i + 1, dpi });
+      }
+      // Yield so the progress toast can paint and the UI stays responsive.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    return doc ? { blob: doc.output('blob'), lowered } : null;
+  }
+
+  private async registerFont(doc: JsPdfDocument): Promise<boolean> {
+    try {
+      await this.deps.font.register(doc);
+      return true;
+    } catch {
+      this.deps.notify(this.deps.i18n.t('pdfFontFail'), 4000);
+      return false;
+    }
+  }
+
+  /** Starts a document with this page, or appends the page to it. */
+  private static addPage(jspdf: JsPdfModule, doc: JsPdfDocument | null, page: Page): JsPdfDocument {
+    const w = page.w * MM * PT_PER_PX;
+    const h = page.h * MM * PT_PER_PX;
     const orientation = w > h ? 'l' : 'p';
-    const target = doc ?? new jspdf.jsPDF({ unit: 'pt', format: [w, h], orientation, compress: true });
-    if (doc) target.addPage([w, h], orientation);
-    target.addImage(data, 'JPEG', 0, 0, w, h, undefined, 'FAST');
-    return target;
+    if (doc) return doc.addPage([w, h], orientation);
+    return new jspdf.jsPDF({
+      unit: 'pt',
+      format: [w, h],
+      orientation,
+      compress: true,
+      // 0.001 pt is far below anything visible, and keeps the file small.
+      floatPrecision: 3,
+      putOnlyUsedFonts: true,
+    });
+  }
+
+  private async addVectorPage(jspdf: JsPdfModule, doc: JsPdfDocument, page: Page): Promise<void> {
+    const backend = new PdfVectorBackend(jspdf, doc, {
+      k: PT_PER_PX,
+      font: PDF_FONT_NAME,
+      baseline: (this.baseline ??= PdfFont.baseline()),
+      pencilTone: (this.pencilTone ??= PencilGrain.meanCoverage()),
+      images: await this.deps.images.forPage(page),
+    });
+    backend.beginPage(page.w * MM, page.h * MM);
+    this.deps.painter.emit(backend, page, { scale: PDF_PATTERN_SCALE, highlightersFirst: true });
+    backend.endPage();
+  }
+
+  /** Embeds the page as a PNG; returns the dpi it was rendered at. */
+  private async addRasterPage(doc: JsPdfDocument, page: Page, dpi: RasterDpi): Promise<number> {
+    const plan = ExportSizing.plan(page, ExportSizing.scaleForDpi(dpi));
+    const png = await this.deps.rasterizer.png(page, { scale: plan.scale, size: plan.size, paper: true });
+    const bytes = new Uint8Array(await png.arrayBuffer());
+    const w = page.w * MM * PT_PER_PX;
+    const h = page.h * MM * PT_PER_PX;
+    doc.addImage(bytes, 'PNG', 0, 0, w, h, undefined, 'FAST');
+    return plan.lowered ? ExportSizing.dpiOf(plan) : dpi;
   }
 }

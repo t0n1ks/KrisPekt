@@ -3,7 +3,7 @@ import type { AutoBackupInterval, Language, Notebook, Subject } from '../../core
 /** What the shelf can ask the app to do. Implemented by ShelfActions. */
 export interface LibraryActions {
   openNotebook(nb: Notebook): void;
-  exportPdf(nb: Notebook): void;
+  exportNotebook(nb: Notebook): void;
   newSubject(): void;
   editSubject(subject: Subject): void;
   deleteSubject(subject: Subject): void;

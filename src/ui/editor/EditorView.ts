@@ -12,7 +12,14 @@ import { PageOperations } from '../../editor/PageOperations';
 import { ImageInserter } from '../../features/images/ImageInserter';
 import { ImageRejectedError, type ImageEncoder } from '../../features/images/ImageEncoder';
 import type { PdfImporter } from '../../features/pdf/PdfImporter';
+import { ExportController, type ExportRequest } from '../../features/export/ExportController';
+import { PageRasterizer } from '../../features/export/PageRasterizer';
+import { PngExporter } from '../../features/export/PngExporter';
+import { ZipArchive } from '../../features/export/ZipArchive';
+import type { FileSaver } from '../../features/files/FileSaver';
 import { PdfExporter } from '../../features/pdf/PdfExporter';
+import { PdfFont } from '../../features/pdf/PdfFont';
+import { PdfImages } from '../../features/pdf/PdfImages';
 import type { I18n } from '../../i18n/I18n';
 import { KeyboardShortcuts } from '../../input/KeyboardShortcuts';
 import type { BlobRepository } from '../../storage/BlobRepository';
@@ -38,7 +45,7 @@ import { TopBar } from './TopBar';
 export interface EditorActions {
   closed(): void;
   editNotebook(nb: Notebook): void;
-  exportPdf(nb: Notebook): void;
+  exportNotebook(nb: Notebook): void;
   setLanguage(language: Language): void;
   subjectName(subjectId: string): string;
 }
@@ -57,6 +64,7 @@ export interface EditorViewDeps {
   saveQueue: SaveQueue;
   imageEncoder: ImageEncoder;
   pdfImporter: PdfImporter;
+  files: FileSaver;
   makeId: () => string;
   actions: EditorActions;
   onStorageError: (error: unknown) => void;
@@ -77,7 +85,7 @@ export class EditorView {
   private readonly pageOps: PageOperations;
   private readonly pageSettings: PageSettingsDialog;
   private readonly images: ImageInserter;
-  private readonly exporter: PdfExporter;
+  private readonly exporter: ExportController;
   private readonly diagnostics: InputDiagnosticsOverlay;
 
   constructor(private readonly deps: EditorViewDeps) {
@@ -141,12 +149,7 @@ export class EditorView {
       layout: c.layout,
       makeId: deps.makeId,
     });
-    this.exporter = new PdfExporter({
-      painter: c.painter,
-      bitmaps: c.bitmaps,
-      i18n,
-      notify: (m, ms) => deps.toast.show(m, ms),
-    });
+    this.exporter = this.createExporter();
     this.fab.append(icon('plus', 26));
     this.fab.addEventListener('click', () => this.pageOps.add());
     new KeyboardShortcuts(this.shortcutHandlers());
@@ -154,6 +157,24 @@ export class EditorView {
   }
 
   /* ---------- wiring ---------- */
+
+  /** PDF (vector or raster) and PNG export, drawn with the editor's own painter. */
+  private createExporter(): ExportController {
+    const { i18n, toast, blobs, files } = this.deps;
+    const c = this.canvas;
+    const notify = (message: string, ms?: number): void => toast.show(message, ms);
+    const rasterizer = new PageRasterizer(c.painter, c.bitmaps);
+    const pdf = new PdfExporter({
+      painter: c.painter,
+      rasterizer,
+      images: new PdfImages(blobs),
+      font: new PdfFont(),
+      i18n,
+      notify,
+    });
+    const png = new PngExporter(rasterizer, i18n, notify);
+    return new ExportController({ pdf, png, zip: new ZipArchive(), files, i18n, notify });
+  }
 
   private hooks(): EditorCanvasHooks {
     const d = this.deps;
@@ -303,14 +324,22 @@ export class EditorView {
     return this.canvas.session.isOpen;
   }
 
-  /** The open notebook's pages if `nb` is open (for PDF export of unsaved state). */
+  /** The open notebook's pages if `nb` is open (for exporting unsaved state). */
   pagesOf(nb: Notebook): Page[] | null {
     return this.canvas.session.notebook === nb ? this.canvas.session.pages : null;
   }
 
-  /** Renders pages (of any notebook) into a PDF file. */
-  renderPdf(pages: readonly Page[]): Promise<Blob | null> {
-    return this.exporter.export(pages);
+  /** The open page's index if `nb` is open, else null. */
+  currentIndexOf(nb: Notebook): number | null {
+    const session = this.canvas.session;
+    if (session.notebook !== nb) return null;
+    const page = session.currentPage();
+    return page ? session.indexOf(page) : null;
+  }
+
+  /** Exports pages (of any notebook) as PDF or PNG and saves the file. */
+  exportPages(request: ExportRequest): Promise<void> {
+    return this.exporter.run(request);
   }
 
   /** Opens a notebook in the editor. Returns false if its pages could not be loaded. */
@@ -543,7 +572,7 @@ export class EditorView {
       },
       { label: i18n.t('insertPhoto'), icon: 'image', onClick: () => void this.insertPhoto() },
       { label: i18n.t('addPdfPages'), icon: 'file', onClick: () => void this.importPdfHere() },
-      { label: i18n.t('savePdfNb'), icon: 'download', onClick: () => actions.exportPdf(nb) },
+      { label: i18n.t('exportMenu'), icon: 'download', onClick: () => actions.exportNotebook(nb) },
       '-',
       {
         label: i18n.t('fingerDraw'),

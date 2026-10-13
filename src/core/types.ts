@@ -151,6 +151,28 @@ export interface RecentColors {
   hl: string[];
 }
 
+/** Export formats: vector PDF, raster PDF (lossless images), PNG images. */
+export type ExportFormat = 'pdf' | 'pdfRaster' | 'png';
+
+/** Raster PDF resolutions. */
+export type RasterDpi = 300 | 600;
+
+/** PNG sizes as multiples of the page at 96 dpi. */
+export type PngScale = 2 | 4 | 6;
+
+/** Which pages an export includes; `current` exists only in the editor. */
+export type ExportScope = 'current' | 'all' | 'range';
+
+/** The last export choices. */
+export interface ExportPrefs {
+  format: ExportFormat;
+  dpi: RasterDpi;
+  scale: PngScale;
+  /** PNG without paper and pattern. */
+  transparent: boolean;
+  pages: ExportScope;
+}
+
 /** User preferences, stored in localStorage under `konspektnik.prefs.v1`. */
 export interface Preferences {
   /** The pen's current brush. */
@@ -181,6 +203,8 @@ export interface Preferences {
   lastBackupBytes: number;
   /** When content (a page, notebook or subject) was last written, ms since epoch; 0 = never. */
   lastChangeAt: number;
+  /** The last export choices. */
+  exp: ExportPrefs;
 }
 
 /** A point in screen (stage-local CSS px) or world coordinates. */

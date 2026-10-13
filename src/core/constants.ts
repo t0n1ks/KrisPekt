@@ -1,4 +1,14 @@
-import type { AutoBackupInterval, Background, BrushKind, Language, PenPrefs, Preferences } from './types';
+import type {
+  AutoBackupInterval,
+  Background,
+  BrushKind,
+  ExportPrefs,
+  Language,
+  PenPrefs,
+  PngScale,
+  Preferences,
+  RasterDpi,
+} from './types';
 
 /* ---------- units and layout ---------- */
 
@@ -202,6 +212,15 @@ export const BRUSH_SPECS: Record<BrushKind, BrushSpec> = {
   brush: { defaults: { c: '#16181D', s: 4 }, min: 1, max: 20, step: 0.5 },
 };
 
+/** Export starts as a vector PDF of all pages. */
+export const DEFAULT_EXPORT: ExportPrefs = {
+  format: 'pdf',
+  dpi: 300,
+  scale: 4,
+  transparent: false,
+  pages: 'all',
+};
+
 export const DEFAULT_PREFS: Preferences = {
   brush: 'ballpoint',
   brushes: {
@@ -226,6 +245,7 @@ export const DEFAULT_PREFS: Preferences = {
   lastBackupAt: 0,
   lastBackupBytes: 0,
   lastChangeAt: 0,
+  exp: { ...DEFAULT_EXPORT },
 };
 
 /* ---------- automatic backup ---------- */
@@ -304,6 +324,23 @@ export const IMAGE_JPEG_QUALITY = 0.88;
 export const PDF_IMPORT_WIDTH = 1800;
 export const PDF_IMPORT_MAX_SCALE = 3;
 export const PDF_IMPORT_JPEG_QUALITY = 0.86;
-export const PDF_EXPORT_SCALE = 2;
-export const PDF_EXPORT_JPEG_QUALITY = 0.9;
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+
+/* ---------- export ---------- */
+
+/** PDF points per world px (72 pt per inch; world px are 96 per inch). */
+export const PT_PER_PX = 72 / 96;
+/**
+ * Canvas scale used for background patterns in vector PDF: lines 0.5 world px (0.375 pt)
+ * wide, as in the earlier 2× export.
+ */
+export const PDF_PATTERN_SCALE = 2;
+/** The text font embedded in vector PDFs (same-origin, loaded only during export). */
+export const PDF_FONT_FILE = 'fonts/Onest-Regular.ttf';
+export const PDF_FONT_NAME = 'Onest';
+/** Resolutions offered for raster PDF. */
+export const RASTER_DPIS: readonly RasterDpi[] = [300, 600];
+/** PNG export sizes, as multiples of the page at 96 dpi. */
+export const PNG_SCALES: readonly PngScale[] = [2, 4, 6];
+/** Largest raster page in pixels; a bigger page is rendered at a lower resolution. */
+export const EXPORT_MAX_PX = 40e6;

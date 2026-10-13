@@ -1,5 +1,4 @@
-import type { AutoBackupInterval, Language, Notebook, Preferences } from '../core/types';
-import { safeFileName } from '../core/utils/format';
+import type { AutoBackupInterval, ExportPrefs, Language, Notebook, Preferences } from '../core/types';
 import { uid } from '../core/utils/id';
 import { PageSizePolicy } from '../domain/PageSizePolicy';
 import { PageSizes } from '../domain/PageSizes';
@@ -21,6 +20,7 @@ import { RecordReader } from '../storage/RecordReader';
 import { SaveQueue } from '../storage/SaveQueue';
 import { SubjectRepository } from '../storage/SubjectRepository';
 import { DialogFactory } from '../ui/dialogs/DialogFactory';
+import { ExportDialog } from '../ui/dialogs/ExportDialog';
 import { Menu } from '../ui/dialogs/Menu';
 import { NotebookDialog } from '../ui/dialogs/NotebookDialog';
 import { StorageInfoDialog } from '../ui/dialogs/StorageInfoDialog';
@@ -61,6 +61,7 @@ export class App {
   private readonly pdfImporter: PdfImporter;
   private readonly subjectDialog: SubjectDialog;
   private readonly notebookDialog: NotebookDialog;
+  private readonly exportDialog: ExportDialog;
   private readonly backupFlow: BackupFlow;
   private readonly autoBackup: AutoBackupScheduler;
   private readonly editor: EditorView;
@@ -105,6 +106,12 @@ export class App {
     });
     this.subjectDialog = this.createSubjectDialog();
     this.notebookDialog = this.createNotebookDialog();
+    this.exportDialog = new ExportDialog({
+      i18n: this.i18n,
+      dialogs: this.dialogs,
+      prefs: this.prefs,
+      savePrefs: () => this.prefsStore.save(this.prefs),
+    });
     this.editor = this.createEditor();
     this.libraryView = this.createLibraryView();
   }
@@ -165,12 +172,13 @@ export class App {
       saveQueue: this.saveQueue,
       imageEncoder: this.imageEncoder,
       pdfImporter: this.pdfImporter,
+      files: this.files,
       makeId: uid,
       onStorageError: () => this.storageError(),
       actions: {
         closed: () => this.libraryView.show(),
         editNotebook: (nb) => this.notebookDialog.open(nb),
-        exportPdf: (nb) => void this.exportPdf(nb),
+        exportNotebook: (nb) => this.exportNotebook(nb),
         setLanguage: (l) => this.setLanguage(l),
         subjectName: (id) => this.library.subject(id)?.name ?? '',
       },
@@ -205,7 +213,7 @@ export class App {
       backup,
       persistent: () => this.db.persistent,
       openNotebook: (nb) => void this.openNotebook(nb),
-      exportPdf: (nb) => void this.exportPdf(nb),
+      exportNotebook: (nb) => this.exportNotebook(nb),
       setLanguage: (l) => this.setLanguage(l),
       setAutoBackup: (interval) => this.setAutoBackup(interval),
       rerender,
@@ -289,8 +297,22 @@ export class App {
     if (!(await this.editor.open(nb))) this.libraryView.show();
   }
 
-  /** Exports a notebook (open or closed) to PDF and saves it. */
-  private async exportPdf(nb: Notebook): Promise<void> {
+  /** Asks how to export a notebook (open or closed), then exports it. */
+  private exportNotebook(nb: Notebook): void {
+    this.menu.close();
+    const current = this.editor.currentIndexOf(nb);
+    const open = this.editor.pagesOf(nb);
+    const page = current === null ? undefined : open?.[current];
+    this.exportDialog.open({
+      pageCount: open?.length ?? nb.pageIds.length,
+      current,
+      pageSize: page ?? nb.base,
+      onExport: (settings, indices) => void this.runExport(nb, settings, indices),
+    });
+  }
+
+  /** Exports the chosen pages of a notebook in the chosen format and saves the file. */
+  private async runExport(nb: Notebook, settings: ExportPrefs, indices: number[]): Promise<void> {
     await this.saveQueue.flush(true);
     let pages = this.editor.pagesOf(nb);
     if (!pages) {
@@ -302,8 +324,7 @@ export class App {
       }
       for (const p of pages) PageSizePolicy.enforceLock(p, nb.base);
     }
-    const blob = await this.editor.renderPdf(pages);
-    if (blob) await this.files.save(safeFileName(nb.title, this.i18n.t('defName')) + '.pdf', blob);
+    await this.editor.exportPages({ title: nb.title, pages, indices, settings });
   }
 
   /* ---------- language and errors ---------- */
