@@ -42,7 +42,7 @@ export interface EditorCanvasHooks {
   afterRender(): void;
   onSelectionChange(state: SelectionState | null): void;
   onUndoState(canUndo: boolean, canRedo: boolean): void;
-  onRestored(page: Page, resized: boolean): void;
+  onRestored(pages: Page[], resized: boolean): void;
   onToolChange(tool: Tool): void;
   onBitmapLoaded(): void;
   /** First thing on pointer-down; true swallows the event. */
@@ -120,7 +120,7 @@ export class EditorCanvas {
       history: this.history,
       session: this.session,
       beforeStep: () => hooks.settle(),
-      onRestored: (page, resized) => hooks.onRestored(page, resized),
+      onRestored: (pages, resized) => hooks.onRestored(pages, resized),
       onStateChange: (u, r) => hooks.onUndoState(u, r),
     });
     this.selection = this.createSelection();
@@ -178,7 +178,7 @@ export class EditorCanvas {
       strokes: this.strokes,
       texts: this.texts,
       bitmaps: this.bitmaps,
-      recordUndo: (page) => this.undo.record(page),
+      recordUndo: (...pages) => this.undo.record(...pages),
       makeId: this.deps.makeId,
       onChange: (state) => {
         this.deps.hooks.onSelectionChange(state);

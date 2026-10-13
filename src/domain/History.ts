@@ -16,10 +16,22 @@ export interface PageSnapshot {
   bg: Background;
 }
 
+/**
+ * One undo step: the pages a change touched, as they were before it. Most changes touch one
+ * page; moving a selection onto another page touches two, which are restored together.
+ */
+export type HistoryEntry = PageSnapshot[];
+
+/** The pages an undo/redo step restored, and whether any of them changed size. */
+export interface HistoryStep {
+  pages: Page[];
+  resized: boolean;
+}
+
 /** Undo/redo stacks of page snapshots (max 150 undo steps). */
 export class History {
-  private undoStack: PageSnapshot[] = [];
-  private redoStack: PageSnapshot[] = [];
+  private undoStack: HistoryEntry[] = [];
+  private redoStack: HistoryEntry[] = [];
 
   constructor(private readonly limit = UNDO_LIMIT) {}
 
@@ -57,30 +69,33 @@ export class History {
     return this.redoStack.length > 0;
   }
 
-  /** Records the page's state before a change. Clears the redo stack. */
-  record(page: Page): void {
-    this.undoStack.push(History.snapshot(page));
+  /** Records the pages' state before a change, as one undo step. Clears the redo stack. */
+  record(...pages: Page[]): void {
+    if (!pages.length) return;
+    this.undoStack.push(pages.map(History.snapshot));
     if (this.undoStack.length > this.limit) this.undoStack.shift();
     this.redoStack.length = 0;
   }
 
   /**
-   * Steps back. `find` resolves page ids; entries for deleted pages are skipped.
-   * Returns the page that was restored, or null if there is nothing to undo.
+   * Steps back. `find` resolves page ids; snapshots of deleted pages are skipped, and an
+   * entry whose pages are all gone is dropped. Returns null if there is nothing to undo.
    */
-  undo(find: (id: string) => Page | undefined): { page: Page; resized: boolean } | null {
+  undo(find: (id: string) => Page | undefined): HistoryStep | null {
     return this.step(this.undoStack, this.redoStack, find);
   }
 
   /** Steps forward again (see {@link undo}). */
-  redo(find: (id: string) => Page | undefined): { page: Page; resized: boolean } | null {
+  redo(find: (id: string) => Page | undefined): HistoryStep | null {
     return this.step(this.redoStack, this.undoStack, find);
   }
 
-  /** Forgets every entry of a deleted page. */
+  /** Forgets every snapshot of a deleted page. */
   dropPage(id: string): void {
-    this.undoStack = this.undoStack.filter((e) => e.id !== id);
-    this.redoStack = this.redoStack.filter((e) => e.id !== id);
+    const drop = (stack: HistoryEntry[]): HistoryEntry[] =>
+      stack.map((entry) => entry.filter((snap) => snap.id !== id)).filter((entry) => entry.length > 0);
+    this.undoStack = drop(this.undoStack);
+    this.redoStack = drop(this.redoStack);
   }
 
   clear(): void {
@@ -88,19 +103,23 @@ export class History {
     this.redoStack = [];
   }
 
+  /** Restores every page of the newest entry that still exists, atomically. */
   private step(
-    from: PageSnapshot[],
-    to: PageSnapshot[],
+    from: HistoryEntry[],
+    to: HistoryEntry[],
     find: (id: string) => Page | undefined,
-  ): { page: Page; resized: boolean } | null {
-    let entry: PageSnapshot | undefined;
-    let page: Page | undefined;
+  ): HistoryStep | null {
+    let entry: HistoryEntry | undefined;
     while ((entry = from.pop())) {
-      page = find(entry.id);
-      if (page) break;
+      const found = entry
+        .map((snap) => ({ snap, page: find(snap.id) }))
+        .filter((x): x is { snap: PageSnapshot; page: Page } => !!x.page);
+      if (!found.length) continue;
+      to.push(found.map((x) => History.snapshot(x.page)));
+      let resized = false;
+      for (const { page, snap } of found) resized = History.apply(page, snap) || resized;
+      return { pages: found.map((x) => x.page), resized };
     }
-    if (!entry || !page) return null;
-    to.push(History.snapshot(page));
-    return { page, resized: History.apply(page, entry) };
+    return null;
   }
 }

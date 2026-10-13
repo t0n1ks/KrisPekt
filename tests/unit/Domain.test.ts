@@ -37,7 +37,7 @@ describe('History', () => {
     history.record(p);
     p.strokes = [{ id: 's1', k: 'pen', c: '#000000', s: 1, p: new Float32Array(3) }];
     const find = (id: string) => (id === p.id ? p : undefined);
-    expect(history.undo(find)?.page).toBe(p);
+    expect(history.undo(find)?.pages).toEqual([p]);
     expect(p.strokes).toEqual([]);
     expect(history.canRedo).toBe(true);
     history.redo(find);

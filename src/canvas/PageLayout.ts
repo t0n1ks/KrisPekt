@@ -1,5 +1,6 @@
 import { GAP, MM } from '../core/constants';
 import type { Page, Point } from '../core/types';
+import { SelectionPlacement } from '../domain/SelectionPlacement';
 
 /** Width used before any page exists (an A4 page in world px). */
 const DEFAULT_PAGE_W = 794;
@@ -48,6 +49,15 @@ export class PageLayout {
         return p;
     }
     return null;
+  }
+
+  /**
+   * The page containing a world point, or the nearest page when the point lies in the gap
+   * between pages or beyond the stack (where a dropped selection lands).
+   */
+  nearestPage(world: Point): Page | null {
+    const rects = this.pages.map((p) => ({ ...this.pos(p), w: p.w * MM, h: p.h * MM }));
+    return this.pages[SelectionPlacement.targetIndex(rects, world)] ?? null;
   }
 
   /**

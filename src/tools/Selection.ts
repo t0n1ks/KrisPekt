@@ -1,6 +1,8 @@
 import { MM, PAPER } from '../core/constants';
 import type { Box, Page, Point } from '../core/types';
 import { clamp } from '../core/utils/math';
+import { ItemTransform, type ItemMapping, type PageItems } from '../domain/ItemTransform';
+import { SelectionPlacement, type Rect } from '../domain/SelectionPlacement';
 import type { BitmapCache } from '../canvas/BitmapCache';
 import type { Camera } from '../canvas/Camera';
 import type { LiveLayer, OverlayPainter } from '../canvas/LiveLayer';
@@ -9,7 +11,6 @@ import type { StrokeGeometry } from '../canvas/StrokeGeometry';
 import type { StrokePainter } from '../canvas/StrokePainter';
 import type { TextLayout } from '../canvas/TextLayout';
 import type { EditorSession } from '../editor/EditorSession';
-import { LIMITS } from '../storage/validation/guards';
 
 /** The selected items and the pending move/scale applied on release. */
 export interface SelectionState {
@@ -33,7 +34,8 @@ export interface SelectionDeps {
   strokes: StrokePainter;
   texts: TextLayout;
   bitmaps: BitmapCache;
-  recordUndo: (page: Page) => void;
+  /** Records pages for undo before they change; several pages form one undo step. */
+  recordUndo: (...pages: Page[]) => void;
   makeId: () => string;
   /** The selection appeared, changed or disappeared. */
   onChange: (state: SelectionState | null) => void;
@@ -43,8 +45,6 @@ export interface SelectionDeps {
 const DUPLICATE_OFFSET = 6 * MM;
 /** Screen radius around the resize handle that grabs it. */
 const HANDLE_HIT = 24;
-
-const clampCoord = (v: number): number => clamp(v, LIMITS.coord[0], LIMITS.coord[1]);
 
 /**
  * Lasso selection: which items are selected, the pending move/scale while dragging, and the
@@ -138,44 +138,75 @@ export class Selection implements OverlayPainter {
     this.state.s = 1;
   }
 
-  /** Bakes the pending move/scale into the items (one undo step). */
+  /**
+   * Bakes the pending move/scale into the items (one undo step). The selection lands on the page
+   * under its centre (the nearest page if the centre is in a gap) and is shifted to lie inside
+   * that page. Moving onto another page carries the items over, converting their coordinates,
+   * and keeps them selected there.
+   */
   apply(): void {
     const s = this.state;
     if (!s || (s.dx === 0 && s.dy === 0 && s.s === 1)) return;
-    const p = s.page;
-    this.deps.recordUndo(p);
-    const { x: ox, y: oy } = s.box;
-    const k = s.s;
-    const tx = (x: number): number => clampCoord(ox + (x - ox) * k + s.dx);
-    const ty = (y: number): number => clampCoord(oy + (y - oy) * k + s.dy);
-    p.strokes = p.strokes.map((st) => {
-      if (!s.ids.has(st.id)) return st;
-      const a = new Float32Array(st.p.length);
-      for (let i = 0; i < a.length; i += 3) {
-        a[i] = tx(st.p[i] ?? 0);
-        a[i + 1] = ty(st.p[i + 1] ?? 0);
-        a[i + 2] = st.p[i + 2] ?? 0;
-      }
-      return { ...st, p: a, s: clamp(st.s * k, LIMITS.strokeWidth[0], LIMITS.strokeWidth[1]) };
+    const source = s.page;
+    const moved: Rect = { x: s.box.x + s.dx, y: s.box.y + s.dy, w: s.box.w * s.s, h: s.box.h * s.s };
+    const target = this.dropTarget(source, moved);
+    const offset = this.pageOffset(source, target);
+    const shift = SelectionPlacement.clampShift(
+      { ...moved, x: moved.x + offset.x, y: moved.y + offset.y },
+      target.w * MM,
+      target.h * MM,
+    );
+    const mapping: ItemMapping = {
+      ox: s.box.x,
+      oy: s.box.y,
+      k: s.s,
+      dx: s.dx + offset.x + shift.x,
+      dy: s.dy + offset.y + shift.y,
+    };
+    if (target === source) this.transformOnPage(source, s.ids, mapping);
+    else this.moveToPage(source, target, s.ids, mapping);
+    this.set(target, s.ids);
+  }
+
+  /** The page under the centre of a box given in `source` page px. */
+  private dropTarget(source: Page, box: Rect): Page {
+    const pos = this.deps.layout.pos(source);
+    const center = { x: pos.x + box.x + box.w / 2, y: pos.y + box.y + box.h / 2 };
+    return this.deps.layout.nearestPage(center) ?? source;
+  }
+
+  /** What to add to `from`-page px to get `to`-page px. */
+  private pageOffset(from: Page, to: Page): Point {
+    const a = this.deps.layout.pos(from);
+    const b = this.deps.layout.pos(to);
+    return { x: a.x - b.x, y: a.y - b.y };
+  }
+
+  private transformOnPage(page: Page, ids: ReadonlySet<string>, mapping: ItemMapping): void {
+    this.deps.recordUndo(page);
+    Selection.setItems(page, ItemTransform.mapInPlace(page, ids, mapping));
+    this.deps.session.touch(page);
+  }
+
+  /** Moves items from one page to another: one undo step that restores both pages. */
+  private moveToPage(source: Page, target: Page, ids: ReadonlySet<string>, mapping: ItemMapping): void {
+    this.deps.recordUndo(source, target);
+    const { picked, rest } = ItemTransform.split(source, ids);
+    const arrived = ItemTransform.map(picked, mapping);
+    Selection.setItems(source, rest);
+    Selection.setItems(target, {
+      strokes: [...target.strokes, ...arrived.strokes],
+      texts: [...target.texts, ...arrived.texts],
+      images: [...target.images, ...arrived.images],
     });
-    p.texts = p.texts.map((t) =>
-      s.ids.has(t.id)
-        ? {
-            ...t,
-            x: tx(t.x),
-            y: ty(t.y),
-            w: t.w * k,
-            fs: clamp(t.fs * k, LIMITS.fontSize[0], LIMITS.fontSize[1]),
-          }
-        : t,
-    );
-    p.images = p.images.map((im) =>
-      s.ids.has(im.id) ? { ...im, x: tx(im.x), y: ty(im.y), w: im.w * k, h: im.h * k } : im,
-    );
-    s.box = { x: tx(ox), y: ty(oy), w: s.box.w * k, h: s.box.h * k };
-    this.resetTransform();
-    s.token = ++this.tokenSeq;
-    this.deps.session.touch(p);
+    this.deps.session.touch(source);
+    this.deps.session.touch(target);
+  }
+
+  private static setItems(page: Page, items: PageItems): void {
+    page.strokes = items.strokes;
+    page.texts = items.texts;
+    page.images = items.images;
   }
 
   /** Recolours selected pen strokes and texts (highlighters and images keep their colours). */
@@ -204,48 +235,50 @@ export class Selection implements OverlayPainter {
     this.deps.session.touch(p);
   }
 
-  /** Copies the selected items 6 mm down-right and selects the copies. */
+  /**
+   * Copies the selected items 6 mm down-right and selects the copies. Like a move, the copies
+   * are shifted back inside the page if the offset would push them over its edge.
+   */
   duplicate(): void {
     const s = this.state;
     if (!s) return;
     const p = s.page;
     this.deps.recordUndo(p);
-    const ids = new Set<string>();
     const off = DUPLICATE_OFFSET;
-    for (const st of p.strokes.filter((x) => s.ids.has(x.id))) {
-      const a = new Float32Array(st.p);
-      for (let i = 0; i < a.length; i += 3) {
-        a[i] = clampCoord((a[i] ?? 0) + off);
-        a[i + 1] = clampCoord((a[i + 1] ?? 0) + off);
-      }
-      const copy = { ...st, id: this.deps.makeId(), p: a };
-      p.strokes.push(copy);
+    const shift = SelectionPlacement.clampShift(
+      { ...s.box, x: s.box.x + off, y: s.box.y + off },
+      p.w * MM,
+      p.h * MM,
+    );
+    const copies = ItemTransform.map(
+      ItemTransform.split(p, s.ids).picked,
+      ItemTransform.translation(off + shift.x, off + shift.y),
+    );
+    const ids = new Set<string>();
+    const fresh = <T extends { id: string }>(item: T): T => {
+      const copy = { ...item, id: this.deps.makeId() };
       ids.add(copy.id);
-    }
-    for (const t of p.texts.filter((x) => s.ids.has(x.id))) {
-      const copy = { ...t, id: this.deps.makeId(), x: clampCoord(t.x + off), y: clampCoord(t.y + off) };
-      p.texts.push(copy);
-      ids.add(copy.id);
-    }
-    for (const im of p.images.filter((x) => s.ids.has(x.id))) {
-      const copy = { ...im, id: this.deps.makeId(), x: clampCoord(im.x + off), y: clampCoord(im.y + off) };
-      p.images.push(copy);
-      ids.add(copy.id);
-    }
+      return copy;
+    };
+    p.strokes = [...p.strokes, ...copies.strokes.map(fresh)];
+    p.texts = [...p.texts, ...copies.texts.map(fresh)];
+    p.images = [...p.images, ...copies.images.map(fresh)];
     this.deps.session.touch(p);
     this.set(p, ids);
   }
 
-  /** Draws the selected items with the pending transform, the dashed frame and the resize handle. */
+  /**
+   * Draws the selected items with the pending transform, the dashed frame and the resize
+   * handle. Called on every frame, including zoom frames, so it always follows the camera.
+   */
   renderOverlay(ctx: CanvasRenderingContext2D, live: LiveLayer): void {
     const s = this.state;
     if (!s) return;
     const p = s.page;
     live.usePageSpace(ctx, p);
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, p.w * MM, p.h * MM);
-    ctx.clip();
+    // Not clipped to the page: while dragging, the items follow the pointer across the gap
+    // and onto the next page, where they land on release (see apply()).
     ctx.translate(s.box.x + s.dx, s.box.y + s.dy);
     ctx.scale(s.s, s.s);
     ctx.translate(-s.box.x, -s.box.y);

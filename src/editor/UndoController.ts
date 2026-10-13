@@ -7,8 +7,8 @@ export interface UndoControllerDeps {
   session: EditorSession;
   /** Finishes text editing and drops the selection before a step. */
   beforeStep: () => void;
-  /** A page was restored from history. */
-  onRestored: (page: Page, resized: boolean) => void;
+  /** Pages were restored from history (one step may restore several). */
+  onRestored: (pages: Page[], resized: boolean) => void;
   /** Undo/redo availability changed (toolbar buttons). */
   onStateChange: (canUndo: boolean, canRedo: boolean) => void;
 }
@@ -17,9 +17,9 @@ export interface UndoControllerDeps {
 export class UndoController {
   constructor(private readonly deps: UndoControllerDeps) {}
 
-  /** Records a page before it changes. */
-  record(page: Page): void {
-    this.deps.history.record(page);
+  /** Records pages before they change, as one undo step. */
+  record(...pages: Page[]): void {
+    this.deps.history.record(...pages);
     this.notify();
   }
 
@@ -52,8 +52,8 @@ export class UndoController {
     const find = (id: string): Page | undefined => this.deps.session.find(id);
     const result = direction === 'undo' ? this.deps.history.undo(find) : this.deps.history.redo(find);
     if (result) {
-      this.deps.session.touch(result.page);
-      this.deps.onRestored(result.page, result.resized);
+      for (const page of result.pages) this.deps.session.touch(page);
+      this.deps.onRestored(result.pages, result.resized);
     }
     this.notify();
     return !!result;
