@@ -6,6 +6,7 @@ import { InputLog, type InputLogEntry, type InputSample } from '../../input/Inpu
 /**
  * Hidden "input diagnostics" overlay: the last pointer events with their type, id, contact size,
  * pressure, buttons and how the router classified them, to tune palm rejection on a real tablet.
+ * It also shows how many lost items were moved back onto their pages when the notebook opened.
  *
  * Opened by a long press on "Draw with finger" in the editor's ⋯ menu. Off by default, never
  * stored, plain text only (`textContent`); nothing leaves the device.
@@ -14,6 +15,7 @@ export class InputDiagnosticsOverlay {
   private readonly node = byId('inputDiag');
   private readonly log = new InputLog();
   private frame = 0;
+  private repaired = 0;
 
   constructor(private readonly i18n: I18n) {}
 
@@ -27,6 +29,12 @@ export class InputDiagnosticsOverlay {
     this.log.clear();
     if (on) this.render();
     else this.destroy();
+  }
+
+  /** How many items lying outside their pages were moved back when the notebook was opened. */
+  noteRepaired(count: number): void {
+    this.repaired = count;
+    if (this.visible) this.update();
   }
 
   /** Records a pointer event while the overlay is visible. */
@@ -47,6 +55,7 @@ export class InputDiagnosticsOverlay {
 
   render(): void {
     const head = [this.i18n.t('inputDiagTitle', { n: PALM_SIZE_PX }), this.i18n.t('inputDiagLegend')];
+    if (this.repaired) head.push(this.i18n.t('inputDiagRepaired', { n: this.repaired }));
     this.node.textContent = [...head, ...this.log.entries.map(InputDiagnosticsOverlay.line)].join('\n');
   }
 

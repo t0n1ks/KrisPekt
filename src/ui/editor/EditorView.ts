@@ -1,9 +1,10 @@
 import type { EventBus } from '../../app/EventBus';
 import { ZOOM_MAX, ZOOM_MIN } from '../../core/constants';
-import type { Language, Notebook, Page, Preferences, ToolKind } from '../../core/types';
+import type { Language, Notebook, Page, Preferences, Stroke, TextItem, ToolKind } from '../../core/types';
 import { byId } from '../../core/utils/dom';
 import { clamp } from '../../core/utils/math';
 import { ColorLists } from '../../domain/ColorLists';
+import { PageRepair } from '../../domain/PageRepair';
 import { PageSizePolicy } from '../../domain/PageSizePolicy';
 import type { PageSizes } from '../../domain/PageSizes';
 import { EditorCanvas, type EditorCanvasHooks } from '../../editor/EditorCanvas';
@@ -165,7 +166,7 @@ export class EditorView {
         } else this.selectionBar.hide();
       },
       onUndoState: (u, r) => this.topBar.setUndoState(u, r),
-      onRestored: (_page, resized) => {
+      onRestored: (_pages, resized) => {
         if (resized) this.canvas.viewport.relayout();
         this.refreshPanel();
       },
@@ -326,18 +327,38 @@ export class EditorView {
     const created = !pages.length;
     if (created) pages = [PageSizePolicy.newPageAfter(nb, null, this.deps.makeId)];
     for (const p of pages) PageSizePolicy.enforceLock(p, nb.base);
+    const repaired = this.repairLostItems(pages);
     nb.pageIds = pages.map((p) => p.id);
     c.cache.clear();
     c.undo.clear();
     c.session.open(nb, pages);
     this.deps.saveQueue.setNotebook(nb);
     if (created) pages.forEach((p) => this.deps.saveQueue.markPageDirty(p));
+    repaired.forEach((p) => this.deps.saveQueue.markPageDirty(p));
     this.show();
     this.placeCamera(nb);
     this.topBar.setTitle(nb.title, this.deps.actions.subjectName(nb.subjectId));
     this.renderTray();
     c.renderer.render();
     return true;
+  }
+
+  /**
+   * Moves items lying completely outside their page back onto it (older versions could lose a
+   * selection dragged onto another page that way). Returns the pages that changed; the count
+   * goes to the input diagnostics overlay, not to a toast.
+   */
+  private repairLostItems(pages: readonly Page[]): Page[] {
+    const c = this.canvas;
+    const boxes = { stroke: (s: Stroke) => c.geometry.bbox(s), text: (t: TextItem) => c.texts.box(t) };
+    let count = 0;
+    const changed = pages.filter((page) => {
+      const moved = PageRepair.repair(page, boxes);
+      count += moved;
+      return moved > 0;
+    });
+    this.diagnostics.noteRepaired(count);
+    return changed;
   }
 
   private show(): void {

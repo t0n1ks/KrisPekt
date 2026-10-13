@@ -284,6 +284,7 @@
   "inputDiagOff": "Eingabediagnose ist aus",
   "inputDiagTitle": "Eingabediagnose · Handballen > {n} px",
   "inputDiagLegend": "Typ #ID B×H Druck Tasten Ereignis → Klasse (✎ Stiftsitzung, * Größe aus TouchEvent)",
+  "inputDiagRepaired": "Objekte außerhalb der Seite zurückgeholt: {n}",
   "saveBackup": "Sicherung speichern",
   "restoreBackup": "Aus Sicherung wiederherstellen",
   "whereStored": "Wo die Mitschriften gespeichert sind",

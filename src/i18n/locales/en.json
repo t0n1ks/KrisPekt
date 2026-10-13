@@ -284,6 +284,7 @@
   "inputDiagOff": "Input diagnostics off",
   "inputDiagTitle": "Input diagnostics · palm > {n} px",
   "inputDiagLegend": "type #id w×h pressure buttons event → class (✎ pen session, * size from TouchEvent)",
+  "inputDiagRepaired": "Items outside their page moved back: {n}",
   "saveBackup": "Save backup",
   "restoreBackup": "Restore from backup",
   "whereStored": "Where notes are stored",
