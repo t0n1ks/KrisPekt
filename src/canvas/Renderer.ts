@@ -1,4 +1,4 @@
-import { GAP, MAX_CACHE_PX, MM, PAPER, TEXT_FONT } from '../core/constants';
+import { GAP, MAX_CACHE_PX, MM, PAPER, PINCH_CACHE_PX, TEXT_FONT } from '../core/constants';
 import type { Page } from '../core/types';
 import { context2d } from '../core/utils/dom';
 import type { EditorSession } from '../editor/EditorSession';
@@ -26,8 +26,10 @@ export interface RendererDeps {
 
 /**
  * Draws the desk, page shadows, cached page bitmaps and page numbers on the main canvas.
- * Frames are coalesced with requestAnimationFrame. While pinching, a page whose cache is
- * outdated is drawn by scaling the stale bitmap instead of repainting it every frame.
+ * Frames are coalesced with requestAnimationFrame. While pinching, a page bitmap painted at
+ * another zoom is stretched instead of repainted every frame, but only if it shows the page's
+ * current content; otherwise the page is repainted once at the current zoom (at a lower
+ * resolution) and that bitmap is stretched from then on. The pinch end repaints at full quality.
  */
 export class Renderer {
   private readonly ctx: CanvasRenderingContext2D;
@@ -117,7 +119,7 @@ export class Renderer {
   }
 
   private drawContent(page: Page, sx: number, sy: number, sw: number, sh: number, sc: number): void {
-    const { cache, session, painter } = this.deps;
+    const { cache, session } = this.deps;
     const ctx = this.ctx;
     const skip = this.deps.skipFor(page);
     const revision = session.revision(page);
@@ -126,23 +128,44 @@ export class Renderer {
       ctx.drawImage(fresh, sx, sy);
       return;
     }
-    const stale = cache.stale(page.id);
-    if (stale && this.pinching) {
-      ctx.drawImage(stale, sx, sy, sw, sh);
+    if (this.pinching) {
+      const bitmap =
+        cache.reusable(page.id, revision, skip.key) ??
+        cache.paint(page, ...Renderer.cappedSize(sw, sh, sc), revision, skip);
+      ctx.drawImage(bitmap, sx, sy, sw, sh);
       return;
     }
     if (sw * sh > MAX_CACHE_PX) {
-      // Too big to cache (deep zoom): draw straight onto the screen, clipped to the page.
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(sx, sy, sw, sh);
-      ctx.clip();
-      ctx.setTransform(sc, 0, 0, sc, sx, sy);
-      painter.paint(ctx, page, sc, skip.set);
-      ctx.restore();
+      this.drawDirect(page, sx, sy, sw, sh, sc, skip);
       return;
     }
     ctx.drawImage(cache.paint(page, sw, sh, sc, revision, skip), sx, sy);
+  }
+
+  /** Width, height and scale of a page bitmap repainted mid-pinch: at most {@link PINCH_CACHE_PX}. */
+  private static cappedSize(sw: number, sh: number, sc: number): [number, number, number] {
+    const k = Math.min(1, Math.sqrt(PINCH_CACHE_PX / (sw * sh)));
+    return [sw * k, sh * k, sc * k];
+  }
+
+  /** Deep zoom: the page is too big to cache, so it is drawn straight onto the screen. */
+  private drawDirect(
+    page: Page,
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+    sc: number,
+    skip: SkipInfo,
+  ): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(sx, sy, sw, sh);
+    ctx.clip();
+    ctx.setTransform(sc, 0, 0, sc, sx, sy);
+    this.deps.painter.paint(ctx, page, sc, skip.set);
+    ctx.restore();
   }
 
   private drawLabel(page: Page, index: number, x: number, y: number): void {

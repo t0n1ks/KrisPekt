@@ -17,6 +17,11 @@ export const RULER_H = 64;
 export const MAX_DPR = 2;
 /** Max pixels in a page-cache bitmap; larger pages are drawn directly. */
 export const MAX_CACHE_PX = 14e6;
+/**
+ * Max pixels of a page bitmap repainted during a pinch (its old bitmap was outdated). Lower than
+ * {@link MAX_CACHE_PX} so the repaint stays fast; the pinch end repaints at full quality.
+ */
+export const PINCH_CACHE_PX = 4e6;
 /** Decoded images / PDF pages kept in memory. */
 export const BITMAP_LRU_SIZE = 8;
 /** Page caches kept when they are off-screen. */

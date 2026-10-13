@@ -24,7 +24,9 @@ interface Entry {
  *
  * Cache key format: `<scale with 4 decimals>|<page revision>|<skip key>`. Any change of zoom,
  * page content (revision) or hidden items (selection token / edited text) invalidates it.
- * Entries are kept in least-recently-used order.
+ * Each entry also keeps its revision and skip key on their own: while pinching, a bitmap of
+ * another scale may be stretched, but only if it still shows the current content
+ * ({@link reusable}). Entries are kept in least-recently-used order.
  */
 export class PageCache {
   private readonly entries = new Map<string, Entry>();
@@ -46,9 +48,23 @@ export class PageCache {
     return entry.canvas;
   }
 
-  /** Any cached bitmap, even outdated (shown scaled while pinching). */
-  stale(pageId: string): HTMLCanvasElement | null {
-    return this.entries.get(pageId)?.canvas ?? null;
+  /**
+   * A bitmap with the page's current content at any scale (stretched while pinching), or null.
+   * A bitmap painted before the latest content change, or with other items hidden, is never
+   * reused: it would show deleted items, or items at their old size and position.
+   */
+  reusable(pageId: string, revision: number, skipKey: string): HTMLCanvasElement | null {
+    const entry = this.entries.get(pageId);
+    return entry && PageCache.isReusable(entry, revision, skipKey) ? entry.canvas : null;
+  }
+
+  /** Whether a cache entry shows a page's current content (whatever its scale). */
+  static isReusable(
+    entry: { revision: number; skipKey: string },
+    revision: number,
+    skipKey: string,
+  ): boolean {
+    return entry.revision === revision && entry.skipKey === skipKey;
   }
 
   /** Repaints a page into its cache bitmap and returns it. */
