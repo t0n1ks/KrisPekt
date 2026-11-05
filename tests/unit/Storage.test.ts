@@ -122,7 +122,7 @@ describe('SaveQueue', () => {
     const notebooks = new NotebookRepository(db, reader);
     const onError = vi.fn();
     const onSaved = vi.fn();
-    return { pages, notebooks, onError, onSaved, queue: new SaveQueue(pages, notebooks, onError, onSaved) };
+    return { pages, notebooks, onError, onSaved, queue: new SaveQueue(pages, onError, onSaved) };
   }
 
   it('reports content changes, but not a forced flush with nothing changed', async () => {
@@ -152,7 +152,7 @@ describe('SaveQueue', () => {
 
   it('keeps pages dirty and reports when saving fails', async () => {
     const { pages, onError, queue } = setup();
-    const save = vi.spyOn(pages, 'save').mockRejectedValueOnce(new Error('quota'));
+    const save = vi.spyOn(pages, 'commit').mockRejectedValueOnce(new Error('quota'));
     queue.markPageDirty(page());
     await queue.flush();
     expect(onError).toHaveBeenCalledTimes(1);
@@ -161,12 +161,35 @@ describe('SaveQueue', () => {
     expect((await pages.all()).map((p) => p.id)).toEqual(['pg1']);
   });
 
-  it('forgets deleted pages', async () => {
+  it('deletes a page instead of saving it, and a page marked dirty again stays', async () => {
     const { pages, queue } = setup();
     const p = page();
+    await pages.save(p);
     queue.markPageDirty(p);
-    queue.forget(p);
+    queue.markPageDeleted(p);
     await queue.flush();
     expect(await pages.all()).toEqual([]);
+    queue.markPageDeleted(p);
+    queue.markPageDirty(p);
+    await queue.flush();
+    expect((await pages.all()).map((x) => x.id)).toEqual(['pg1']);
+  });
+
+  it('deletes pages and writes the new order in one transaction, retrying both after a failure', async () => {
+    const { pages, notebooks, onError, queue } = setup();
+    const a = page({ id: 'a' });
+    const nb = notebook({ pageIds: ['a'] });
+    await pages.save(a);
+    queue.setNotebook(nb);
+    nb.pageIds = [];
+    queue.markPageDeleted(a);
+    const commit = vi.spyOn(pages, 'commit').mockRejectedValueOnce(new Error('quota'));
+    await queue.flush();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect((await pages.all()).map((p) => p.id)).toEqual(['a']);
+    await queue.flush();
+    expect(commit).toHaveBeenCalledTimes(2);
+    expect(await pages.all()).toEqual([]);
+    expect((await notebooks.all())[0]?.pageIds).toEqual([]);
   });
 });

@@ -122,14 +122,14 @@ describe('History with multi-page entries', () => {
     expect(p2.texts).toEqual([]);
   });
 
-  it('keeps the rest of an entry when one of its pages is deleted', () => {
+  it('drops a whole entry when one of its pages is deleted, so the other page keeps its items', () => {
     const p1 = page({ id: 'p1' });
     const history = new History();
     history.record(p1, page({ id: 'p2' }));
     p1.strokes = [];
     history.dropPage('p2');
-    expect(history.undo((id) => (id === 'p1' ? p1 : undefined))?.pages).toEqual([p1]);
-    expect(p1.strokes).toHaveLength(1);
+    expect(history.undo((id) => (id === 'p1' ? p1 : undefined))).toBeNull();
+    expect(p1.strokes).toHaveLength(0);
   });
 });
 

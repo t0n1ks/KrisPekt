@@ -7,10 +7,11 @@ export interface Keyed {
   id: string;
 }
 
-/** A group of records written to one store inside a multi-store transaction. */
+/** Records written to, and ids deleted from, one store inside a multi-store transaction. */
 export interface StoreWrite {
   store: StoreName;
   values: readonly Keyed[];
+  deletes?: readonly string[];
 }
 
 const STORES: readonly StoreName[] = ['subjects', 'notebooks', 'pages', 'blobs'];
@@ -110,12 +111,15 @@ export class Database {
     return this.writeAcross([{ store, values }]);
   }
 
-  /** Writes to several stores atomically: either every record is stored or none is. */
+  /** Writes to and deletes from several stores atomically: either all of it happens or none. */
   async writeAcross(writes: readonly StoreWrite[]): Promise<void> {
-    const active = writes.filter((w) => w.values.length);
+    const active = writes.filter((w) => w.values.length || w.deletes?.length);
     if (!active.length) return;
     if (!this.idb) {
-      for (const w of active) for (const v of w.values) this.mem(w.store).set(v.id, v);
+      for (const w of active) {
+        for (const v of w.values) this.mem(w.store).set(v.id, v);
+        for (const id of w.deletes ?? []) this.mem(w.store).delete(id);
+      }
       return;
     }
     await this.transaction(
@@ -124,6 +128,7 @@ export class Database {
         for (const w of active) {
           const objectStore = tx.objectStore(w.store);
           for (const v of w.values) objectStore.put(v);
+          for (const id of w.deletes ?? []) objectStore.delete(id);
         }
       },
     );

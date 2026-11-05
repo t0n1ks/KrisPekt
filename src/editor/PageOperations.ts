@@ -116,7 +116,7 @@ export class PageOperations {
     if (!ok || !session.has(page)) return;
     this.deps.forgetSelectionOn(page);
     session.remove(page);
-    this.deps.saveQueue.forget(page);
+    this.deps.saveQueue.markPageDeleted(page);
     this.deps.cache.delete(page.id);
     this.deps.undo.dropPage(page.id);
     this.deps.viewport.relayout();
@@ -128,7 +128,7 @@ export class PageOperations {
     const stillUsed = PageRepository.blobIds(this.deps.session.pages);
     const orphaned = [...PageRepository.blobIds([page])].filter((id) => !stillUsed.has(id));
     try {
-      await this.deps.pages.deleteMany([page.id]);
+      await this.deps.saveQueue.flush();
       await this.deps.blobs.deleteMany(orphaned);
     } catch (error) {
       this.deps.onError(error);

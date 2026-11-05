@@ -86,7 +86,6 @@ export class App {
     this.library = new LibraryService(this.repos, uid, () => this.contentChanged());
     this.saveQueue = new SaveQueue(
       this.repos.pages,
-      this.repos.notebooks,
       () => this.storageError(),
       () => this.contentChanged(),
     );

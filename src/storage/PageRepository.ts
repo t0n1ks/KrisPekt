@@ -1,5 +1,6 @@
 import type { Notebook, Page } from '../core/types';
 import type { Database } from './Database';
+import { NotebookRepository } from './NotebookRepository';
 import type { RecordReader } from './RecordReader';
 import { parsePage } from './validation/records';
 
@@ -22,15 +23,14 @@ export class PageRepository {
 
   /**
    * Pages of a notebook in `pageIds` order; pages missing from that list are appended
-   * so nothing stored is ever lost from view.
+   * so nothing stored is ever lost from view, and a page listed twice appears once.
    */
   async loadOrdered(nb: Notebook): Promise<Page[]> {
     const pages = await this.ofNotebook(nb.id);
     const byId = new Map(pages.map((p) => [p.id, p]));
-    const ordered = nb.pageIds.map((id) => byId.get(id)).filter((p): p is Page => !!p);
-    const listed = new Set(ordered);
-    for (const page of pages) if (!listed.has(page)) ordered.push(page);
-    return ordered;
+    const listed = new Set(nb.pageIds.map((id) => byId.get(id)).filter((p): p is Page => !!p));
+    for (const page of pages) listed.add(page);
+    return [...listed];
   }
 
   /** Inserts or replaces pages. */
@@ -40,6 +40,17 @@ export class PageRepository {
 
   deleteMany(ids: readonly string[]): Promise<void> {
     return this.db.deleteMany('pages', ids);
+  }
+
+  /**
+   * Saves and deletes pages together with their notebook in one transaction, so the page order
+   * can never disagree with the pages stored, whenever the app is closed.
+   */
+  commit(notebook: Notebook | null, save: readonly Page[], remove: readonly string[]): Promise<void> {
+    return this.db.writeAcross([
+      { store: 'pages', values: save.map(PageRepository.toRecord), deletes: remove },
+      { store: 'notebooks', values: notebook ? [NotebookRepository.toRecord(notebook)] : [] },
+    ]);
   }
 
   /** A shallow copy with only the persisted fields. */

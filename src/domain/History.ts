@@ -90,12 +90,24 @@ export class History {
     return this.step(this.redoStack, this.undoStack, find);
   }
 
-  /** Forgets every snapshot of a deleted page. */
+  /**
+   * Forgets every step that involves a deleted page. The whole step goes: half of one (a
+   * selection moved between two pages, say) would take items away and put them nowhere.
+   */
   dropPage(id: string): void {
     const drop = (stack: HistoryEntry[]): HistoryEntry[] =>
-      stack.map((entry) => entry.filter((snap) => snap.id !== id)).filter((entry) => entry.length > 0);
+      stack.filter((entry) => !entry.some((snap) => snap.id === id));
     this.undoStack = drop(this.undoStack);
     this.redoStack = drop(this.redoStack);
+  }
+
+  /** Ids of every blob the steps could bring back; these must stay stored. */
+  blobIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const entry of [...this.undoStack, ...this.redoStack]) {
+      for (const snap of entry) for (const image of snap.images) ids.add(image.blob);
+    }
+    return ids;
   }
 
   clear(): void {
