@@ -241,6 +241,7 @@ export const DEFAULT_PREFS: Preferences = {
   twoFingerScroll: false,
   straighten: true,
   seeded: false,
+  blobSweepDue: true,
   autoBackup: '3days',
   lastBackupAt: 0,
   lastBackupBytes: 0,
@@ -311,6 +312,12 @@ export const LONG_PRESS_MS = 500;
 export const TWO_FINGER_TAP_MS = 300;
 /** … and moving less than this many px. */
 export const TWO_FINGER_TAP_SLOP = 10;
+/** "Pages deleted · Undo" stays this long; the pages' images are removed after it. */
+export const PAGE_UNDO_WINDOW_MS = 6000;
+/** A cleanup left over from the last run waits this long after start, so it never slows the start. */
+export const BLOB_SWEEP_DELAY_MS = 4000;
+/** Painted page thumbnails kept in memory (thumbnails on screen are always kept). */
+export const THUMBNAIL_CACHE_SIZE = 60;
 /** Two fingers must change their distance by this many px before they zoom … */
 export const PINCH_ZOOM_SLOP_PX = 20;
 /** … and by at least this share of how far they moved together, otherwise they are scrolling. */

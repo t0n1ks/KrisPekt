@@ -154,6 +154,7 @@ export class PreferencesStore {
       twoFingerScroll: bool(raw.twoFingerScroll, d.twoFingerScroll),
       straighten: bool(raw.straighten, d.straighten),
       seeded: bool(raw.seeded, d.seeded),
+      blobSweepDue: bool(raw.blobSweepDue, d.blobSweepDue),
       autoBackup: AUTO_BACKUP_INTERVALS.find((v) => v === raw.autoBackup) ?? d.autoBackup,
       lastBackupAt: toClampedNumber(raw.lastBackupAt, 0, MAX_TIMESTAMP, d.lastBackupAt),
       lastBackupBytes: toClampedNumber(raw.lastBackupBytes, 0, Number.MAX_SAFE_INTEGER, d.lastBackupBytes),

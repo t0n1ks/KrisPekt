@@ -196,6 +196,8 @@ export interface Preferences {
   twoFingerScroll: boolean;
   straighten: boolean;
   seeded: boolean;
+  /** Stored images may have lost their last page; see BlobSweeper. */
+  blobSweepDue: boolean;
   lang?: Language;
   /** Automatic backup interval. */
   autoBackup: AutoBackupInterval;

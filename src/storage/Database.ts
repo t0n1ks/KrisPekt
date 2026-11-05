@@ -134,6 +134,50 @@ export class Database {
     );
   }
 
+  /**
+   * Deletes every blob that no page references, unless `keep` spares it. Reads the pages one at
+   * a time and works in one transaction, so no page can be saved halfway through. Returns how
+   * many blobs were deleted and how many spared.
+   */
+  async sweepBlobs(
+    references: (page: unknown) => Iterable<string>,
+    keep: (id: string) => boolean,
+  ): Promise<{ deleted: number; spared: number }> {
+    const referenced = new Set<string>();
+    const result = { deleted: 0, spared: 0 };
+    const sweep = (id: string, remove: (id: string) => unknown): void => {
+      if (referenced.has(id)) return;
+      if (keep(id)) result.spared++;
+      else {
+        remove(id);
+        result.deleted++;
+      }
+    };
+    if (!this.idb) {
+      for (const page of this.mem('pages').values()) for (const id of references(page)) referenced.add(id);
+      const blobs = this.mem('blobs');
+      for (const id of [...blobs.keys()]) sweep(id, (x) => blobs.delete(x));
+      return result;
+    }
+    await this.transaction(['pages', 'blobs'], (tx) => {
+      const cursor = tx.objectStore('pages').openCursor();
+      cursor.onsuccess = () => {
+        const row = cursor.result;
+        if (row) {
+          for (const id of references(row.value)) referenced.add(id);
+          row.continue();
+          return;
+        }
+        const blobs = tx.objectStore('blobs');
+        const keys = blobs.getAllKeys();
+        keys.onsuccess = () => {
+          for (const key of keys.result) if (typeof key === 'string') sweep(key, (x) => blobs.delete(x));
+        };
+      };
+    });
+    return result;
+  }
+
   /** Deletes a record. */
   delete(store: StoreName, id: string): Promise<void> {
     return this.deleteMany(store, [id]);
