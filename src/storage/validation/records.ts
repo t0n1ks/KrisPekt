@@ -1,9 +1,21 @@
 import { BRUSH_KINDS } from '../../core/constants';
-import type { ImageItem, Notebook, NotebookView, Page, Stroke, Subject, TextItem } from '../../core/types';
+import type {
+  ImageItem,
+  Notebook,
+  NotebookView,
+  Page,
+  Stroke,
+  Subject,
+  TextItem,
+  TextParagraph,
+  TextSpan,
+} from '../../core/types';
+import { RichText } from '../../domain/RichText';
 import {
   LIMITS,
   MAX_LEN,
   MAX_STROKE_POINTS,
+  MAX_TEXT_RUNS,
   ValidationError,
   asArray,
   asBackground,
@@ -100,9 +112,43 @@ export function parseStroke(raw: unknown, path = 'stroke'): Stroke {
   return stroke;
 }
 
+/** Style flags are stored only when on. */
+function parseFlag(value: unknown, path: string): true {
+  if (value !== true) throw new ValidationError(path, 'expected true');
+  return true;
+}
+
+function parseRun(raw: unknown, path: string): TextSpan {
+  const o = asRecord(raw, path);
+  const t = asString(o.t, `${path}.t`, MAX_LEN.text);
+  if (t.includes('\n')) throw new ValidationError(`${path}.t`, 'a line break inside a run');
+  const run: TextSpan = { t };
+  if (o.fs !== undefined) run.fs = asNumber(o.fs, `${path}.fs`, LIMITS.fontSize);
+  if (o.c !== undefined) run.c = asColor(o.c, `${path}.c`);
+  for (const key of ['b', 'i', 'u', 's'] as const) {
+    if (o[key] !== undefined) run[key] = parseFlag(o[key], `${path}.${key}`);
+  }
+  return run;
+}
+
+function parseParagraph(raw: unknown, path: string, budget: { runs: number }): TextParagraph {
+  const o = asRecord(raw, path);
+  const rawRuns = asArray(o.runs, `${path}.runs`, MAX_TEXT_RUNS);
+  budget.runs -= rawRuns.length;
+  if (rawRuns.length === 0 || budget.runs < 0) throw new ValidationError(`${path}.runs`, 'bad run count');
+  const para: TextParagraph = { runs: rawRuns.map((run, i) => parseRun(run, `${path}.runs[${i}]`)) };
+  if (o.align !== undefined) para.align = asOneOf(o.align, ['center', 'right'] as const, `${path}.align`);
+  if (o.list !== undefined) para.list = asOneOf(o.list, ['bullet', 'number'] as const, `${path}.list`);
+  return para;
+}
+
+/**
+ * Items without `paras` are text from before rich text. With them, `t` follows from the runs:
+ * a stored `t` that disagrees could otherwise show one text and search or export another.
+ */
 export function parseText(raw: unknown, path = 'text'): TextItem {
   const o = asRecord(raw, path);
-  return {
+  const item: TextItem = {
     id: asId(o.id, `${path}.id`),
     x: asNumber(o.x, `${path}.x`, LIMITS.coord),
     y: asNumber(o.y, `${path}.y`, LIMITS.coord),
@@ -111,6 +157,15 @@ export function parseText(raw: unknown, path = 'text'): TextItem {
     fs: asNumber(o.fs, `${path}.fs`, LIMITS.fontSize),
     c: asColor(o.c, `${path}.c`),
   };
+  if (o.auto !== undefined) item.auto = parseFlag(o.auto, `${path}.auto`);
+  if (o.paras === undefined) return item;
+  const rawParas = asArray(o.paras, `${path}.paras`, MAX_LEN.text + 1);
+  if (rawParas.length === 0) throw new ValidationError(`${path}.paras`, 'no paragraphs');
+  const budget = { runs: MAX_TEXT_RUNS };
+  item.paras = rawParas.map((para, i) => parseParagraph(para, `${path}.paras[${i}]`, budget));
+  item.t = RichText.plainText(item.paras);
+  if (item.t.length > MAX_LEN.text) throw new ValidationError(`${path}.paras`, 'text too long');
+  return item;
 }
 
 export function parseImage(raw: unknown, path = 'image'): ImageItem {

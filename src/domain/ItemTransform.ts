@@ -1,5 +1,6 @@
 import type { ImageItem, Stroke, TextItem } from '../core/types';
 import { clamp } from '../core/utils/math';
+import { RichText } from './RichText';
 import { LIMITS } from '../storage/validation/guards';
 
 /** A page's items, or a subset of them. */
@@ -54,13 +55,7 @@ export class ItemTransform {
     const ty = (y: number): number => clampCoord(m.oy + (y - m.oy) * m.k + m.dy);
     return {
       strokes: items.strokes.map((st) => ItemTransform.mapStroke(st, m.k, tx, ty)),
-      texts: items.texts.map((t) => ({
-        ...t,
-        x: tx(t.x),
-        y: ty(t.y),
-        w: t.w * m.k,
-        fs: clamp(t.fs * m.k, LIMITS.fontSize[0], LIMITS.fontSize[1]),
-      })),
+      texts: items.texts.map((t) => ItemTransform.mapText(t, m.k, tx, ty)),
       images: items.images.map((im) => ({ ...im, x: tx(im.x), y: ty(im.y), w: im.w * m.k, h: im.h * m.k })),
     };
   }
@@ -73,6 +68,24 @@ export class ItemTransform {
       texts: ItemTransform.swap(items.texts, copies.texts),
       images: ItemTransform.swap(items.images, copies.images),
     };
+  }
+
+  private static mapText(
+    t: TextItem,
+    k: number,
+    tx: (x: number) => number,
+    ty: (y: number) => number,
+  ): TextItem {
+    const mapped: TextItem = {
+      ...t,
+      x: tx(t.x),
+      y: ty(t.y),
+      w: t.w * k,
+      fs: clamp(t.fs * k, LIMITS.fontSize[0], LIMITS.fontSize[1]),
+    };
+    if (t.paras && k !== 1)
+      mapped.paras = RichText.scaled(t.paras, k, LIMITS.fontSize[0], LIMITS.fontSize[1]);
+    return mapped;
   }
 
   private static swap<T extends { id: string }>(list: T[], copies: T[]): T[] {

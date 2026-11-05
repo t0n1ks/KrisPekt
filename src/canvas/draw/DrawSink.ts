@@ -27,6 +27,10 @@ export interface TextRun {
   text: string;
   x: number;
   top: number;
+  /** Where the alphabetic baseline is; rich text sets it, and then `top` is only approximate. */
+  baseline?: number;
+  bold?: boolean;
+  italic?: boolean;
   /** Font size in world px. */
   size: number;
   color: string;

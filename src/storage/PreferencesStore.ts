@@ -18,6 +18,7 @@ import type {
   ExportScope,
   PenPrefs,
   Preferences,
+  TextPrefs,
 } from '../core/types';
 import { toClampedNumber } from '../core/utils/math';
 import { isLanguage } from '../i18n/I18n';
@@ -90,6 +91,13 @@ function exportPrefs(raw: UnknownRecord): ExportPrefs {
   };
 }
 
+/** The text style flags that are on. */
+function textFlags(txt: UnknownRecord): Pick<TextPrefs, 'b' | 'i' | 'u' | 's'> {
+  const flags: Pick<TextPrefs, 'b' | 'i' | 'u' | 's'> = {};
+  for (const key of ['b', 'i', 'u', 's'] as const) if (txt[key] === true) flags[key] = true;
+  return flags;
+}
+
 /**
  * Loads and saves {@link Preferences} in localStorage (`konspektnik.prefs.v1`).
  * Stored values are merged over the defaults and every field is validated, so a
@@ -142,7 +150,11 @@ export class PreferencesStore {
         mode: er.mode === 'whole' || er.mode === 'part' ? (er.mode as EraserMode) : d.er.mode,
         r: toClampedNumber(er.r, ...PREF_RANGES.eraser, d.er.r),
       },
-      txt: { fs: toClampedNumber(txt.fs, ...PREF_RANGES.textSize, d.txt.fs), c: color(txt.c, d.txt.c) },
+      txt: {
+        ...textFlags(txt),
+        fs: toClampedNumber(txt.fs, ...PREF_RANGES.textSize, d.txt.fs),
+        c: color(txt.c, d.txt.c),
+      },
       favs: colorList(raw.favs, MAX_FAVORITES) ?? [...d.favs],
       recent: {
         pen: colorList(recent.pen, MAX_RECENT_COLORS) ?? [],

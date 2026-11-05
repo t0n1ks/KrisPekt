@@ -86,17 +86,52 @@ export interface StrokeLike {
   b?: BrushKind;
 }
 
+/** Character styling. An absent field means the box's own size or colour, or "off". */
+export interface TextStyle {
+  /** Font size in world px. */
+  fs?: number;
+  c?: string;
+  /** Bold, italic, underline, strikethrough. */
+  b?: true;
+  i?: true;
+  u?: true;
+  s?: true;
+}
+
+/** A stretch of text in one style. */
+export interface TextSpan extends TextStyle {
+  t: string;
+}
+
+export interface TextParagraph {
+  /** At least one run; an empty paragraph has one empty run, which carries its style. */
+  runs: TextSpan[];
+  /** Absent means left. */
+  align?: 'center' | 'right';
+  list?: 'bullet' | 'number';
+}
+
+/**
+ * A text box. Its height is never stored: it follows from the text and the width. Items written
+ * before rich text have no `paras` and no `auto`; they load and render as they always did, and
+ * get `paras` when edited.
+ */
 export interface TextItem {
   id: string;
   x: number;
   y: number;
   /** Wrap width in world px. */
   w: number;
-  /** The text itself. */
+  /** The text without styles; paragraphs on separate lines. */
   t: string;
-  /** Font size in world px. */
+  /** Default font size in world px. */
   fs: number;
+  /** Default colour. */
   c: string;
+  /** The box grows with its text; off once the user sets the width by hand. */
+  auto?: true;
+  /** The styled text. */
+  paras?: TextParagraph[];
 }
 
 export interface ImageItem {
@@ -142,9 +177,14 @@ export interface EraserPrefs {
   r: number;
 }
 
+/** The style of the next new text box: the last one used. */
 export interface TextPrefs {
   fs: number;
   c: string;
+  b?: true;
+  i?: true;
+  u?: true;
+  s?: true;
 }
 
 /** Recently used custom colours, newest first; pen and highlighter keep separate lists. */

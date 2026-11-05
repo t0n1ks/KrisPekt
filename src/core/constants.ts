@@ -38,6 +38,8 @@ export const BITMAP_LRU_SIZE = 8;
 export const PAGE_CACHE_KEEP = 3;
 
 export const TEXT_FONT = '"Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+/** Font sizes offered for text, in world px. */
+export const TEXT_SIZES: readonly number[] = [10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64];
 /** Text line height as a multiple of the font size. */
 export const TEXT_LINE_HEIGHT = 1.35;
 
@@ -350,6 +352,9 @@ export const PT_PER_PX = 72 / 96;
 export const PDF_PATTERN_SCALE = 2;
 /** The text font embedded in vector PDFs (same-origin, loaded only during export). */
 export const PDF_FONT_FILE = 'fonts/Onest-Regular.ttf';
+/** Its own name in a PDF: viewers tell embedded fonts apart by name, and may merge two with one name. */
+export const PDF_BOLD_FONT_NAME = 'Onest-Bold';
+export const PDF_BOLD_FONT_FILE = 'fonts/Onest-Bold.ttf';
 export const PDF_FONT_NAME = 'Onest';
 /** Resolutions offered for raster PDF. */
 export const RASTER_DPIS: readonly RasterDpi[] = [300, 600];

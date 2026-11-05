@@ -34,6 +34,8 @@ export const MAX_LEN = {
   isoDate: 40,
 } as const;
 
+/** Max styled runs in one text box. */
+export const MAX_TEXT_RUNS = 4000;
 /** Max points (x, y, pressure triples) in one stroke. */
 export const MAX_STROKE_POINTS = 100000;
 /** Max items of each kind on one page, and pages per notebook. */

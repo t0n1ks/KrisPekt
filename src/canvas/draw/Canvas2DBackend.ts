@@ -64,11 +64,11 @@ export class Canvas2DBackend implements DrawSink<Path2D> {
   /** Draws with `fillText` (never as markup). */
   text(run: TextRun): void {
     const ctx = this.ctx;
-    ctx.font = TextLayout.font(run.size);
+    ctx.font = TextLayout.font(run.size, run.bold, run.italic);
     ctx.fillStyle = run.color;
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = run.baseline === undefined ? 'top' : 'alphabetic';
     ctx.textAlign = 'left';
-    ctx.fillText(run.text, run.x, run.top);
+    ctx.fillText(run.text, run.x, run.baseline ?? run.top);
   }
 
   image(run: ImageRun): void {
