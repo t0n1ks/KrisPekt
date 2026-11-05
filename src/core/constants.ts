@@ -315,6 +315,8 @@ export const TWO_FINGER_TAP_SLOP = 10;
 export const PINCH_ZOOM_SLOP_PX = 20;
 /** … and by at least this share of how far they moved together, otherwise they are scrolling. */
 export const PINCH_SPREAD_PER_TRAVEL = 0.5;
+/** "Zoom locked at …" appears at most this often when a gesture tries to zoom. */
+export const ZOOM_LOCK_HINT_MS = 5000;
 
 /* ---------- import / export limits ---------- */
 

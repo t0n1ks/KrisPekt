@@ -31,9 +31,17 @@ export class Viewport {
   fitWidth(): void {
     const { camera } = this;
     const anchor = camera.toWorld(camera.width / 2, camera.height * 0.4);
-    camera.z = camera.fitZoom(this.layout);
+    camera.setZoom(camera.fitZoom(this.layout));
     camera.centerX();
     camera.y = anchor.y - (camera.height * 0.4) / camera.z;
+    camera.clampTo(this.layout);
+    this.renderer.request();
+  }
+
+  /** Zooms to a value, keeping the point 40 % down the middle of the screen in place. */
+  zoomTo(zoom: number): void {
+    const { camera } = this;
+    camera.zoomAt({ x: camera.width / 2, y: camera.height * 0.4 }, zoom);
     camera.clampTo(this.layout);
     this.renderer.request();
   }

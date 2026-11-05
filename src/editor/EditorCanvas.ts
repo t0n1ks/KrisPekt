@@ -50,6 +50,8 @@ export interface EditorCanvasHooks {
   beforePointerDown(): boolean;
   onPenSeen(): void;
   onTwoFingerTap(): void;
+  /** A gesture tried to zoom while the zoom is locked. */
+  onZoomBlocked(): void;
   /** Every routed pointer event, for the input diagnostics overlay. */
   onInputSample(sample: InputSample): void;
   /** Finish text editing and drop the selection. */
@@ -131,6 +133,7 @@ export class EditorCanvas {
       camera: this.camera,
       layout: this.layout,
       renderer: this.renderer,
+      onZoomBlocked: () => this.deps.hooks.onZoomBlocked(),
     });
     this.router = this.createRouter();
   }

@@ -1,5 +1,6 @@
 import type { Page } from '../../core/types';
 import { byId, el, replaceChildren } from '../../core/utils/dom';
+import { formatZoom } from '../../core/utils/format';
 import type { PageSizes } from '../../domain/PageSizes';
 import type { I18n } from '../../i18n/I18n';
 import { icon } from '../icons';
@@ -7,7 +8,7 @@ import { icon } from '../icons';
 export interface TopBarHandlers {
   back(): void;
   title(): void;
-  zoom(): void;
+  zoom(anchor: HTMLElement): void;
   lock(): void;
   pages(): void;
   undo(): void;
@@ -39,13 +40,14 @@ export class TopBar {
     this.undoButton.append(icon('undo'));
     this.redoButton.append(icon('redo'));
     this.moreButton.append(icon('more'));
+    this.zoom.setAttribute('aria-haspopup', 'menu');
     const bind = (button: HTMLButtonElement, fn: () => void): void => {
       button.addEventListener('click', fn);
       this.cleanup.push(() => button.removeEventListener('click', fn));
     };
     bind(this.back, handlers.back);
     bind(this.titleButton, handlers.title);
-    bind(this.zoom, handlers.zoom);
+    bind(this.zoom, () => handlers.zoom(this.zoom));
     bind(this.lock, handlers.lock);
     bind(this.pages, handlers.pages);
     bind(this.undoButton, handlers.undo);
@@ -68,8 +70,8 @@ export class TopBar {
   }
 
   /** Updates the lock pill, page counter and zoom; skipped when nothing visible changed. */
-  update(page: Page, index: number, count: number, zoom: number): void {
-    const key = [index, count, page.locked, page.w, page.h, Math.round(zoom * 100)].join('|');
+  update(page: Page, index: number, count: number, zoom: number, zoomLocked: boolean): void {
+    const key = [index, count, page.locked, page.w, page.h, formatZoom(zoom), zoomLocked].join('|');
     if (key === this.lastKey) return;
     this.lastKey = key;
     const t = this.i18n;
@@ -82,7 +84,14 @@ export class TopBar {
     const state = page.locked ? t.t('stLocked') : t.t('stUnlocked');
     this.lock.setAttribute('aria-label', t.t('lockAria', { size: this.sizes.label(page.w, page.h), state }));
     replaceChildren(this.pages, icon('pages', 17), el('span', null, `${index + 1}/${count}`));
-    this.zoom.textContent = Math.round(zoom * 100) + '%';
+    this.updateZoom(zoom, zoomLocked);
+  }
+
+  private updateZoom(zoom: number, locked: boolean): void {
+    const value = formatZoom(zoom);
+    replaceChildren(this.zoom, locked ? icon('lock', 14) : null, el('span', null, value));
+    this.zoom.classList.toggle('pill--zoom-locked', locked);
+    this.zoom.setAttribute('aria-label', this.i18n.t(locked ? 'zoomLockedAt' : 'zoomAria', { v: value }));
   }
 
   /** Forces the next update to redraw (after a language change). */
@@ -95,7 +104,6 @@ export class TopBar {
     const labels: [HTMLElement, string][] = [
       [this.back, t.t('toShelf')],
       [this.titleButton, t.t('nbSettings')],
-      [this.zoom, t.t('fitWidth')],
       [this.pages, t.t('pages')],
       [this.undoButton, t.t('undo')],
       [this.redoButton, t.t('redo')],

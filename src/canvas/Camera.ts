@@ -10,7 +10,6 @@ import type { PageLayout } from './PageLayout';
 export class Camera {
   x = 0;
   y = 0;
-  z = 1;
   /** Stage width/height in CSS px. */
   width = 1;
   height = 1;
@@ -18,6 +17,34 @@ export class Camera {
   dpr = 1;
   private left = 0;
   private top = 0;
+  private zoom = 1;
+  private locked = false;
+
+  /** Zoom: screen px per world px. Changes only through {@link setZoom} and {@link zoomAt}. */
+  get z(): number {
+    return this.zoom;
+  }
+
+  /** Whether the user locked the zoom. */
+  get zoomLocked(): boolean {
+    return this.locked;
+  }
+
+  /**
+   * Sets the zoom, within the allowed range. The one place that writes it, so that a locked
+   * zoom holds whichever code path asks for a change. Does nothing while locked.
+   */
+  setZoom(zoom: number): void {
+    if (!this.locked) this.zoom = clamp(zoom, ZOOM_MIN, ZOOM_MAX);
+  }
+
+  /** Locks the zoom at a value, or unlocks it with null (the zoom then stays where it is). */
+  setZoomLock(zoom: number | null): void {
+    this.locked = false;
+    if (zoom === null) return;
+    this.setZoom(zoom);
+    this.locked = true;
+  }
 
   /** Updates the stage geometry; call on every resize. */
   resize(rect: { left: number; top: number; width: number; height: number }, devicePixelRatio: number): void {
@@ -65,8 +92,9 @@ export class Camera {
 
   /** Changes zoom keeping the world point under `screen` fixed. */
   zoomAt(screen: Point, zoom: number): void {
+    if (this.locked) return;
     const w = this.toWorld(screen.x, screen.y);
-    this.z = clamp(zoom, ZOOM_MIN, ZOOM_MAX);
+    this.setZoom(zoom);
     this.x = w.x - screen.x / this.z;
     this.y = w.y - screen.y / this.z;
   }

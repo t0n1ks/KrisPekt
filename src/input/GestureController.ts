@@ -39,12 +39,16 @@ interface PinchGesture {
   moved: number;
   /** False while the two fingers only scroll; see {@link PinchIntent}. */
   zooming: boolean;
+  /** A locked zoom already turned this pinch down. */
+  blocked: boolean;
 }
 
 export interface GestureDeps {
   camera: Camera;
   layout: PageLayout;
   renderer: Pick<Renderer, 'request' | 'render' | 'setPinching'>;
+  /** A pinch or Ctrl + wheel tried to zoom while the zoom is locked. */
+  onZoomBlocked?: () => void;
 }
 
 /** Inertia decay per 16 ms frame. */
@@ -101,6 +105,7 @@ export class GestureController {
       t0: now(),
       moved: 0,
       zooming: false,
+      blocked: false,
     };
   }
 
@@ -168,6 +173,10 @@ export class GestureController {
     this.stopInertia();
     const { camera, renderer } = this.deps;
     if (e.ctrlKey || e.metaKey) {
+      if (camera.zoomLocked) {
+        this.deps.onZoomBlocked?.();
+        return;
+      }
       camera.zoomAt(pt, camera.z * Math.exp(-e.deltaY * 0.0045));
       renderer.setPinching(true);
       clearTimeout(this.wheelTimer);
@@ -215,17 +224,26 @@ export class GestureController {
     g.moved = Math.max(g.moved, Math.abs(d - g.d0), Math.hypot(mx - g.mx0, my - g.my0));
     if (g.moved < 4) return;
     if (!g.zooming && PinchIntent.isZoom(Math.abs(d - g.d0), Math.hypot(mx - g.mx0, my - g.my0))) {
-      g.zooming = true;
-      // Count the distance from the edge of the dead zone, so the zoom does not jump when it starts.
-      g.d0 += Math.sign(d - g.d0) * PINCH_ZOOM_SLOP_PX;
-      renderer.setPinching(true);
+      this.startPinchZoom(g, d);
     }
-    const z = g.zooming ? clamp((g.z0 * d) / g.d0, ZOOM_MIN, ZOOM_MAX) : g.z0;
-    camera.z = z;
-    camera.x = g.wx - mx / z;
-    camera.y = g.wy - my / z;
+    if (g.zooming) camera.setZoom(clamp((g.z0 * d) / g.d0, ZOOM_MIN, ZOOM_MAX));
+    camera.x = g.wx - mx / camera.z;
+    camera.y = g.wy - my / camera.z;
     camera.clampTo(this.deps.layout);
     renderer.request();
+  }
+
+  /** The fingers clearly mean to zoom; a locked zoom keeps them scrolling instead. */
+  private startPinchZoom(g: PinchGesture, distance: number): void {
+    if (this.deps.camera.zoomLocked) {
+      if (!g.blocked) this.deps.onZoomBlocked?.();
+      g.blocked = true;
+      return;
+    }
+    g.zooming = true;
+    // Count the distance from the edge of the dead zone, so the zoom does not jump when it starts.
+    g.d0 += Math.sign(distance - g.d0) * PINCH_ZOOM_SLOP_PX;
+    this.deps.renderer.setPinching(true);
   }
 
   private startInertia(vx: number, vy: number): void {

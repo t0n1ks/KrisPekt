@@ -289,6 +289,7 @@ test('bug 2: zooming never shows deleted or moved content', async ({ page }) => 
 
   // 2. A stroke written at the normal zoom, then moved with the lasso while zoomed in.
   await page.click('#btnZoom');
+  await page.click('.menu__item:has-text("Вписать по ширине")');
   await page.waitForTimeout(300);
   await page.keyboard.press('p');
   await drag(page, a.x, a.y, a.x + 40, a.y + 10);

@@ -56,3 +56,8 @@ export function formatRelativeDay(ts: number, i18n: I18n, nowDate: Date = new Da
     return formatDate(ts, i18n, nowDate);
   }
 }
+
+/** A zoom as a whole percentage: "140%". */
+export function formatZoom(zoom: number): string {
+  return Math.round(zoom * 100) + '%';
+}

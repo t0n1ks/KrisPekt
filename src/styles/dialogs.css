@@ -145,6 +145,10 @@
 .menu__item:hover {
   background: var(--surface-2);
 }
+.menu__item:disabled {
+  background: none;
+  color: var(--muted);
+}
 .menu__item--danger {
   color: var(--danger);
 }

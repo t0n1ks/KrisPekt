@@ -1,8 +1,6 @@
 import type { EventBus } from '../../app/EventBus';
-import { ZOOM_MAX, ZOOM_MIN } from '../../core/constants';
 import type { Language, Notebook, Page, Preferences, Stroke, TextItem, ToolKind } from '../../core/types';
 import { byId } from '../../core/utils/dom';
-import { clamp } from '../../core/utils/math';
 import { ColorLists } from '../../domain/ColorLists';
 import { PageRepair } from '../../domain/PageRepair';
 import { PageSizePolicy } from '../../domain/PageSizePolicy';
@@ -40,6 +38,7 @@ import { TextEditorOverlay } from './TextEditorOverlay';
 import { ToolOptionsPopover } from './ToolOptionsPopover';
 import { ToolTray } from './ToolTray';
 import { TopBar } from './TopBar';
+import { ZoomMenu } from './ZoomMenu';
 
 /** What the editor asks of the rest of the app. */
 export interface EditorActions {
@@ -87,6 +86,7 @@ export class EditorView {
   private readonly images: ImageInserter;
   private readonly exporter: ExportController;
   private readonly diagnostics: InputDiagnosticsOverlay;
+  private readonly zoom: ZoomMenu;
 
   constructor(private readonly deps: EditorViewDeps) {
     const { i18n, sizes, menu } = deps;
@@ -108,6 +108,15 @@ export class EditorView {
       prefs: () => deps.prefs.txt,
       makeId: deps.makeId,
       recordUndo: (page) => c.undo.record(page),
+    });
+    this.zoom = new ZoomMenu({
+      camera: c.camera,
+      viewport: c.viewport,
+      i18n,
+      notebook: () => c.session.nb,
+      markDirty: () => deps.saveQueue.markNotebookDirty(),
+      redraw: () => c.renderer.request(),
+      toast: (message) => deps.toast.show(message),
     });
     this.topBar = new TopBar(i18n, sizes, this.topBarHandlers());
     this.tray = new ToolTray(i18n, {
@@ -196,6 +205,7 @@ export class EditorView {
         this.panel.refreshSoon(this.canvas.session.pages, this.canvas.session.currentIndex),
       beforePointerDown: () => this.beforePointerDown(),
       onPenSeen: () => this.onPenSeen(),
+      onZoomBlocked: () => this.zoom.showBlockedHint(),
       onTwoFingerTap: () => {
         if (this.canvas.undo.undo()) d.toast.show(d.i18n.t('undone'), 1000);
       },
@@ -218,7 +228,7 @@ export class EditorView {
     return {
       back: () => void this.close(),
       title: () => this.deps.actions.editNotebook(c().session.nb),
-      zoom: () => c().viewport.fitWidth(),
+      zoom: (anchor: HTMLElement) => this.deps.menu.show(anchor, this.zoom.entries()),
       lock: () => this.openPageSettings(c().session.currentPage()),
       pages: () => {
         if (this.panel.toggle()) this.refreshPanel();
@@ -299,6 +309,14 @@ export class EditorView {
       c.renderer.render();
     };
     new ResizeObserver(onResize).observe(c.stage);
+    // Over the bars the wheel is the browser's: a locked zoom must not let it zoom the whole page.
+    this.root.addEventListener(
+      'wheel',
+      (e) => {
+        if ((e.ctrlKey || e.metaKey) && c.camera.zoomLocked) e.preventDefault();
+      },
+      { passive: false },
+    );
     window.addEventListener('resize', onResize);
     const themeChanged = (): void => {
       c.theme.read();
@@ -402,7 +420,9 @@ export class EditorView {
 
   private placeCamera(nb: Notebook): void {
     const c = this.canvas;
-    c.camera.z = nb.view?.z ? clamp(nb.view.z, ZOOM_MIN, ZOOM_MAX) : c.camera.fitZoom(c.layout);
+    c.camera.setZoomLock(null);
+    c.camera.setZoom(nb.view?.z ? nb.view.z : c.camera.fitZoom(c.layout));
+    c.camera.setZoomLock(nb.zoomLock ?? null);
     c.camera.centerX();
     const target = (nb.view?.pageId && c.session.find(nb.view.pageId)) || c.session.pages[0];
     if (target) c.viewport.scrollTo(target);
@@ -451,7 +471,10 @@ export class EditorView {
     c.live.render();
     this.positionOverlays();
     const page = c.session.currentPage();
-    if (page) this.topBar.update(page, c.session.currentIndex, c.session.pages.length, c.camera.z);
+    if (page) {
+      const { z, zoomLocked } = c.camera;
+      this.topBar.update(page, c.session.currentIndex, c.session.pages.length, z, zoomLocked);
+    }
     this.panel.highlight(c.session.currentIndex);
     this.deps.bus.emit('page-changed', { index: c.session.currentIndex, count: c.session.pages.length });
   }
@@ -581,6 +604,8 @@ export class EditorView {
       { label: i18n.t('insertPhoto'), icon: 'image', onClick: () => void this.insertPhoto() },
       { label: i18n.t('addPdfPages'), icon: 'file', onClick: () => void this.importPdfHere() },
       { label: i18n.t('exportMenu'), icon: 'download', onClick: () => actions.exportNotebook(nb) },
+      // The zoom pill is hidden on phones, so the lock has to be reachable from here too.
+      this.zoom.lockEntry(),
       '-',
       {
         label: i18n.t('fingerDraw'),

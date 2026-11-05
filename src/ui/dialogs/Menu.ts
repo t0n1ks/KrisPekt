@@ -13,6 +13,8 @@ export interface MenuItem {
   check?: boolean;
   /** A colour dot before the label (used by the recolour menu). */
   swatch?: string;
+  /** Shown greyed out; it cannot be tapped. */
+  disabled?: boolean;
   /** A long press (or right click) runs this instead of `onClick`; used for hidden extras. */
   onLongPress?: () => void;
 }
@@ -78,7 +80,7 @@ export class Menu {
   private item(entry: MenuItem): HTMLButtonElement {
     const button = el('button', {
       class: 'menu__item' + (entry.danger ? ' menu__item--danger' : ''),
-      attrs: { type: 'button', role: 'menuitem' },
+      attrs: { type: 'button', role: 'menuitem', disabled: entry.disabled },
       on: {
         click: () => {
           this.close();

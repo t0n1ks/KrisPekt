@@ -6,6 +6,8 @@
   flex-direction: column;
   background: var(--desk);
   z-index: 5;
+  /* Fingers on the bars must not zoom the whole page in the browser. */
+  touch-action: pan-x pan-y;
 }
 
 /* top bar */
@@ -49,6 +51,9 @@
 .pill--zoom {
   min-width: 58px;
   justify-content: center;
+}
+.pill--zoom-locked {
+  color: var(--accent);
 }
 @media (max-width: 560px) {
   .pill--zoom {
