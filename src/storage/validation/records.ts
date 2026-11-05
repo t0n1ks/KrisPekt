@@ -64,6 +64,8 @@ export function parseNotebook(raw: unknown, path = 'notebook'): Notebook {
   };
   if (o.sample !== undefined) notebook.sample = asBoolean(o.sample, `${path}.sample`);
   if (o.order !== undefined) notebook.order = asNumber(o.order, `${path}.order`, LIMITS.order);
+  if (o.zoomLock !== undefined)
+    notebook.zoomLock = asNumber(o.zoomLock, `${path}.zoomLock`, LIMITS.lockedZoom);
   return notebook;
 }
 

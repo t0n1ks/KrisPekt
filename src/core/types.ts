@@ -57,6 +57,8 @@ export interface Notebook {
   /** Position among the subject's notebooks; older notebooks without it sort by creation time. */
   order?: number;
   view: NotebookView | null;
+  /** The zoom the user locked this notebook at; absent means unlocked. */
+  zoomLock?: number;
 }
 
 /**

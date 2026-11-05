@@ -1,4 +1,4 @@
-import { BACKGROUNDS } from '../../core/constants';
+import { BACKGROUNDS, ZOOM_MAX, ZOOM_MIN } from '../../core/constants';
 import type { Background } from '../../core/types';
 import { ID_PATTERN } from '../../core/utils/id';
 
@@ -23,6 +23,7 @@ export const LIMITS = {
   strokeWidth: [0.01, 1000],
   pressure: [0, 1],
   zoom: [0.01, 100],
+  lockedZoom: [ZOOM_MIN, ZOOM_MAX],
   timestamp: [0, 8.64e15],
   order: [-1e9, 1e9],
 } as const satisfies Record<string, readonly [number, number]>;
