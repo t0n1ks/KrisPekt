@@ -168,6 +168,7 @@ export class TouchClassifier {
     const partner = others[0];
     if (others.length === 1 && partner !== undefined) {
       const other = this.contacts.get(partner);
+      if (other?.role === 'pan') this.endPan(sample.time);
       if (other) changes.push(this.assign(partner, other, 'pinch'));
       changes.push(this.assign(sample.id, contact, 'pinch', null));
       return changes;

@@ -1,6 +1,13 @@
-import { TWO_FINGER_TAP_MS, TWO_FINGER_TAP_SLOP, ZOOM_MAX, ZOOM_MIN } from '../core/constants';
+import {
+  PINCH_ZOOM_SLOP_PX,
+  TWO_FINGER_TAP_MS,
+  TWO_FINGER_TAP_SLOP,
+  ZOOM_MAX,
+  ZOOM_MIN,
+} from '../core/constants';
 import type { Point } from '../core/types';
 import { clamp, now } from '../core/utils/math';
+import { PinchIntent } from '../domain/PinchIntent';
 import type { Camera } from '../canvas/Camera';
 import type { PageLayout } from '../canvas/PageLayout';
 import type { Renderer } from '../canvas/Renderer';
@@ -30,6 +37,8 @@ interface PinchGesture {
   my0: number;
   t0: number;
   moved: number;
+  /** False while the two fingers only scroll; see {@link PinchIntent}. */
+  zooming: boolean;
 }
 
 export interface GestureDeps {
@@ -73,6 +82,8 @@ export class GestureController {
   /** Starts a pinch with two contacts at stage-local points. */
   beginPinch(a: [number, Point], b: [number, Point]): void {
     this.stop();
+    // Whatever pan came before, a pen landing after this pinch must not undo it.
+    this.lastPanStart = null;
     this.touches.set(a[0], { ...a[1] });
     this.touches.set(b[0], { ...b[1] });
     const [pa, pb] = [a[1], b[1]];
@@ -89,6 +100,7 @@ export class GestureController {
       my0: my,
       t0: now(),
       moved: 0,
+      zooming: false,
     };
   }
 
@@ -202,8 +214,13 @@ export class GestureController {
     const my = (a.y + b.y) / 2;
     g.moved = Math.max(g.moved, Math.abs(d - g.d0), Math.hypot(mx - g.mx0, my - g.my0));
     if (g.moved < 4) return;
-    const z = clamp((g.z0 * d) / g.d0, ZOOM_MIN, ZOOM_MAX);
-    renderer.setPinching(true);
+    if (!g.zooming && PinchIntent.isZoom(Math.abs(d - g.d0), Math.hypot(mx - g.mx0, my - g.my0))) {
+      g.zooming = true;
+      // Count the distance from the edge of the dead zone, so the zoom does not jump when it starts.
+      g.d0 += Math.sign(d - g.d0) * PINCH_ZOOM_SLOP_PX;
+      renderer.setPinching(true);
+    }
+    const z = g.zooming ? clamp((g.z0 * d) / g.d0, ZOOM_MIN, ZOOM_MAX) : g.z0;
     camera.z = z;
     camera.x = g.wx - mx / z;
     camera.y = g.wy - my / z;

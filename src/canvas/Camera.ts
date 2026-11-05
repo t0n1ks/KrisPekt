@@ -90,9 +90,9 @@ export class Camera {
     return { x: this.x, y: this.y, z: this.z };
   }
 
-  restore(s: { x: number; y: number; z: number }): void {
+  /** Goes back to a snapshot's position. The zoom stays: a pan never changes it. */
+  restore(s: { x: number; y: number }): void {
     this.x = s.x;
     this.y = s.y;
-    this.z = s.z;
   }
 }

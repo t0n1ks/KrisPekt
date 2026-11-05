@@ -311,6 +311,10 @@ export const LONG_PRESS_MS = 500;
 export const TWO_FINGER_TAP_MS = 300;
 /** … and moving less than this many px. */
 export const TWO_FINGER_TAP_SLOP = 10;
+/** Two fingers must change their distance by this many px before they zoom … */
+export const PINCH_ZOOM_SLOP_PX = 20;
+/** … and by at least this share of how far they moved together, otherwise they are scrolling. */
+export const PINCH_SPREAD_PER_TRAVEL = 0.5;
 
 /* ---------- import / export limits ---------- */
 
