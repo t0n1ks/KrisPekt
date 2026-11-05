@@ -262,10 +262,14 @@ export class App {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
         this.hiddenAt = Date.now();
+        this.editor.rememberView();
         void this.saveQueue.flush(true);
       } else if (this.hiddenAt) this.autoBackup.appResumed(Date.now() - this.hiddenAt);
     });
-    window.addEventListener('pagehide', () => void this.saveQueue.flush(true));
+    window.addEventListener('pagehide', () => {
+      this.editor.rememberView();
+      void this.saveQueue.flush(true);
+    });
   }
 
   /* ---------- backups ---------- */

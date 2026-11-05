@@ -409,16 +409,24 @@ export class EditorView {
     if (c.ruler.on) c.ruler.placeDefault(c.camera.width, c.camera.height);
   }
 
+  /**
+   * Notes the open notebook's page and zoom for the next save. Runs when leaving the editor and
+   * when the app goes to the background, because Android may then kill it without warning.
+   */
+  rememberView(): void {
+    const { session, camera } = this.canvas;
+    if (!session.notebook) return;
+    const page = session.currentPage();
+    session.notebook.view = { pageId: page ? page.id : null, z: camera.z };
+  }
+
   /** Saves and returns to the shelf. */
   async close(): Promise<void> {
     const c = this.canvas;
     this.settle();
     this.popover.close();
     this.deps.menu.close();
-    if (c.session.notebook) {
-      const page = c.session.currentPage();
-      c.session.notebook.view = { pageId: page ? page.id : null, z: c.camera.z };
-    }
+    this.rememberView();
     await this.deps.saveQueue.flush(true);
     c.session.close();
     this.deps.saveQueue.setNotebook(null);
