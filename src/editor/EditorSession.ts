@@ -1,5 +1,6 @@
 import type { Notebook, Page } from '../core/types';
 import { clamp } from '../core/utils/math';
+import { PageOrder, type RemovedItem } from '../domain/PageOrder';
 
 /**
  * State of the open notebook: its pages in order, the current page index and a per-page
@@ -78,7 +79,11 @@ export class EditorSession {
 
   /** Inserts pages after `after` (or at the end) and updates the notebook's page order. */
   insert(after: Page | null, pages: Page[]): void {
-    const index = after ? this.pages.indexOf(after) + 1 : this.pages.length;
+    this.insertAt(after ? this.pages.indexOf(after) + 1 : this.pages.length, pages);
+  }
+
+  /** Inserts pages at a position and updates the notebook's page order. */
+  insertAt(index: number, pages: Page[]): void {
     this.pages.splice(index, 0, ...pages);
     for (const p of pages) {
       this.byId.set(p.id, p);
@@ -88,23 +93,33 @@ export class EditorSession {
     this.syncOrder();
   }
 
-  /** Removes a page and updates the order. */
-  remove(page: Page): void {
-    const index = this.pages.indexOf(page);
-    if (index < 0) return;
-    this.pages.splice(index, 1);
-    this.byId.delete(page.id);
+  /** Removes pages, updates the order and returns where they were, for {@link restoreRemoved}. */
+  removeMany(pages: readonly Page[]): RemovedItem<Page>[] {
+    const { kept, removed } = PageOrder.without(this.pages, new Set(pages));
+    this.pages = kept;
+    for (const { item } of removed) this.byId.delete(item.id);
+    this.syncOrder();
+    return removed;
+  }
+
+  /** Puts removed pages back at their positions and queues them for saving. */
+  restoreRemoved(removed: readonly RemovedItem<Page>[]): void {
+    this.pages = PageOrder.restored(this.pages, removed);
+    for (const { item } of removed) {
+      this.byId.set(item.id, item);
+      this.bump(item);
+      this.onDirty(item);
+    }
     this.syncOrder();
   }
 
-  /** Swaps a page with its neighbour (`dir` = -1 up, +1 down). Returns false at the ends. */
-  move(page: Page, dir: -1 | 1): boolean {
-    const i = this.pages.indexOf(page);
-    const j = i + dir;
-    const other = this.pages[j];
-    if (i < 0 || !other) return false;
-    this.pages[j] = page;
-    this.pages[i] = other;
+  /** Moves a page to an index. Returns false if that changes nothing. */
+  moveTo(page: Page, index: number): boolean {
+    const from = this.pages.indexOf(page);
+    if (from < 0) return false;
+    const to = clamp(index, 0, this.pages.length - 1);
+    if (from === to) return false;
+    this.pages = PageOrder.moved(this.pages, from, to);
     this.syncOrder();
     return true;
   }

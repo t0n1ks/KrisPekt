@@ -6,6 +6,11 @@ import type { Notebook, Page, PageSize } from '../core/types';
  * The notebook's base size belongs to its first page. A locked page always has the base
  * size; locking a page snaps it back to the base size. An unlocked page keeps its own size
  * and may be resized. A new page copies the lock state of the page it follows.
+ *
+ * Changing the page order never changes a size: the base stays as it is when the first page is
+ * deleted or moved, so no page is ever resized by that. A page with its own size that becomes
+ * first keeps that size, and locked pages keep the base. A page inserted before the very first
+ * one follows no page, so it is locked at the base size.
  */
 export class PageSizePolicy {
   /** Makes a locked page match the base size. */
@@ -41,6 +46,11 @@ export class PageSizePolicy {
       changed.push(page);
     }
     return changed;
+  }
+
+  /** A new empty page for position `index` of a page list, following the page before it. */
+  static newPageAt(nb: Notebook, pages: readonly Page[], index: number, makeId: () => string): Page {
+    return PageSizePolicy.newPageAfter(nb, pages[index - 1] ?? null, makeId);
   }
 
   /**

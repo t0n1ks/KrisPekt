@@ -6,10 +6,12 @@ import { PageRepair } from '../../domain/PageRepair';
 import { PageSizePolicy } from '../../domain/PageSizePolicy';
 import type { PageSizes } from '../../domain/PageSizes';
 import { EditorCanvas, type EditorCanvasHooks } from '../../editor/EditorCanvas';
+import { PageDeletion } from '../../editor/PageDeletion';
 import { PageOperations } from '../../editor/PageOperations';
 import { ImageInserter } from '../../features/images/ImageInserter';
 import { ImageRejectedError, type ImageEncoder } from '../../features/images/ImageEncoder';
 import type { PdfImporter } from '../../features/pdf/PdfImporter';
+import type { BlobSweeper } from '../../services/BlobSweeper';
 import { ExportController, type ExportRequest } from '../../features/export/ExportController';
 import { PageRasterizer } from '../../features/export/PageRasterizer';
 import { PngExporter } from '../../features/export/PngExporter';
@@ -21,12 +23,13 @@ import { PdfImages } from '../../features/pdf/PdfImages';
 import type { I18n } from '../../i18n/I18n';
 import { KeyboardShortcuts } from '../../input/KeyboardShortcuts';
 import type { BlobRepository } from '../../storage/BlobRepository';
-import type { PageRepository } from '../../storage/PageRepository';
+import { PageRepository } from '../../storage/PageRepository';
 import type { SaveQueue } from '../../storage/SaveQueue';
 import type { Tool } from '../../tools/Tool';
 import type { DialogFactory } from '../dialogs/DialogFactory';
 import type { Menu, MenuEntry } from '../dialogs/Menu';
 import { PageSettingsDialog } from '../dialogs/PageSettingsDialog';
+import { Snackbar } from '../dialogs/Snackbar';
 import type { Toast } from '../dialogs/Toast';
 import { icon } from '../icons';
 import { languageMenu, languageShort } from '../widgets/languageMenu';
@@ -60,6 +63,7 @@ export interface EditorViewDeps {
   toast: Toast;
   pages: PageRepository;
   blobs: BlobRepository;
+  sweeper: BlobSweeper;
   saveQueue: SaveQueue;
   imageEncoder: ImageEncoder;
   pdfImporter: PdfImporter;
@@ -82,6 +86,8 @@ export class EditorView {
   private readonly textEditor: TextEditorOverlay;
   private readonly rulerWidget: RulerWidget;
   private readonly pageOps: PageOperations;
+  private readonly deletion: PageDeletion;
+  private readonly snackbar = new Snackbar();
   private readonly pageSettings: PageSettingsDialog;
   private readonly images: ImageInserter;
   private readonly exporter: ExportController;
@@ -142,6 +148,7 @@ export class EditorView {
       (e) => c.router.isPalmTouch(e),
     );
     this.pageOps = this.createPageOperations();
+    this.deletion = this.createPageDeletion();
     this.panel = this.createPagesPanel();
     this.pageSettings = new PageSettingsDialog({
       i18n,
@@ -201,8 +208,7 @@ export class EditorView {
         this.refreshPanel();
       },
       onToolChange: (tool) => this.onToolChange(tool),
-      onBitmapLoaded: () =>
-        this.panel.refreshSoon(this.canvas.session.pages, this.canvas.session.currentIndex),
+      onBitmapLoaded: () => this.panel.refreshSoon(),
       beforePointerDown: () => this.beforePointerDown(),
       onPenSeen: () => this.onPenSeen(),
       onZoomBlocked: () => this.zoom.showBlockedHint(),
@@ -231,7 +237,9 @@ export class EditorView {
       zoom: (anchor: HTMLElement) => this.deps.menu.show(anchor, this.zoom.entries()),
       lock: () => this.openPageSettings(c().session.currentPage()),
       pages: () => {
-        if (this.panel.toggle()) this.refreshPanel();
+        this.settle();
+        this.popover.close();
+        this.panel.open(c().session.pages, c().session.currentIndex);
       },
       undo: () => c().undo.undo(),
       redo: () => c().undo.redo(),
@@ -245,45 +253,65 @@ export class EditorView {
     return new PageOperations({
       session: c.session,
       viewport: c.viewport,
+      camera: c.camera,
+      layout: c.layout,
       undo: c.undo,
-      cache: c.cache,
-      blobs: d.blobs,
-      pages: d.pages,
       saveQueue: d.saveQueue,
       i18n: d.i18n,
       sizes: d.sizes,
       makeId: d.makeId,
       toast: (message, ms) => d.toast.show(message, ms),
+      settle: () => this.settle(),
+      onPagesChanged: () => this.refreshPanel(),
+    });
+  }
+
+  private createPageDeletion(): PageDeletion {
+    const c = this.canvas;
+    const d = this.deps;
+    return new PageDeletion({
+      session: c.session,
+      pageOps: this.pageOps,
+      undo: c.undo,
+      cache: c.cache,
+      saveQueue: d.saveQueue,
+      sweeper: d.sweeper,
+      i18n: d.i18n,
+      prompt: this.snackbar,
+      toast: (message) => d.toast.show(message),
       confirm: (title, text) => d.dialogs.confirm(title, text),
       settle: () => this.settle(),
-      forgetSelectionOn: (page) => {
-        if (c.selection.current?.page === page) c.selection.clear();
-      },
       onPagesChanged: () => this.refreshPanel(),
-      onError: d.onStorageError,
     });
   }
 
   private createPagesPanel(): PagesPanel {
     const c = this.canvas;
-    return new PagesPanel(this.deps.i18n, this.deps.sizes, this.deps.menu, c.painter, () => c.camera.dpr, {
-      goTo: (page) => {
-        c.viewport.scrollTo(page);
-        if (c.camera.width < 700) this.panel.hide();
+    return new PagesPanel({
+      i18n: this.deps.i18n,
+      sizes: this.deps.sizes,
+      menu: this.deps.menu,
+      painter: c.painter,
+      loadBitmap: (id) => c.bitmaps.load(id),
+      revision: (page) => c.session.revision(page),
+      dpr: () => c.camera.dpr,
+      sheetOpen: () => this.deps.dialogs.hasOpenSheet,
+      handlers: {
+        goTo: (page) => c.viewport.scrollTo(page),
+        addBefore: (page) => this.pageOps.addBefore(page),
+        addAfter: (page) => this.pageOps.add(page),
+        settings: (page) => this.openPageSettings(page),
+        duplicate: (page) => this.pageOps.duplicate(page),
+        remove: (pages) => this.deletion.request(pages),
+        moveTo: (page, index) => this.pageOps.moveTo(page, index),
       },
-      addAfter: (page) => this.pageOps.add(page),
-      addAtEnd: () => this.pageOps.add(c.session.pages[c.session.pages.length - 1]),
-      settings: (page) => this.openPageSettings(page),
-      duplicate: (page) => this.pageOps.duplicate(page),
-      remove: (page) => void this.pageOps.delete(page),
-      move: (page, dir) => this.pageOps.move(page, dir),
     });
   }
 
   private shortcutHandlers() {
     const c = this.canvas;
     return {
-      enabled: () => !this.root.hidden && c.session.isOpen,
+      enabled: () => !this.root.hidden && c.session.isOpen && !this.panel.isOpen,
       undo: () => void c.undo.undo(),
       redo: () => void c.undo.redo(),
       deleteSelection: () => {
@@ -440,15 +468,28 @@ export class EditorView {
     session.notebook.view = { pageId: page ? page.id : null, z: camera.z };
   }
 
+  /** Blobs in use that stored pages may not reference: undo steps and pages awaiting Undo. */
+  blobsInUse(): Set<string> {
+    const { session, history } = this.canvas;
+    return new Set([
+      ...PageRepository.blobIds(session.pages),
+      ...history.blobIds(),
+      ...this.deletion.pendingBlobIds(),
+    ]);
+  }
+
   /** Saves and returns to the shelf. */
   async close(): Promise<void> {
     const c = this.canvas;
     this.settle();
     this.popover.close();
     this.deps.menu.close();
+    this.panel.hide();
+    this.deletion.finish();
     this.rememberView();
     await this.deps.saveQueue.flush(true);
     c.session.close();
+    c.undo.clear();
     this.deps.saveQueue.setNotebook(null);
     c.cache.clear();
     c.renderer.setEnabled(false);

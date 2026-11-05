@@ -70,6 +70,11 @@ export class Menu {
     setTimeout(() => document.addEventListener('pointerdown', this.outside, true), 0);
   }
 
+  /** Whether a menu is open. */
+  get isOpen(): boolean {
+    return this.node !== null;
+  }
+
   close(): void {
     if (!this.node) return;
     this.node.remove();

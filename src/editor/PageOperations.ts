@@ -1,9 +1,9 @@
-import type { PageCache } from '../canvas/PageCache';
+import type { Camera } from '../canvas/Camera';
+import type { PageLayout } from '../canvas/PageLayout';
 import type { Background, Page } from '../core/types';
 import { PageSizePolicy } from '../domain/PageSizePolicy';
 import type { PageSizes } from '../domain/PageSizes';
 import type { I18n } from '../i18n/I18n';
-import type { BlobRepository } from '../storage/BlobRepository';
 import { PageRepository } from '../storage/PageRepository';
 import type { SaveQueue } from '../storage/SaveQueue';
 import type { EditorSession } from './EditorSession';
@@ -13,39 +13,73 @@ import type { Viewport } from './Viewport';
 export interface PageOperationsDeps {
   session: EditorSession;
   viewport: Viewport;
+  camera: Camera;
+  layout: PageLayout;
   undo: UndoController;
-  cache: PageCache;
-  blobs: BlobRepository;
-  pages: PageRepository;
   saveQueue: SaveQueue;
   i18n: I18n;
   sizes: PageSizes;
   makeId: () => string;
   toast: (message: string, ms?: number) => void;
-  confirm: (title: string, text: string) => Promise<boolean>;
   /** Finishes text editing and clears the selection (before structural changes). */
   settle: () => void;
-  /** Clears the selection if it is on this page. */
-  forgetSelectionOn: (page: Page) => void;
   /** The page list changed (refresh the pages panel). */
   onPagesChanged: () => void;
-  onError: (error: unknown) => void;
 }
 
-/** Adding, deleting, duplicating, moving, locking and resizing pages of the open notebook. */
+/**
+ * Adding, duplicating, moving, locking and resizing pages of the open notebook. Changes to the
+ * page list are saved right away, in one transaction. Undo steps name pages by id, not position,
+ * so none of these changes can make a step target the wrong page.
+ */
 export class PageOperations {
   constructor(private readonly deps: PageOperationsDeps) {}
 
   /** Adds a page after `after` (default: the current page), following the lock rules. */
   add(after?: Page): void {
-    const { session, i18n, sizes } = this.deps;
+    const { session } = this.deps;
     this.deps.settle();
     const ref = after ?? session.currentPage() ?? null;
     const page = PageSizePolicy.newPageAfter(session.nb, ref, this.deps.makeId);
     this.insert(ref, [page]);
     this.deps.viewport.scrollTo(page);
+    this.announce(page);
+  }
+
+  /** Adds a page just before `before`, following the page ahead of it (see {@link PageSizePolicy}). */
+  addBefore(before: Page): void {
+    const { session } = this.deps;
+    this.deps.settle();
+    const index = session.indexOf(before);
+    if (index < 0) return;
+    const page = PageSizePolicy.newPageAt(session.nb, session.pages, index, this.deps.makeId);
+    session.insertAt(index, [page]);
+    this.deps.viewport.relayout();
+    this.deps.viewport.scrollTo(page);
+    this.afterListChange();
+    this.announce(page);
+  }
+
+  private announce(page: Page): void {
+    const { session, i18n, sizes } = this.deps;
     const message = i18n.t('pageAdded', { i: session.indexOf(page) + 1, size: sizes.label(page.w, page.h) });
     this.deps.toast(message + (page.locked ? i18n.t('nbSizeSuffix') : ''), 1800);
+  }
+
+  /** Runs a change to the page list, keeping the current page where it is on screen. */
+  keepingView(change: () => void): void {
+    const { session, camera, layout, viewport } = this.deps;
+    const page = session.currentPage();
+    const offset = page ? camera.y - layout.pos(page).y : 0;
+    change();
+    layout.update(session.pages);
+    if (page && session.has(page)) camera.y = layout.pos(page).y + offset;
+    viewport.relayout();
+  }
+
+  private afterListChange(): void {
+    void this.deps.saveQueue.flush();
+    this.deps.onPagesChanged();
   }
 
   /** Inserts pages (new, duplicated or imported) after a page. */
@@ -54,7 +88,7 @@ export class PageOperations {
     for (const p of pages) PageSizePolicy.enforceLock(p, session.nb.base);
     session.insert(after, pages);
     this.deps.viewport.relayout();
-    this.deps.onPagesChanged();
+    this.afterListChange();
   }
 
   /** Locks or unlocks a page; locking snaps it to the notebook size. */
@@ -102,41 +136,11 @@ export class PageOperations {
     this.deps.onPagesChanged();
   }
 
-  /** Deletes a page after confirmation, with the images only it used. */
-  async delete(page: Page): Promise<void> {
-    const { session, i18n } = this.deps;
-    if (session.pages.length <= 1) {
-      this.deps.toast(i18n.t('keepOne'));
-      return;
-    }
-    const ok = await this.deps.confirm(
-      i18n.t('delPageQ'),
-      i18n.t('delPageText', { n: session.indexOf(page) + 1 }),
-    );
-    if (!ok || !session.has(page)) return;
-    this.deps.forgetSelectionOn(page);
-    session.remove(page);
-    this.deps.saveQueue.markPageDeleted(page);
-    this.deps.cache.delete(page.id);
-    this.deps.undo.dropPage(page.id);
-    this.deps.viewport.relayout();
-    this.deps.onPagesChanged();
-    await this.removeStored(page);
-  }
-
-  private async removeStored(page: Page): Promise<void> {
-    const stillUsed = PageRepository.blobIds(this.deps.session.pages);
-    const orphaned = [...PageRepository.blobIds([page])].filter((id) => !stillUsed.has(id));
-    try {
-      await this.deps.saveQueue.flush();
-      await this.deps.blobs.deleteMany(orphaned);
-    } catch (error) {
-      this.deps.onError(error);
-    }
-  }
-
   /** Inserts a copy of a page right after it. */
   duplicate(page: Page): void {
+    this.deps.settle();
+    // Items are never changed in place and blobs are only removed once no page uses them,
+    // so the copy can share both with the original.
     const copy: Page = {
       ...PageRepository.toRecord(page),
       id: this.deps.makeId(),
@@ -149,11 +153,15 @@ export class PageOperations {
     this.deps.viewport.scrollTo(copy);
   }
 
-  /** Moves a page up (-1) or down (+1). */
-  move(page: Page, dir: -1 | 1): void {
-    if (!this.deps.session.move(page, dir)) return;
-    this.deps.viewport.relayout();
-    this.deps.onPagesChanged();
+  /** Moves a page to an index, keeping the current page in view. */
+  moveTo(page: Page, index: number): void {
+    const { session } = this.deps;
+    this.deps.settle();
+    let moved = false;
+    this.keepingView(() => {
+      moved = session.moveTo(page, index);
+    });
+    if (moved) this.afterListChange();
   }
 
   private afterResize(page: Page): void {

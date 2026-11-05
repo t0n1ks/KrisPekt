@@ -64,11 +64,15 @@
           <aside class="pages-panel" id="panel" hidden>
             <div class="pages-panel__head">
               <h2 class="pages-panel__title" id="panelTitle"></h2>
+              <button class="btn" id="panelSelect" type="button"></button>
               <button class="icon-btn" id="panelClose" type="button"></button>
             </div>
+            <p class="pages-panel__hint" id="panelHint"></p>
             <div class="pages-panel__list" id="plist"></div>
-            <div class="pages-panel__foot">
-              <button class="btn btn--wide" id="panelAdd" type="button"></button>
+            <div class="pages-panel__foot" id="panelFoot" hidden>
+              <span class="pages-panel__count" id="panelSelCount"></span>
+              <button class="btn" id="panelSelCancel" type="button"></button>
+              <button class="btn btn--danger" id="panelDelete" type="button"></button>
             </div>
           </aside>
         </div>

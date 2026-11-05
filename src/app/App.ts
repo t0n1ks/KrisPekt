@@ -1,3 +1,4 @@
+import { BLOB_SWEEP_DELAY_MS } from '../core/constants';
 import type { AutoBackupInterval, ExportPrefs, Language, Notebook, Preferences } from '../core/types';
 import { uid } from '../core/utils/id';
 import { PageSizePolicy } from '../domain/PageSizePolicy';
@@ -9,7 +10,9 @@ import { PdfImporter } from '../features/pdf/PdfImporter';
 import { PdfLoader } from '../features/pdf/PdfLoader';
 import { I18n } from '../i18n/I18n';
 import { AutoBackupScheduler } from '../services/AutoBackupScheduler';
+import { BlobSweeper } from '../services/BlobSweeper';
 import { LibraryService } from '../services/LibraryService';
+import { TabPresence } from '../services/TabPresence';
 import { BackupService } from '../storage/BackupService';
 import { BlobRepository } from '../storage/BlobRepository';
 import { Database } from '../storage/Database';
@@ -64,6 +67,7 @@ export class App {
   private readonly exportDialog: ExportDialog;
   private readonly backupFlow: BackupFlow;
   private readonly autoBackup: AutoBackupScheduler;
+  private readonly sweeper: BlobSweeper;
   private readonly editor: EditorView;
   private readonly libraryView: LibraryView;
   private corruptToastPending = false;
@@ -110,6 +114,18 @@ export class App {
       dialogs: this.dialogs,
       prefs: this.prefs,
       savePrefs: () => this.prefsStore.save(this.prefs),
+    });
+    this.sweeper = new BlobSweeper({
+      blobs: this.repos.blobs,
+      tabs: new TabPresence(),
+      inUse: () => this.editor.blobsInUse(),
+      flush: () => this.saveQueue.flush(),
+      isDue: () => this.prefs.blobSweepDue,
+      setDue: (due) => {
+        this.prefs.blobSweepDue = due;
+        this.prefsStore.save(this.prefs);
+      },
+      onError: () => this.storageError(),
     });
     this.editor = this.createEditor();
     this.libraryView = this.createLibraryView();
@@ -168,6 +184,7 @@ export class App {
       toast: this.toast,
       pages: this.repos.pages,
       blobs: this.repos.blobs,
+      sweeper: this.sweeper,
       saveQueue: this.saveQueue,
       imageEncoder: this.imageEncoder,
       pdfImporter: this.pdfImporter,
@@ -251,6 +268,7 @@ export class App {
     this.libraryView.show();
     this.watchLifecycle();
     this.autoBackup.appOpened();
+    setTimeout(() => void this.sweeper.run(), BLOB_SWEEP_DELAY_MS);
   }
 
   /**
