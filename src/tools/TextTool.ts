@@ -13,7 +13,7 @@ const TEXT_HIT_PAD = 6;
 
 type TextSize = '14' | '18' | '24' | '32';
 
-/** Text boxes: tap empty paper to type, tap existing text to edit it. */
+/** Text boxes: tap empty paper to type, tap a box to select it, and tap it again to edit it. */
 export class TextTool extends Tool {
   readonly kind: ToolKind = 'text';
   private tap: { page: Page | null; start: Point; moved: boolean } | null = null;
@@ -55,12 +55,13 @@ export class TextTool extends Tool {
     if (page) this.openAt(page, pt);
   }
 
-  /** Edits the topmost text under the point, or starts a new one there. */
+  /** Selects the topmost text under the point, or starts a new one there. */
   private openAt(page: Page, pt: Point): void {
     const { camera, layout, texts } = this.ctx;
     const local = layout.toPage(page, camera.toWorld(pt.x, pt.y));
     const hit = [...page.texts].reverse().find((t) => {
-      const b = texts.box(t);
+      // The visible text, not the box: old boxes are far wider than their text.
+      const b = texts.contentBox(t);
       const pad = TEXT_HIT_PAD;
       return local.x >= b.x0 - pad && local.x <= b.x1 + pad && local.y >= b.y0 - pad && local.y <= b.y1 + pad;
     });

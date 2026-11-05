@@ -1,7 +1,9 @@
 import { MM, PAPER } from '../core/constants';
-import type { Box, Page, Point } from '../core/types';
+import type { Box, Page, Point, TextItem } from '../core/types';
 import { clamp } from '../core/utils/math';
 import { ItemTransform, type ItemMapping, type PageItems } from '../domain/ItemTransform';
+import { RichText } from '../domain/RichText';
+import { SelectionClipboard } from '../domain/SelectionClipboard';
 import { SelectionPlacement, type Rect } from '../domain/SelectionPlacement';
 import type { BitmapCache } from '../canvas/BitmapCache';
 import type { Camera } from '../canvas/Camera';
@@ -54,6 +56,7 @@ const HANDLE_HIT = 24;
 export class Selection implements OverlayPainter {
   private state: SelectionState | null = null;
   private tokenSeq = 0;
+  private readonly clipboard = new SelectionClipboard();
 
   constructor(private readonly deps: SelectionDeps) {}
 
@@ -216,9 +219,58 @@ export class Selection implements OverlayPainter {
     const p = s.page;
     this.deps.recordUndo(p);
     p.strokes = p.strokes.map((st) => (s.ids.has(st.id) && st.k === 'pen' ? { ...st, c: color } : st));
-    p.texts = p.texts.map((t) => (s.ids.has(t.id) ? { ...t, c: color } : t));
+    p.texts = p.texts.map((t) => (s.ids.has(t.id) ? Selection.recoloredText(t, color) : t));
     s.token = ++this.tokenSeq;
     this.deps.session.touch(p);
+  }
+
+  private static recoloredText(text: TextItem, color: string): TextItem {
+    const recolored: TextItem = { ...text, c: color };
+    if (text.paras) recolored.paras = RichText.withoutColors(text.paras);
+    return recolored;
+  }
+
+  /** Remembers the selected items for {@link paste}. */
+  copy(): boolean {
+    const s = this.state;
+    if (!s) return false;
+    const box = { x0: s.box.x, y0: s.box.y, x1: s.box.x + s.box.w, y1: s.box.y + s.box.h };
+    this.clipboard.copy(ItemTransform.split(s.page, s.ids).picked, box);
+    return true;
+  }
+
+  get canPaste(): boolean {
+    return !this.clipboard.isEmpty;
+  }
+
+  /** Images of copied items; these must stay stored. */
+  clipboardBlobIds(): string[] {
+    return this.clipboard.blobIds();
+  }
+
+  /**
+   * Puts copied items on a page (one undo step), centred on a page point and shifted to lie
+   * inside the page, and selects them.
+   */
+  paste(page: Page, center: Point): boolean {
+    const copied = this.clipboard.box;
+    if (!copied) return false;
+    const w = copied.x1 - copied.x0;
+    const h = copied.y1 - copied.y0;
+    const x = center.x - w / 2;
+    const y = center.y - h / 2;
+    const shift = SelectionPlacement.clampShift({ x, y, w, h }, page.w * MM, page.h * MM);
+    const items = this.clipboard.pasted(x + shift.x - copied.x0, y + shift.y - copied.y0, this.deps.makeId);
+    if (!items) return false;
+    this.clear();
+    this.deps.recordUndo(page);
+    page.strokes = [...page.strokes, ...items.strokes];
+    page.texts = [...page.texts, ...items.texts];
+    page.images = [...page.images, ...items.images];
+    this.deps.session.touch(page);
+    const ids = [...items.strokes, ...items.texts, ...items.images].map((item) => item.id);
+    this.set(page, new Set(ids));
+    return true;
   }
 
   /** Deletes the selected items. */

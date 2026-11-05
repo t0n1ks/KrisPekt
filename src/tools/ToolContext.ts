@@ -33,7 +33,7 @@ export interface ToolContext {
   requestLive(): void;
   toast(message: string, ms?: number): void;
   confirm(title: string, text: string, okLabel: string): Promise<boolean>;
-  /** Opens the text box editor for a new (`item` null) or existing text. */
+  /** Starts a new text box (`item` null) or selects an existing one. */
   editText(page: Page, item: TextItem | null, x: number, y: number): void;
   /** Switches tools. */
   setTool(kind: ToolKind): void;

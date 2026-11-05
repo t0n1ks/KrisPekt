@@ -253,25 +253,250 @@
   pointer-events: none;
 }
 
-/* text box editor overlay */
+/* text box editor: runs at world px and is scaled with the page, see TextBoxEditor */
 .text-editor {
   position: absolute;
+  left: 0;
+  top: 0;
   z-index: 2;
-  border: 0;
-  outline: 1.5px dashed var(--paper-ui);
-  outline-offset: 4px;
-  background: transparent;
-  resize: none;
-  overflow: hidden;
-  padding: 0;
+  transform-origin: 0 0;
   margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
   font-family: var(--f-body);
   font-weight: 400;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  caret-color: var(--paper-ui);
-  color: var(--text-color);
+  font-style: normal;
+  font-kerning: normal;
   line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+  caret-color: var(--paper-ui);
+  pointer-events: none;
+  text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.text-editor[hidden] {
+  display: none;
+}
+.text-editor--editing {
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+}
+.text-para {
+  position: relative;
+  min-height: 1px;
+}
+.text-para--center {
+  text-align: center;
+}
+.text-para--right {
+  text-align: right;
+}
+.text-para--list {
+  padding-left: var(--indent);
+}
+.text-para--list::before {
+  content: attr(data-marker);
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: var(--marker-size);
+  color: var(--marker-color);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.text-run {
+  font-size: var(--run-size);
+  color: var(--run-color);
+}
+.text-run--bold {
+  font-weight: 700;
+}
+.text-run--italic {
+  font-style: italic;
+}
+.text-run--underline {
+  text-decoration-line: underline;
+}
+/* The same lines as the canvas draws: unbroken, and of the same weight. */
+.text-run--underline,
+.text-run--strike {
+  text-decoration-skip-ink: none;
+  text-decoration-thickness: 0.07em;
+  text-underline-offset: 0.11em;
+}
+.text-run--strike {
+  text-decoration-line: line-through;
+}
+.text-run--underline.text-run--strike {
+  text-decoration-line: underline line-through;
+}
+
+/* text box frame: not scaled, so handles keep their touch size at any zoom */
+.text-frame {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  outline: 1.5px solid var(--paper-ui);
+  outline-offset: 3px;
+  pointer-events: none;
+}
+.text-frame[hidden] {
+  display: none;
+}
+.text-frame__body,
+.text-frame__edge,
+.text-frame__move,
+.text-frame__handle {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+}
+.text-frame__body {
+  inset: 0;
+  cursor: move;
+}
+.text-frame--editing .text-frame__body {
+  pointer-events: none;
+}
+.text-frame__edge {
+  cursor: move;
+}
+.text-frame__edge--top {
+  left: 0;
+  right: 0;
+  top: -14px;
+  height: 11px;
+}
+.text-frame__edge--bottom {
+  left: 0;
+  right: 0;
+  bottom: -14px;
+  height: 11px;
+}
+.text-frame__edge--left-edge {
+  top: 0;
+  bottom: 0;
+  left: -14px;
+  width: 11px;
+}
+.text-frame__edge--right-edge {
+  top: 0;
+  bottom: 0;
+  right: -14px;
+  width: 11px;
+}
+.text-frame__move {
+  left: 50%;
+  top: -52px;
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  color: var(--paper-ui);
+  cursor: move;
+}
+.text-frame__handle {
+  width: 44px;
+  height: 44px;
+  cursor: ew-resize;
+}
+.text-frame__handle::after {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 2px solid var(--paper-ui);
+}
+.text-frame__handle--left,
+.text-frame__handle--top-left,
+.text-frame__handle--bottom-left {
+  left: -25px;
+}
+.text-frame__handle--right,
+.text-frame__handle--top-right,
+.text-frame__handle--bottom-right {
+  right: -25px;
+}
+.text-frame__handle--left,
+.text-frame__handle--right {
+  top: 50%;
+  margin-top: -22px;
+}
+.text-frame__handle--top-left,
+.text-frame__handle--top-right {
+  top: -25px;
+}
+.text-frame__handle--bottom-left,
+.text-frame__handle--bottom-right {
+  bottom: -25px;
+}
+
+/* text formatting bar: placed inside the visual viewport by TextFormatBar */
+.text-bar {
+  position: fixed;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 10px 26px -12px var(--shadow);
+  touch-action: manipulation;
+}
+.text-bar[hidden] {
+  display: none;
+}
+.text-bar__button {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+.text-bar__button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.text-bar__size {
+  min-width: 34px;
+  height: 38px;
+  flex: none;
+  padding: 0 2px;
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+.text-bar__dot {
+  position: absolute;
+  left: 11px;
+  bottom: 4px;
+  width: 16px;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--dot-color);
+}
+.text-bar__dot--mixed {
+  background: var(--line);
 }
 
 /* selection bar */

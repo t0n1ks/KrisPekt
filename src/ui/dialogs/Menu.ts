@@ -57,12 +57,22 @@ export class Menu {
     this.close();
     this.bus.emit('menu-opened', undefined);
     document.body.append(menu);
+    // Pressing a menu does not take the focus away from a text box, or the keyboard would close.
+    menu.addEventListener('mousedown', (e) => {
+      if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+    });
     const r = anchor.getBoundingClientRect();
     const mw = menu.offsetWidth;
     const mh = menu.offsetHeight;
-    const x = clamp(r.right - mw, 8, innerWidth - mw - 8);
+    // The visual viewport is what an on-screen keyboard leaves of the screen.
+    const view = window.visualViewport;
+    const left = view?.offsetLeft ?? 0;
+    const top = view?.offsetTop ?? 0;
+    const width = view?.width ?? innerWidth;
+    const bottom = top + (view?.height ?? innerHeight);
+    const x = clamp(r.right - mw, left + 8, Math.max(left + 8, left + width - mw - 8));
     let y = r.bottom + 6;
-    if (y + mh > innerHeight - 8) y = Math.max(8, r.top - mh - 6);
+    if (y + mh > bottom - 8) y = Math.max(top + 8, r.top - mh - 6);
     menu.style.left = x + 'px';
     menu.style.top = y + 'px';
     this.node = menu;

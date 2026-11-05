@@ -9,11 +9,14 @@ import { ColorPalette } from '../widgets/ColorPalette';
 export interface SelectionBarHandlers {
   recolor(color: string): void;
   duplicate(): void;
+  copy(): void;
+  paste(): void;
+  canPaste(): boolean;
   remove(): void;
   deselect(): void;
 }
 
-/** Floating actions above (or below) the selection: colour, duplicate, delete, deselect. */
+/** Floating actions above (or below) the selection: colour, duplicate, copy, paste, delete, deselect. */
 export class SelectionBar {
   private readonly node = byId('selbar');
 
@@ -34,11 +37,23 @@ export class SelectionBar {
     replaceChildren(
       this.node,
       colorButton,
-      this.button('copy', t.t('duplicate'), () => this.handlers.duplicate()),
+      this.button('duplicate', t.t('duplicate'), () => this.handlers.duplicate()),
+      this.button('copy', t.t('copySel'), () => this.handlers.copy()),
+      ...(this.handlers.canPaste() ? [this.pasteButton()] : []),
       this.button('trash', t.t('delete'), () => this.handlers.remove(), true),
       this.button('close', t.t('deselect'), () => this.handlers.deselect()),
     );
     this.node.hidden = false;
+  }
+
+  /** Only "Paste", for when the lasso is on and nothing is selected. */
+  showPaste(): void {
+    replaceChildren(this.node, this.pasteButton());
+    this.node.hidden = false;
+  }
+
+  private pasteButton(): HTMLButtonElement {
+    return this.button('paste', this.i18n.t('pasteSel'), () => this.handlers.paste());
   }
 
   hide(): void {

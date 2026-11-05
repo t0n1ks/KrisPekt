@@ -37,7 +37,8 @@ import { InputDiagnosticsOverlay } from './InputDiagnosticsOverlay';
 import { PagesPanel } from './PagesPanel';
 import { RulerWidget } from './RulerWidget';
 import { SelectionBar } from './SelectionBar';
-import { TextEditorOverlay } from './TextEditorOverlay';
+import { TextBoxEditor } from './TextBoxEditor';
+import { TextLayout } from '../../canvas/TextLayout';
 import { ToolOptionsPopover } from './ToolOptionsPopover';
 import { ToolTray } from './ToolTray';
 import { TopBar } from './TopBar';
@@ -73,6 +74,9 @@ export interface EditorViewDeps {
   onStorageError: (error: unknown) => void;
 }
 
+/** How far below the tool tray the "Paste" button sits. */
+const PASTE_BAR_TOP = 72;
+
 /** The notebook editor screen. */
 export class EditorView {
   private readonly root = byId('editor');
@@ -83,7 +87,7 @@ export class EditorView {
   private readonly popover: ToolOptionsPopover;
   private readonly panel: PagesPanel;
   private readonly selectionBar: SelectionBar;
-  private readonly textEditor: TextEditorOverlay;
+  private readonly textEditor: TextBoxEditor;
   private readonly rulerWidget: RulerWidget;
   private readonly pageOps: PageOperations;
   private readonly deletion: PageDeletion;
@@ -107,13 +111,30 @@ export class EditorView {
       hooks: this.hooks(),
     });
     const c = this.canvas;
-    this.textEditor = new TextEditorOverlay({
+    this.textEditor = new TextBoxEditor({
       camera: c.camera,
       layout: c.layout,
       session: c.session,
+      texts: c.texts,
+      i18n,
+      menu,
       prefs: () => deps.prefs.txt,
+      savePrefs: deps.savePrefs,
+      recentColors: () => deps.prefs.recent.pen,
+      commitColor: (color) => {
+        deps.prefs.recent.pen = ColorLists.pushRecent(deps.prefs.recent.pen, color);
+        deps.savePrefs();
+        return deps.prefs.recent.pen;
+      },
       makeId: deps.makeId,
       recordUndo: (page) => c.undo.record(page),
+      undoPage: () => void c.undo.undo(),
+      redoPage: () => void c.undo.redo(),
+      canUndoPage: () => c.history.canUndo,
+      canRedoPage: () => c.history.canRedo,
+      isPalm: (e) => c.router.isPalmTouch(e),
+      toast: (message) => deps.toast.show(message),
+      redraw: () => c.renderer.request(),
     });
     this.zoom = new ZoomMenu({
       camera: c.camera,
@@ -136,6 +157,9 @@ export class EditorView {
     this.selectionBar = new SelectionBar(i18n, menu, {
       recolor: (color) => c.selection.recolor(color),
       duplicate: () => c.selection.duplicate(),
+      copy: () => this.copySelection(),
+      paste: () => void this.pasteSelection(),
+      canPaste: () => c.selection.canPaste,
       remove: () => c.selection.remove(),
       deselect: () => c.selection.clear(),
     });
@@ -200,7 +224,7 @@ export class EditorView {
         if (state) {
           this.selectionBar.show();
           this.positionOverlays();
-        } else this.selectionBar.hide();
+        } else this.showPasteOrNothing();
       },
       onUndoState: (u, r) => this.topBar.setUndoState(u, r),
       onRestored: (_pages, resized) => {
@@ -218,7 +242,10 @@ export class EditorView {
       onInputSample: (sample) => this.diagnostics.record(sample),
       settle: () => this.settle(),
       hiddenTextOn: (page) => this.textEditor.hiddenOn(page),
-      editText: (page, item, x, y) => this.textEditor.start(page, item, x, y),
+      editText: (page, item, x, y) => {
+        if (item) this.textEditor.select(page, item);
+        else this.textEditor.startNew(page, x, y);
+      },
       setTool: (kind) => this.setTool(kind),
       refreshTray: () => this.renderTray(),
       toast: (message, ms) => d.toast.show(message, ms),
@@ -314,7 +341,16 @@ export class EditorView {
       enabled: () => !this.root.hidden && c.session.isOpen && !this.panel.isOpen,
       undo: () => void c.undo.undo(),
       redo: () => void c.undo.redo(),
+      textKey: (e: KeyboardEvent) => this.textEditor.handleKey(e),
+      copySelection: () => this.copySelection(),
+      cutSelection: () => {
+        if (!this.copySelection()) return false;
+        c.selection.remove();
+        return true;
+      },
+      pasteSelection: () => this.pasteSelection(),
       deleteSelection: () => {
+        if (this.textEditor.removeSelected()) return true;
         if (!c.selection.current) return false;
         c.selection.remove();
         return true;
@@ -356,7 +392,10 @@ export class EditorView {
       attributes: true,
       attributeFilter: ['data-theme'],
     });
-    void document.fonts?.ready.then(() => {
+    // Canvas text does not load a font weight by itself in time for the first paint. Bold is part
+    // of what is on pages, so it is loaded here, for screen and exports alike.
+    const bold = document.fonts?.load(TextLayout.font(16, true), 'AЯ').catch(() => []);
+    void Promise.all([document.fonts?.ready, bold]).then(() => {
       c.texts.reset();
       for (const page of c.session.pages) c.session.bump(page);
       this.rulerWidget.invalidate();
@@ -475,6 +514,7 @@ export class EditorView {
       ...PageRepository.blobIds(session.pages),
       ...history.blobIds(),
       ...this.deletion.pendingBlobIds(),
+      ...this.canvas.selection.clipboardBlobIds(),
     ]);
   }
 
@@ -526,7 +566,43 @@ export class EditorView {
     this.rulerWidget.position();
     if (c.selection.current && this.selectionBar.visible) {
       this.selectionBar.position(c.selection.screenBox(), c.camera.width, c.camera.height);
+    } else if (this.selectionBar.visible) {
+      this.selectionBar.position(
+        { x: c.camera.width / 2, y: c.camera.topPad + PASTE_BAR_TOP, w: 0, h: 0 },
+        c.camera.width,
+        c.camera.height,
+      );
     }
+  }
+
+  /** Remembers the selected items, for pasting on any page of any notebook. */
+  private copySelection(): boolean {
+    const c = this.canvas;
+    if (!c.selection.copy()) return false;
+    this.deps.toast.show(this.deps.i18n.t('copiedSel'));
+    this.selectionBar.show();
+    this.positionOverlays();
+    return true;
+  }
+
+  /** Pastes in the middle of the visible part of the current page. */
+  private pasteSelection(): boolean {
+    const c = this.canvas;
+    const page = c.session.currentPage();
+    if (!page || !c.selection.canPaste) return false;
+    if (c.tools.kind !== 'lasso') c.tools.select('lasso');
+    const center = c.layout.toPage(page, c.camera.toWorld(c.camera.width / 2, c.camera.height / 2));
+    return c.selection.paste(page, center);
+  }
+
+  /** With the lasso on and something copied, "Paste" stays at hand while nothing is selected. */
+  private showPasteOrNothing(): void {
+    const c = this.canvas;
+    if (c.selection.current) return;
+    if (c.tools.kind === 'lasso' && c.selection.canPaste && c.session.isOpen) {
+      this.selectionBar.showPaste();
+      this.positionOverlays();
+    } else this.selectionBar.hide();
   }
 
   private refreshPanel(): void {
@@ -548,6 +624,7 @@ export class EditorView {
   }
 
   private onToolChange(tool: Tool): void {
+    this.showPasteOrNothing();
     this.renderTray();
     this.canvas.applyCursor(tool);
   }
@@ -763,7 +840,7 @@ export class EditorView {
     const c = this.canvas;
     this.root.setAttribute('aria-label', i18n.t('notebook'));
     this.fab.setAttribute('aria-label', i18n.t('addPage'));
-    this.textEditor.applyLabel(i18n.t('text'));
+    this.textEditor.applyLanguage();
     this.topBar.applyLanguage();
     this.panel.applyLanguage();
     if (!c.session.isOpen) return;

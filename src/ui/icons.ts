@@ -58,6 +58,22 @@ const PATHS = {
   globe:
     '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  duplicate:
+    '<rect x="4" y="4" width="11" height="11" rx="2"/><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M14.5 12v5M12 14.5h5"/>',
+  paste: '<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3.5h6V5M9 11h6M9 15h6"/>',
+  minus: '<path d="M5 12h14"/>',
+  bold: '<path d="M7.5 5h5.5a3.5 3.5 0 0 1 0 7H7.5zM7.5 12H14a3.5 3.5 0 0 1 0 7H7.5z" stroke-width="2.4"/>',
+  italic: '<path d="M10 5h7M7 19h7M14 5l-4 14"/>',
+  underline: '<path d="M7 4v8a5 5 0 0 0 10 0V4M5 20.5h14"/>',
+  strike:
+    '<path d="M4 12h16M16.5 7.5C16 5.8 14.3 4.8 12 4.8c-2.7 0-4.5 1.3-4.5 3.4 0 1.5.9 2.7 2.8 3.8M7.5 16.5c.5 1.7 2.2 2.7 4.5 2.7 2.7 0 4.5-1.3 4.5-3.4 0-.7-.2-1.3-.5-1.8"/>',
+  alignLeft: '<path d="M4 6h16M4 10.5h10M4 15h16M4 19.5h10"/>',
+  alignCenter: '<path d="M4 6h16M7 10.5h10M4 15h16M7 19.5h10"/>',
+  alignRight: '<path d="M4 6h16M10 10.5h10M4 15h16M10 19.5h10"/>',
+  listBullet:
+    '<circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><path d="M9.5 7H20M9.5 12H20M9.5 17H20"/>',
+  listNumber:
+    '<path d="M4 5l1.5-1v5M3.8 13.8c.3-.8 2.7-1 2.6.5 0 .9-2.6 2-2.6 3.2h2.8M9.5 7H20M9.5 12H20M9.5 17H20"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;
