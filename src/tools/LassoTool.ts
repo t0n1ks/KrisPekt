@@ -93,7 +93,10 @@ export class LassoTool extends Tool {
     const ids = new Set<string>();
     for (const st of page.strokes) if (StrokeGeometry.insideLasso(st, poly)) ids.add(st.id);
     for (const t of page.texts) {
-      const b = this.ctx.texts.box(t);
+      // A text box is selected when the middle of its visible text is inside the loop. Not the
+      // middle of the box: a box may be far wider than its text, and the loop goes around what
+      // you see.
+      const b = this.ctx.texts.contentBox(t);
       if (StrokeGeometry.pointInPolygon((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, poly)) ids.add(t.id);
     }
     for (const im of page.images) {
