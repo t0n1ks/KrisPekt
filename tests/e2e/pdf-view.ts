@@ -16,7 +16,7 @@ interface PdfDoc {
 }
 interface PdfPage {
   view: number[];
-  getTextContent(): Promise<{ items: { str?: string }[] }>;
+  getTextContent(): Promise<{ items: { str?: string; fontName?: string; transform?: number[] }[] }>;
   getViewport(options: { scale: number }): { width: number; height: number };
   render(options: object): { promise: Promise<void> };
 }
@@ -68,6 +68,33 @@ export function pdfInfo(page: Page, pdf: Buffer): Promise<PdfPageInfo> {
       }
       const first = await doc.getPage(1);
       return { pages: doc.numPages, width: first.view[2], height: first.view[3], text };
+    },
+    [pdf.toString('base64'), PDFJS_PREFIX] as const,
+  );
+}
+
+/** One piece of selectable text on page 1, as pdf.js reads it. */
+export interface PdfTextItem {
+  str: string;
+  fontName: string;
+  /** The text matrix: [a, b, c, d, x, y]; d is the size, c the slant. */
+  transform: number[];
+}
+
+/** The selectable text of page 1, with the font and the matrix of each piece. */
+export function pdfTextItems(page: Page, pdf: Buffer): Promise<PdfTextItem[]> {
+  return page.evaluate(
+    async ([b64, prefix]) => {
+      const pdfjs = (await import(prefix + 'pdf.min.mjs')) as PdfJs;
+      pdfjs.GlobalWorkerOptions.workerSrc = prefix + 'pdf.worker.min.mjs';
+      const data = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const doc = await pdfjs.getDocument({ data }).promise;
+      const content = await (await doc.getPage(1)).getTextContent();
+      return content.items.map((item) => ({
+        str: item.str ?? '',
+        fontName: item.fontName ?? '',
+        transform: item.transform ?? [],
+      }));
     },
     [pdf.toString('base64'), PDFJS_PREFIX] as const,
   );

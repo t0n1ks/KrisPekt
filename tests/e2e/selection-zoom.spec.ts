@@ -277,8 +277,10 @@ test('bug 2: zooming never shows deleted or moved content', async ({ page }) => 
   const around: Rect = { x: anchor.x - 40, y: anchor.y - 40, w: 80, h: 80 };
   await expect.poll(() => inkIn(page, around)).toBeGreaterThan(200);
 
+  // One tap selects a text box and a second one edits it.
   await page.mouse.click(anchor.x, anchor.y);
   await expect(page.locator('#textEd')).toBeVisible();
+  await page.mouse.click(anchor.x, anchor.y);
   await page.keyboard.press('Control+A');
   await page.keyboard.press('Backspace');
   await page.keyboard.press('Escape');
