@@ -1,3 +1,4 @@
+import { PDF_BOLD_FONT_NAME } from '../../core/constants';
 import type { ShapePart } from '../../canvas/brushes/PathSink';
 import { CurveMath } from '../../canvas/draw/CurveMath';
 import type { DrawSink, FillStyle, ImageRun, LineStyle, TextRun } from '../../canvas/draw/DrawSink';
@@ -25,6 +26,9 @@ export interface PdfVectorOptions {
   /** Images of the page by blob id; null when one could not be read. */
   images: ReadonlyMap<string, PdfImage | null>;
 }
+
+/** The slant of synthetic italic: what Chromium applies to a font without an italic face. */
+const ITALIC_SLANT = 0.25;
 
 /**
  * Writes drawing commands into a jsPDF document as vector paths, real text and embedded
@@ -106,10 +110,27 @@ export class PdfVectorBackend implements DrawSink<PathRecorder> {
     if (!run.text.trim()) return;
     const k = this.options.k;
     this.setAlpha(1);
-    this.doc.setFont(this.options.font, 'normal');
+    this.doc.setFont(run.bold ? PDF_BOLD_FONT_NAME : this.options.font, 'normal');
     this.doc.setFontSize(run.size * k);
     this.doc.setTextColor(run.color);
-    this.doc.text(run.text, run.x * k, (run.top + run.size * this.options.baseline) * k);
+    const baseline = (run.baseline ?? run.top + run.size * this.options.baseline) * k;
+    if (run.italic) this.slanted(run.text, run.x * k, baseline);
+    else this.doc.text(run.text, run.x * k, baseline);
+  }
+
+  /**
+   * Text slanted around its baseline, like the browser slants a font without an italic face.
+   * jsPDF's own text transform needs its "advanced" mode; a transform around the text does not,
+   * and the text stays real, selectable text. PDF's y axis runs upwards, hence the page height.
+   */
+  private slanted(text: string, x: number, baseline: number): void {
+    const pdfBaseline = this.doc.internal.pageSize.getHeight() - baseline;
+    this.doc.saveGraphicsState();
+    this.doc.setCurrentTransformationMatrix(
+      this.doc.Matrix(1, 0, ITALIC_SLANT, 1, -ITALIC_SLANT * pdfBaseline, 0),
+    );
+    this.doc.text(text, x, baseline);
+    this.doc.restoreGraphicsState();
   }
 
   /** Embeds the stored image as it is (no re-encoding); the blob id lets jsPDF reuse it. */

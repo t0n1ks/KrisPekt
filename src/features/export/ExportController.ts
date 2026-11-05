@@ -1,3 +1,4 @@
+import { TextLayout } from '../../canvas/TextLayout';
 import type { ExportPrefs, Page } from '../../core/types';
 import { safeFileName } from '../../core/utils/format';
 import type { I18n } from '../../i18n/I18n';
@@ -42,6 +43,8 @@ export class ExportController {
     }
     const base = safeFileName(request.title, i18n.t('defName'));
     try {
+      // Canvas text in Bold needs the face loaded before it is drawn, also right after a start.
+      await document.fonts?.load(TextLayout.font(16, true), 'AЯ');
       const lowered =
         request.settings.format === 'png'
           ? await this.png(selected, request.settings, base)

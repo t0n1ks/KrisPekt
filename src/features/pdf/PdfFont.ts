@@ -1,30 +1,41 @@
-import { PDF_FONT_FILE, PDF_FONT_NAME, TEXT_LINE_HEIGHT } from '../../core/constants';
+import {
+  PDF_BOLD_FONT_FILE,
+  PDF_BOLD_FONT_NAME,
+  PDF_FONT_FILE,
+  PDF_FONT_NAME,
+  TEXT_LINE_HEIGHT,
+} from '../../core/constants';
 import { TextLayout } from '../../canvas/TextLayout';
 
 type JsPdfDocument = InstanceType<(typeof import('jspdf'))['jsPDF']>;
 
-/** File name of the font inside jsPDF's virtual file system. */
-const VFS_NAME = 'Onest-Regular.ttf';
+/** File names of the fonts inside jsPDF's virtual file system. */
+const VFS_REGULAR = 'Onest-Regular.ttf';
+const VFS_BOLD = 'Onest-Bold.ttf';
 /** Onest's em-box ascent share (hhea 970 / (970 + 305)); used when the canvas cannot measure it. */
 const FALLBACK_BASELINE = 970 / 1275;
 /** Font size the baseline is measured at (large, for precision). */
 const PROBE_SIZE = 100;
 
 /**
- * The text font for vector PDF: Onest Regular as a Latin + Cyrillic TTF from our own origin
- * (`public/fonts`, SIL OFL). It is fetched only when a vector PDF is made, then kept for the
- * session. jsPDF embeds only the glyphs the document uses.
+ * The text fonts for vector PDF: Onest Regular and Bold as Latin + Cyrillic TTFs from our own
+ * origin (`public/fonts`, SIL OFL). They are fetched only when a vector PDF is made, then kept
+ * for the session. jsPDF embeds only the glyphs the document uses. Onest has no italic face, so
+ * italic is slanted when it is drawn.
  */
 export class PdfFont {
-  private data: Promise<string> | null = null;
+  private data: Promise<[string, string]> | null = null;
 
-  /** @param fetchFont reads the TTF bytes (the same-origin file by default; tests read it from disk) */
-  constructor(private readonly fetchFont: () => Promise<Uint8Array> = PdfFont.fetchSameOrigin) {}
+  /** @param fetchFont reads a TTF's bytes (the same-origin file by default; tests read it from disk) */
+  constructor(private readonly fetchFont: (file: string) => Promise<Uint8Array> = PdfFont.fetchSameOrigin) {}
 
-  /** Registers the font in a document; rejects when it cannot be loaded. */
+  /** Registers the fonts in a document; rejects when they cannot be loaded. */
   async register(doc: JsPdfDocument): Promise<string> {
-    doc.addFileToVFS(VFS_NAME, await this.load());
-    doc.addFont(VFS_NAME, PDF_FONT_NAME, 'normal', 400, 'Identity-H');
+    const [regular, bold] = await this.load();
+    doc.addFileToVFS(VFS_REGULAR, regular);
+    doc.addFont(VFS_REGULAR, PDF_FONT_NAME, 'normal', undefined, 'Identity-H');
+    doc.addFileToVFS(VFS_BOLD, bold);
+    doc.addFont(VFS_BOLD, PDF_BOLD_FONT_NAME, 'normal', undefined, 'Identity-H');
     return PDF_FONT_NAME;
   }
 
@@ -46,9 +57,9 @@ export class PdfFont {
     }
   }
 
-  private load(): Promise<string> {
+  private load(): Promise<[string, string]> {
     if (!this.data) {
-      this.data = this.fetchBase64();
+      this.data = Promise.all([this.fetchBase64(PDF_FONT_FILE), this.fetchBase64(PDF_BOLD_FONT_FILE)]);
       this.data.catch(() => {
         this.data = null;
       });
@@ -56,12 +67,12 @@ export class PdfFont {
     return this.data;
   }
 
-  private async fetchBase64(): Promise<string> {
-    return PdfFont.toBase64(await this.fetchFont());
+  private async fetchBase64(file: string): Promise<string> {
+    return PdfFont.toBase64(await this.fetchFont(file));
   }
 
-  private static async fetchSameOrigin(): Promise<Uint8Array> {
-    const response = await fetch(import.meta.env.BASE_URL + PDF_FONT_FILE);
+  private static async fetchSameOrigin(file: string): Promise<Uint8Array> {
+    const response = await fetch(import.meta.env.BASE_URL + file);
     if (!response.ok) throw new Error(`font: HTTP ${response.status}`);
     return new Uint8Array(await response.arrayBuffer());
   }
