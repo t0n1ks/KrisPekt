@@ -101,7 +101,7 @@ reference/       the original prototype (neither built nor published)
 
 Tools that write only write: a tap with a pen, the highlighter, the eraser, the lasso or the text tool never opens a link, a card or a bookmark marker. They open with the **Hand** (with a finger, a stylus or a mouse), or with a finger tap while fingers are not drawing (**Draw with finger** is off).
 
-The Hand shares a toolbar button with the lasso: tap it while either is in use to switch, or long-press it for a menu. It can also be shown as its own button in **Customise toolbar**; tapping that button while the Hand is in use goes back to the lasso. On a keyboard, its key is **G**.
+The Hand shares a toolbar button with the lasso: tap it while either is in use to switch, or long-press it for a menu. It can also be shown as its own button in **Customise toolbar**; the shared button then always shows the lasso, and tapping the Hand's button while the Hand is in use goes back to the lasso. On a keyboard, its key is **G**.
 
 - One finger or a stylus on empty paper scrolls; pinch zoom works unless the zoom is locked.
 - A tap selects a text box or a photo, and a tap on empty paper or ink lets it go. A tap on a card opens it, so a card is selected by dragging it or through its menu.
