@@ -8,6 +8,10 @@ export interface LinkTargetPickerDeps {
   i18n: I18n;
   directory: LinkDirectory;
   recent: () => readonly InternalLink[];
+  /** Takes one place off the recent list. */
+  forgetRecent: (link: InternalLink) => void;
+  /** Empties the recent list, once the user agrees; resolves with whether it was. */
+  clearRecents: () => Promise<boolean>;
   /** The link copied in the app, if any. */
   copied: () => InternalLink | null;
   onPick: (link: InternalLink) => void;
@@ -82,7 +86,7 @@ export class LinkTargetPicker {
     return [
       ...this.section(i18n.t('linkPickCurrent'), known(current ? [current] : [])),
       ...this.section(i18n.t('linkPickCopied'), known(copied ? [copied] : [])),
-      ...this.section(i18n.t('linkPickRecent'), known(this.deps.recent())),
+      ...this.recents(known(this.deps.recent())),
       el('h3', { class: 'link-pick__heading' }, i18n.t('linkPickBrowse')),
       ...directory
         .subjects()
@@ -103,6 +107,58 @@ export class LinkTargetPicker {
       el('h3', { class: 'link-pick__heading' }, title),
       ...entries.map((entry) => this.entryRow(entry)),
     ];
+  }
+
+  private recents(entries: readonly LinkEntry[]): Node[] {
+    if (!entries.length) return [];
+    const { i18n } = this.deps;
+    const clear = el(
+      'button',
+      {
+        class: 'link-pick__clear',
+        attrs: { type: 'button' },
+        on: {
+          click: () => {
+            void this.deps.clearRecents().then((cleared) => {
+              if (cleared) this.render();
+            });
+          },
+        },
+      },
+      i18n.t('linkRecentClear'),
+    );
+    return [
+      el(
+        'div',
+        { class: 'link-pick__heading-row' },
+        el('h3', { class: 'link-pick__heading' }, i18n.t('linkPickRecent')),
+        clear,
+      ),
+      ...entries.map((entry) => this.recentRow(entry)),
+    ];
+  }
+
+  private recentRow(entry: LinkEntry): HTMLElement {
+    const label = this.deps.i18n.t('linkRecentRemove');
+    return el(
+      'div',
+      { class: 'link-pick__recent' },
+      this.entryRow(entry),
+      el(
+        'button',
+        {
+          class: 'icon-btn link-pick__forget',
+          attrs: { type: 'button', 'aria-label': label, title: label },
+          on: {
+            click: () => {
+              this.deps.forgetRecent(entry.target);
+              this.render();
+            },
+          },
+        },
+        icon('close', 16),
+      ),
+    );
   }
 
   private subject(id: string, name: string): Node[] {

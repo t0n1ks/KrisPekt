@@ -278,6 +278,31 @@
   font-weight: 600;
 }
 
+.link-pick__heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.link-pick__clear {
+  min-height: 44px;
+  padding: 0 8px;
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+.link-pick__recent {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.link-pick__recent > .link-pick__row {
+  flex: 1;
+  min-width: 0;
+}
+.link-pick__forget {
+  flex: none;
+}
+
 .link-pick__row,
 .link-pick__up,
 .anchor-list__jump {
