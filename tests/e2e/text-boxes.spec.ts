@@ -545,6 +545,8 @@ test.describe('text boxes', () => {
       await page.mouse.click(at.x + 30, at.y);
       await frame(page).evaluate((node) => node.setAttribute('hidden', ''));
       await bar(page).evaluate((node) => node.setAttribute('hidden', ''));
+      // Bold Latin and Cyrillic are separate files: a slow machine could still be fetching one.
+      await page.evaluate(() => document.fonts.ready);
       const shown = await editor(page).boundingBox();
       if (!shown) throw new Error('no editor');
       const clip = { x: shown.x - 4, y: shown.y - 2, width: shown.width + 8, height: shown.height + 4 };
