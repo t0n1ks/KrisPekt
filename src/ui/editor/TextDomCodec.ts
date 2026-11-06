@@ -1,9 +1,8 @@
-import { PAPER } from '../../core/constants';
 import type { LinkTarget, TextParagraph, TextSpan, TextStyle } from '../../core/types';
 import { el, replaceChildren } from '../../core/utils/dom';
 import { ID_PATTERN } from '../../core/utils/id';
 import { RichText } from '../../domain/RichText';
-import { LIST_INDENT_EM, type BoxDefaults } from '../../domain/RichTextLayout';
+import { LIST_INDENT_EM, RichTextLayout, type BoxDefaults } from '../../domain/RichTextLayout';
 import { SafeUrl } from '../../domain/SafeUrl';
 import { COLOR_PATTERN, LIMITS } from '../../storage/validation/guards';
 
@@ -150,7 +149,7 @@ export class TextDomCodec {
   private static run(run: TextSpan, base: BoxDefaults): HTMLSpanElement {
     const span = el('span', { class: 'text-run' });
     span.style.setProperty('--run-size', (run.fs ?? base.fs) + 'px');
-    span.style.setProperty('--run-color', run.c ?? base.c);
+    span.style.setProperty('--run-color', RichTextLayout.runColor(run, base));
     if (run.fs !== undefined) span.dataset.fs = String(run.fs);
     if (run.c !== undefined) span.dataset.c = run.c;
     for (const flag of FLAGS) {
@@ -161,7 +160,6 @@ export class TextDomCodec {
     if (run.link) {
       TextDomCodec.writeLink(span, run.link);
       span.classList.add('text-run--underline');
-      span.style.setProperty('--run-color', PAPER.link);
     }
     if (run.t) span.textContent = run.t;
     else span.append(el('br'));

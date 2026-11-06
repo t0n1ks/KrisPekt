@@ -48,7 +48,7 @@ export class ContentsBlock {
     session.touch(page);
   }
 
-  /** Writes a table of contents again, from the anchors and page numbers as they are now. */
+  /** Writes a table of contents again, from the anchors and page numbers as they are now. It stays where it is, as it looks. */
   update(page: Page, item: TextItem): void {
     const updated = this.written(page, item);
     if (!updated || !page.texts.some((other) => other.id === item.id)) return;
@@ -65,11 +65,15 @@ export class ContentsBlock {
       return null;
     }
     const { fs, c } = item;
-    const paras = TableOfContents.paragraphs(entries, {
-      width: item.w,
-      pageLabel: (n) => i18n.t('contentsPage', { n }),
-      measure: (t) => texts.naturalWidth({ t, paras: [{ runs: [{ t }] }], fs, c }),
-    });
+    const paras = TableOfContents.paragraphs(
+      entries,
+      {
+        width: item.w,
+        pageLabel: (n) => i18n.t('contentsPage', { n }),
+        measure: (t, look) => texts.naturalWidth({ t, paras: [{ runs: [{ ...look, t }] }], fs, c }),
+      },
+      item.paras,
+    );
     return { ...item, paras, t: RichText.plainText(paras) };
   }
 }
