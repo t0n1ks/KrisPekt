@@ -500,6 +500,22 @@ test.describe('touch', () => {
     };
   }
 
+  /** Waits until the list of thumbnails has kept its position for a moment. */
+  async function listAtRest(page: Page): Promise<void> {
+    let last = -1;
+    await expect
+      .poll(
+        async () => {
+          const top = await page.locator('#plist').evaluate((n) => n.scrollTop);
+          const resting = top === last;
+          last = top;
+          return resting;
+        },
+        { intervals: [200] },
+      )
+      .toBe(true);
+  }
+
   test('a long press picks a page up, a swipe scrolls, a still long press opens the menu', async ({
     page,
   }) => {
@@ -539,7 +555,10 @@ test.describe('touch', () => {
       .toBeGreaterThan(scrollBefore);
     expect((await labels(page, 'Touch')).slice(0, 3)).toEqual([before[1], before[0], before[2]]);
 
-    // A long press without moving opens the page's menu.
+    // A long press without moving opens the page's menu. A finger landing on a list that is still
+    // gliding from the swipe stops the glide instead of pressing a page, so wait for it to rest.
+    await thumb(page, 8).scrollIntoViewIfNeeded();
+    await listAtRest(page);
     const still = await thumb(page, 8).boundingBox();
     if (!still) throw new Error('no layout');
     await touch.start(still.x + 60, still.y + 60);
