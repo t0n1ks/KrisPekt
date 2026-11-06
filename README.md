@@ -47,7 +47,7 @@ npm run preview    # проверить сборку: http://localhost:4173/Kris
 npm run test:e2e   # смоук-тест Playwright (после npm run build; первый раз: npx playwright install chromium)
 ```
 
-Публикация: каждый push в `main` запускает GitHub Actions (`npm ci` → `npm audit` → lint → тесты → сборка → GitHub Pages).
+Публикация: каждый push в `main` запускает GitHub Actions (`npm ci` → `npm audit` → lint → тесты → сборка → e2e-тесты Playwright → GitHub Pages).
 
 ## Архитектура
 
