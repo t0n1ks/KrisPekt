@@ -761,8 +761,10 @@ test.describe('on a phone', () => {
     await menu(page, 'Корзина');
     await expect(page.locator('.trash__row')).toHaveCount(1);
     expect(await overflowing()).toBe(false);
-    const row = await page.locator('.trash__row').boundingBox();
-    expect((row?.width ?? 999) <= 320).toBe(true);
+    // The list is drawn again once its sizes are known, which can replace the row being measured.
+    await expect
+      .poll(async () => (await page.locator('.trash__row').boundingBox())?.width ?? 999)
+      .toBeLessThanOrEqual(320);
   });
 });
 
