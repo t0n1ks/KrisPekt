@@ -1,5 +1,5 @@
 import { CARD_PLACE_HINT_MS, MM } from '../../core/constants';
-import type { CardItem, CardKind, LinkCard, Page, PdfCard, Point, UrlLink } from '../../core/types';
+import type { Anchor, CardItem, CardKind, LinkCard, Page, PdfCard, Point, UrlLink } from '../../core/types';
 import { el } from '../../core/utils/dom';
 import { pickFile } from '../../core/utils/files';
 import { CardRules } from '../../domain/CardRules';
@@ -35,6 +35,10 @@ export interface CardControllerDeps {
   openLink: (hit: LinkHit) => Promise<void>;
   /** What a long press on a link offers. */
   linkEntries: (hit: LinkHit) => MenuEntry[];
+  /** What pressing a bookmark's marker offers. */
+  markerEntries: (page: Page, anchor: Anchor) => MenuEntry[];
+  /** Makes a card a place links can lead to. */
+  makeLink: (page: Page, card: CardItem) => void;
   targets: PagePressTargets;
   session: EditorSession;
   undo: Pick<UndoController, 'record'>;
@@ -114,6 +118,7 @@ export class CardController implements PressTarget {
     }
     const hit = this.deps.targets.at(pt);
     if (hit?.kind === 'link') void this.deps.openLink(hit);
+    else if (hit?.kind === 'anchor') this.showMarkerMenu(pt, hit.page, hit.anchor);
     else if (hit?.onMenu) this.showMenu(pt, hit.page, hit.card);
     else if (hit) void this.openCard(hit.card);
   }
@@ -123,6 +128,10 @@ export class CardController implements PressTarget {
     if (!hit) return false;
     if (hit.kind === 'card') {
       this.showMenu(pt, hit.page, hit.card);
+      return true;
+    }
+    if (hit.kind === 'anchor') {
+      this.showMarkerMenu(pt, hit.page, hit.anchor);
       return true;
     }
     const entries = this.deps.linkEntries(hit);
@@ -256,6 +265,11 @@ export class CardController implements PressTarget {
     this.deps.menu.show(this.anchor, entries);
   }
 
+  private showMarkerMenu(pt: Point, page: Page, anchor: Anchor): void {
+    this.placeAnchor(pt);
+    this.deps.menu.show(this.anchor, this.deps.markerEntries(page, anchor));
+  }
+
   private pdfEntries(page: Page, card: PdfCard): MenuEntry[] {
     const { i18n } = this.deps;
     return [
@@ -285,6 +299,7 @@ export class CardController implements PressTarget {
   private commonEntries(page: Page, card: CardItem): MenuEntry[] {
     const { i18n } = this.deps;
     return [
+      { label: i18n.t('linkMake'), icon: 'bookmark', onClick: () => this.deps.makeLink(page, card) },
       { label: i18n.t('cardMove'), icon: 'lasso', onClick: () => this.deps.selectCard(page, card) },
       '-',
       { label: i18n.t('delete'), icon: 'trash', danger: true, onClick: () => this.remove(page, card) },

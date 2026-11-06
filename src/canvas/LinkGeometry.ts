@@ -4,6 +4,11 @@ import { CardRules } from '../domain/CardRules';
 import type { StrokeGeometry } from './StrokeGeometry';
 import type { TextLayout } from './TextLayout';
 
+/** The bookmark marker, in page px; small enough to stay out of the way of writing. */
+export const MARK_WIDTH = 9;
+export const MARK_HEIGHT = 13;
+const MARK_GAP = 4;
+
 function boxOf(rect: PageRect): Box {
   return { x0: rect.x, y0: rect.y, x1: rect.x + rect.w, y1: rect.y + rect.h };
 }
@@ -57,6 +62,15 @@ export class LinkGeometry {
   anchorBox(page: Page, anchor: Anchor): Box {
     if (!anchor.items.length) return this.pageBox(page);
     return this.rangeBox(page, anchor) ?? this.itemsBox(page, anchor.items) ?? boxOf(anchor.rect);
+  }
+
+  /** Where an anchor's marker is drawn: left of what it marks, or in the corner of a whole page. */
+  markerBox(page: Page, anchor: Anchor): Box {
+    const box = this.anchorBox(page, anchor);
+    const bound = anchor.items.length > 0;
+    const x = bound ? Math.max(MARK_GAP / 2, box.x0 - MARK_WIDTH - MARK_GAP) : MARK_GAP;
+    const y = bound ? box.y0 : MARK_GAP;
+    return { x0: x, y0: y, x1: x + MARK_WIDTH, y1: y + MARK_HEIGHT };
   }
 
   /** Where an ink link is now. */

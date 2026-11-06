@@ -1,16 +1,22 @@
 import type { LinkGeometry } from '../../canvas/LinkGeometry';
 import { MAX_ANCHOR_NAME } from '../../core/constants';
-import type { Anchor, Box, InternalLink, Page, PageRect, TextItem } from '../../core/types';
+import type { Anchor, Box, CardItem, InternalLink, Page, PageRect, TextItem } from '../../core/types';
+import { AnchorMarks } from '../../domain/AnchorMarks';
 import { FileNames } from '../../domain/FileNames';
 import { LinkClipboard } from '../../domain/LinkClipboard';
 import type { EditorSession } from '../../editor/EditorSession';
 import type { UndoController } from '../../editor/UndoController';
 import type { I18n } from '../../i18n/I18n';
 import type { AnchorDialog } from '../dialogs/AnchorDialog';
+import type { DialogFactory } from '../dialogs/DialogFactory';
+import type { MenuEntry } from '../dialogs/Menu';
 
 export interface AnchorControllerDeps {
   i18n: I18n;
   dialog: AnchorDialog;
+  dialogs: Pick<DialogFactory, 'confirm'>;
+  /** How many links anywhere in the notes lead to these places. */
+  countLinks: (targets: readonly InternalLink[]) => Promise<number>;
   session: EditorSession;
   undo: Pick<UndoController, 'record'>;
   geometry: Pick<LinkGeometry, 'anchorBox' | 'itemsBox'>;
@@ -38,13 +44,18 @@ export class AnchorController {
 
   /** Bookmarks a whole page. */
   async addToPage(page: Page): Promise<boolean> {
-    return this.add(page, [], undefined, null);
+    return this.add(page, [], undefined, null, this.deps.i18n.t('bookmarkAdd'));
   }
 
   /** Bookmarks items selected with the lasso, named after the first text box among them. */
   async addToItems(page: Page, ids: ReadonlySet<string>): Promise<boolean> {
     const text = page.texts.find((item) => ids.has(item.id));
     return this.add(page, [...ids], undefined, text?.t ?? null);
+  }
+
+  /** Bookmarks an attachment card, named after it. */
+  async addToCard(page: Page, card: CardItem): Promise<boolean> {
+    return this.add(page, [card.id], undefined, card.kind === 'pdf' ? card.name : card.title);
   }
 
   /** Bookmarks a text box, or a stretch of one. */
@@ -73,14 +84,53 @@ export class AnchorController {
     this.deps.session.touch(now.page);
   }
 
-  /** Deletes an anchor. Links to it show as broken until undo brings it back. */
-  remove(id: string): void {
+  /** Removes an anchor. Links to it show as broken until undo brings it back. */
+  async remove(id: string): Promise<void> {
     const found = this.find(id);
-    if (!found) return;
-    this.deps.undo.record(found.page);
-    found.page.anchors = found.page.anchors.filter((a) => a.id !== id);
-    this.deps.session.touch(found.page);
-    this.deps.toast(this.deps.i18n.t('bookmarkDeleted'));
+    if (found) await this.removeFrom(found.page, [id]);
+  }
+
+  /** Removes the anchors on these items, or on a stretch of a text box. */
+  async removeOn(page: Page, ids: ReadonlySet<string>, range: [number, number] | null): Promise<void> {
+    const anchors = AnchorMarks.on(page, ids, range);
+    if (anchors.length)
+      await this.removeFrom(
+        page,
+        anchors.map((anchor) => anchor.id),
+      );
+  }
+
+  /** What pressing a bookmark's marker offers. */
+  markerEntries(page: Page, anchor: Anchor): MenuEntry[] {
+    const { i18n } = this.deps;
+    const link: InternalLink = { kind: 'anchor', nb: page.nbId, id: anchor.id };
+    return [
+      { label: i18n.t('bookmarkRename'), icon: 'edit', onClick: () => void this.rename(anchor.id) },
+      { label: i18n.t('cardCopyLink'), icon: 'copy', onClick: () => this.copyLink(link) },
+      '-',
+      {
+        label: i18n.t('bookmarkDelete'),
+        icon: 'trash',
+        danger: true,
+        onClick: () => void this.remove(anchor.id),
+      },
+    ];
+  }
+
+  /** One undo step, after a warning if links lead there. */
+  private async removeFrom(page: Page, ids: readonly string[]): Promise<void> {
+    const { i18n, session } = this.deps;
+    const targets = ids.map((id): InternalLink => ({ kind: 'anchor', nb: page.nbId, id }));
+    const count = await this.deps.countLinks(targets);
+    if (count > 0) {
+      const text = i18n.t('bookmarkRemoveWarn', { n: count });
+      if (!(await this.deps.dialogs.confirm(i18n.t('bookmarkDelete'), text))) return;
+    }
+    if (!session.has(page)) return;
+    this.deps.undo.record(page);
+    page.anchors = page.anchors.filter((anchor) => !ids.includes(anchor.id));
+    session.touch(page);
+    this.deps.toast(i18n.t('bookmarkDeleted'));
   }
 
   /** Copies a link inside the app, for "Paste link". */
@@ -95,10 +145,11 @@ export class AnchorController {
     items: string[],
     range: [number, number] | undefined,
     text: string | null,
+    title = this.deps.i18n.t('linkMakeTitle'),
   ): Promise<boolean> {
     const { i18n, session } = this.deps;
     const label = i18n.t('linkPageN', { n: session.indexOf(page) + 1 });
-    const name = await this.deps.dialog.ask(i18n.t('bookmarkAdd'), defaultAnchorName(text, label));
+    const name = await this.deps.dialog.ask(title, defaultAnchorName(text, label));
     if (!name || !session.has(page)) return false;
     const anchor: Anchor = { id: this.deps.makeId(), name, items, rect: { x: 0, y: 0, w: 0, h: 0 } };
     if (range) anchor.range = range;
@@ -106,6 +157,9 @@ export class AnchorController {
     this.deps.undo.record(page);
     page.anchors = [...page.anchors, anchor];
     session.touch(page);
+    // A place made to be linked to: it waits at the top of the list in the link dialog.
+    this.deps.remember({ kind: 'anchor', nb: page.nbId, id: anchor.id });
+    this.deps.toast(i18n.t('bookmarkSaved', { name }));
     return true;
   }
 

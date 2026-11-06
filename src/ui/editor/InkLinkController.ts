@@ -2,6 +2,7 @@ import type { LinkGeometry } from '../../canvas/LinkGeometry';
 import type { InkLink, InternalLink, LinkTarget, Page, PageRect, TextItem } from '../../core/types';
 import type { LinkClipboard } from '../../domain/LinkClipboard';
 import type { LinkDirectory } from '../../domain/LinkDirectory';
+import { AnchorMarks } from '../../domain/AnchorMarks';
 import { LinkRules } from '../../domain/LinkRules';
 import { RichText } from '../../domain/RichText';
 import type { EditorSession } from '../../editor/EditorSession';
@@ -29,8 +30,10 @@ export interface InkLinkControllerDeps {
   clipboard: LinkClipboard;
   makeId: () => string;
   toast: (message: string) => void;
-  /** Bookmarks the selected items. */
+  /** Bookmarks the selected items: the place a link can lead to. */
   bookmarkSelection: () => void;
+  /** Removes the bookmarks on the selected items. */
+  removeBookmarks: (page: Page, ids: ReadonlySet<string>) => void;
   /** Writes a table of contents again. */
   updateContents: (page: Page, item: TextItem) => void;
 }
@@ -68,7 +71,7 @@ export class InkLinkController {
       const { page, ink } = hit;
       return [
         open,
-        { label: i18n.t('linkMake'), icon: 'edit', onClick: () => void this.change(page, ink) },
+        { label: i18n.t('linkChange'), icon: 'edit', onClick: () => void this.change(page, ink) },
         { label: i18n.t('linkRemove'), icon: 'trash', danger: true, onClick: () => this.removeLink(hit) },
       ];
     }
@@ -84,14 +87,20 @@ export class InkLinkController {
     ];
   }
 
-  /** What the selection bar's link button offers for the selected items. */
+  /**
+   * What the selection bar's link button offers for the selected items: to make them a place links
+   * lead to (a bookmark), or to make them lead somewhere (a link).
+   */
   selectionEntries(): MenuEntry[] {
     const { i18n, clipboard } = this.deps;
     const selected = this.deps.selection.current;
     if (!selected) return [];
-    const linked = selected.page.inkLinks.some((ink) => ink.items.every((id) => selected.ids.has(id)));
+    const { page, ids } = selected;
+    const linked = page.inkLinks.some((ink) => ink.items.every((id) => ids.has(id)));
+    const bookmarked = AnchorMarks.on(page, ids).length > 0;
     return [
-      { label: i18n.t('linkMake'), icon: 'link', onClick: () => void this.makeFromSelection() },
+      { label: i18n.t('linkMake'), icon: 'bookmark', onClick: () => this.deps.bookmarkSelection() },
+      { label: i18n.t('linkInsert'), icon: 'link', onClick: () => void this.insertOnSelection() },
       {
         label: i18n.t('linkPaste'),
         icon: 'paste',
@@ -107,11 +116,19 @@ export class InkLinkController {
             },
           ]
         : []),
-      { label: i18n.t('bookmarkAdd'), icon: 'bookmark', onClick: () => this.deps.bookmarkSelection() },
+      ...(bookmarked
+        ? [
+            {
+              label: i18n.t('bookmarkRemoveHere'),
+              icon: 'trash' as const,
+              onClick: () => this.deps.removeBookmarks(page, ids),
+            },
+          ]
+        : []),
     ];
   }
 
-  private async makeFromSelection(): Promise<void> {
+  private async insertOnSelection(): Promise<void> {
     const selected = this.deps.selection.current;
     if (!selected) return;
     const { page, ids } = selected;

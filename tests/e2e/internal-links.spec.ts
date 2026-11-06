@@ -112,7 +112,7 @@ async function lassoAround(page: Page, c: { x: number; y: number }): Promise<voi
 
 async function bookmarkSelection(page: Page, name: string): Promise<void> {
   await page.locator('#selbar').getByRole('button', { name: 'Ссылка и закладка' }).click();
-  await menuItem(page, 'Добавить закладку').click();
+  await menuItem(page, 'Сделать ссылку…').click();
   await page.fill('#anchorName', name);
   await page.click('.sheet__foot .btn--primary');
   await expect(page.locator('#anchorName')).toBeHidden();
@@ -143,7 +143,7 @@ async function typedLink(
     const root = document.getElementById('textEd') as HTMLElement;
     document.getSelection()?.selectAllChildren(root);
   });
-  await page.locator('.text-bar__button[aria-label="Ссылка"]').click();
+  await page.locator('.text-bar__button[aria-label="Вставить ссылку"]').click();
   await page.getByRole('button', { name: 'В моих записях' }).click();
   await pickBySearch(page, query, name);
   await page.keyboard.press('Escape');
@@ -196,7 +196,7 @@ test('links from text and ink: jump, back, reorder, broken, undo, reload', async
   const ink = await scribble(page, 0.4, 0.5);
   await lassoAround(page, ink);
   await page.locator('#selbar').getByRole('button', { name: 'Ссылка и закладка' }).click();
-  await menuItem(page, 'Сделать ссылкой').click();
+  await menuItem(page, 'Вставить ссылку…').click();
   await pickBySearch(page, 'theo', 'Theorem');
   await expect.poll(async () => (await storedPages(page, 'Beta'))[0]?.inkLinks.length).toBe(1);
 
@@ -243,6 +243,9 @@ test('links from text and ink: jump, back, reorder, broken, undo, reload', async
     .locator('.anchor-list__row', { hasText: 'Theorem' })
     .getByRole('button', { name: 'Удалить закладку' })
     .click();
+  // Two links lead there, one of them in the other notebook.
+  await expect(page.locator('.sheet').last()).toContainText('Перестанут работать ссылки: 2');
+  await page.locator('.sheet__foot .btn--danger').last().click();
   await expect(page.locator('.anchor-list__row')).toHaveCount(0);
   await page.locator('.sheet__head .icon-btn').click();
   await expect(page.locator('.sheet')).toHaveCount(0);
@@ -256,7 +259,7 @@ test('links from text and ink: jump, back, reorder, broken, undo, reload', async
   // A link to the notebook itself still works: the way back in, for undo.
   await lassoAround(page, ink);
   await page.locator('#selbar').getByRole('button', { name: 'Ссылка и закладка' }).click();
-  await menuItem(page, 'Сделать ссылкой').click();
+  await menuItem(page, 'Вставить ссылку…').click();
   await pickBySearch(page, 'alpha', 'Alpha');
   await expect
     .poll(async () => (await storedPages(page, 'Beta'))[0]?.inkLinks[0]?.link.kind)
@@ -295,7 +298,7 @@ test('a linked stroke scratched out or deleted takes its link along, and undo re
   await bookmarkSelection(page, 'Spot');
   await lassoAround(page, ink);
   await page.locator('#selbar').getByRole('button', { name: 'Ссылка и закладка' }).click();
-  await menuItem(page, 'Сделать ссылкой').click();
+  await menuItem(page, 'Вставить ссылку…').click();
   await pickBySearch(page, 'spot', 'Spot');
   await expect.poll(async () => (await storedPages(page, 'Solo'))[0]?.inkLinks.length).toBe(1);
 
@@ -348,7 +351,7 @@ test('a stretch of text can be bookmarked, and a copied link pasted on handwriti
   await page.evaluate(() => {
     document.getSelection()?.selectAllChildren(document.getElementById('textEd') as HTMLElement);
   });
-  await page.locator('.text-bar__button[aria-label="Добавить закладку"]').click();
+  await page.locator('.text-bar__button[aria-label="Сделать ссылку"]').click();
   await expect(page.locator('#anchorName')).toHaveValue('Chapter one');
   await page.locator('.sheet__foot .btn--primary').click();
   await expect(page.locator('#anchorName')).toBeHidden();
@@ -376,7 +379,7 @@ test('a stretch of text can be bookmarked, and a copied link pasted on handwriti
   const ink = await scribble(page, 0.42, 0.6);
   await lassoAround(page, ink);
   await page.locator('#selbar').getByRole('button', { name: 'Ссылка и закладка' }).click();
-  await menuItem(page, 'Вставить ссылку').click();
+  await menuItem(page, 'Вставить скопированную ссылку').click();
   await expect.poll(async () => (await storedPages(page, 'Parts'))[0]?.inkLinks[0]?.link.kind).toBe('anchor');
 });
 
@@ -391,6 +394,7 @@ test('Back returns to the very same place', async ({ page }) => {
   const middle = await at(page, 0.5, 0.5);
   await page.mouse.move(middle.x, middle.y);
   await page.mouse.wheel(0, 90);
+  await expect(page.locator('.toast')).toBeHidden({ timeout: 15_000 });
   await page.waitForTimeout(300);
   const stage = page.locator('#stage');
   const before = await stage.screenshot();
@@ -550,4 +554,89 @@ test('every new panel fits a small phone', async ({ page }) => {
   await fits('.sheet__foot');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
   expect(overflow).toBe(false);
+});
+
+/** Where the marker of a bookmark on the scribble around this point is. */
+function markerOf(ink: { x: number; y: number }): { x: number; y: number } {
+  return { x: ink.x - 50, y: ink.y };
+}
+
+const linkMenu = (page: Page): Locator =>
+  page.locator('#selbar').getByRole('button', { name: 'Ссылка и закладка' });
+
+test('Make link, then Insert link elsewhere: a tap jumps there', async ({ page }) => {
+  await newNotebook(page, 'Flow');
+  const target = await scribble(page, 0.4, 0.3);
+  await lassoAround(page, target);
+  await linkMenu(page).click();
+  await menuItem(page, 'Сделать ссылку…').click();
+  await expect(page.locator('.sheet__title')).toHaveText('Сделать ссылку');
+  await expect(page.getByText('Назовите для себя')).toBeVisible();
+  await page.fill('#anchorName', 'Definition');
+  await page.click('.sheet__foot .btn--primary');
+  await expect(page.getByText('Закладка «Definition» сохранена')).toBeVisible();
+
+  const source = await scribble(page, 0.4, 0.6);
+  await lassoAround(page, source);
+  await linkMenu(page).click();
+  await menuItem(page, 'Вставить ссылку…').click();
+  await expect(page.locator('.sheet__title')).toHaveText('Вставить ссылку');
+  // The new bookmark waits first in the recent list.
+  await expect(page.locator('.link-pick__heading').first()).toHaveText('Недавние');
+  await page.locator('.link-pick__row', { hasText: 'Definition' }).first().click();
+  await expect.poll(async () => (await storedPages(page, 'Flow'))[0]?.inkLinks.length).toBe(1);
+
+  await page.keyboard.press('p');
+  await tap(page, source);
+  await expect(highlight(page)).toBeVisible();
+});
+
+test('a bookmark removed from its marker warns, breaks its link, and undo mends it', async ({ page }) => {
+  await newNotebook(page, 'Marker');
+  const target = await scribble(page, 0.4, 0.3);
+  await lassoAround(page, target);
+  await bookmarkSelection(page, 'Spot');
+  const source = await scribble(page, 0.4, 0.6);
+  await lassoAround(page, source);
+  await linkMenu(page).click();
+  await menuItem(page, 'Вставить ссылку…').click();
+  await page.locator('.link-pick__row', { hasText: 'Spot' }).first().click();
+  await expect.poll(async () => (await storedPages(page, 'Marker'))[0]?.inkLinks.length).toBe(1);
+
+  await page.keyboard.press('p');
+  await tap(page, markerOf(target));
+  await expect(menuItem(page, 'Переименовать закладку')).toBeVisible();
+  await expect(menuItem(page, 'Копировать ссылку')).toBeVisible();
+  await menuItem(page, 'Удалить закладку').click();
+
+  await expect(page.locator('.sheet')).toContainText('Перестанут работать ссылки: 1');
+  await page.click('.sheet__foot .btn--danger');
+  await expect.poll(async () => (await storedPages(page, 'Marker'))[0]?.anchors.length).toBe(0);
+
+  await tap(page, source);
+  await expect(page.locator('.sheet__title')).toHaveText('Цель удалена');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sheet')).toHaveCount(0);
+
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await storedPages(page, 'Marker'))[0]?.anchors.length).toBe(1);
+  await tap(page, source);
+  await expect(highlight(page)).toBeVisible();
+});
+
+test('a selection with a bookmark offers to remove it', async ({ page }) => {
+  await newNotebook(page, 'Here');
+  const ink = await scribble(page, 0.4, 0.3);
+  await lassoAround(page, ink);
+  await linkMenu(page).click();
+  await expect(menuItem(page, 'Убрать закладку здесь')).toHaveCount(0);
+  await menuItem(page, 'Сделать ссылку…').click();
+  await page.fill('#anchorName', 'Ink');
+  await page.click('.sheet__foot .btn--primary');
+  await expect.poll(async () => (await storedPages(page, 'Here'))[0]?.anchors.length).toBe(1);
+
+  await lassoAround(page, ink);
+  await linkMenu(page).click();
+  await menuItem(page, 'Убрать закладку здесь').click();
+  await expect.poll(async () => (await storedPages(page, 'Here'))[0]?.anchors.length).toBe(0);
 });

@@ -13,6 +13,7 @@ import type {
   ToolKind,
 } from '../../core/types';
 import { byId } from '../../core/utils/dom';
+import { AnchorMarks } from '../../domain/AnchorMarks';
 import { ColorLists } from '../../domain/ColorLists';
 import { LinkClipboard } from '../../domain/LinkClipboard';
 import type { LinkDirectory } from '../../domain/LinkDirectory';
@@ -189,6 +190,7 @@ export class EditorView {
       toast: (message) => deps.toast.show(message),
       askLink: (options) => this.linkDialog.ask(options),
       addBookmark: (page, item, range) => this.anchors.addToText(page, item, range),
+      removeBookmark: (page, item, range) => this.anchors.removeOn(page, new Set([item.id]), range),
       updateContents: (page, item) => this.contents.update(page, item),
       redraw: () => c.renderer.request(),
     });
@@ -344,6 +346,8 @@ export class EditorView {
     return new AnchorController({
       i18n: d.i18n,
       dialog: new AnchorDialog(d.i18n, d.dialogs),
+      dialogs: d.dialogs,
+      countLinks: (targets) => this.countLinks(targets),
       session: c.session,
       undo: c.undo,
       geometry: c.linkGeometry,
@@ -352,6 +356,19 @@ export class EditorView {
       toast: (message) => d.toast.show(message),
       remember: (link) => this.rememberLink(link),
     });
+  }
+
+  /** Links are looked for in every notebook; what is open may be ahead of what is stored. */
+  private async countLinks(targets: readonly InternalLink[]): Promise<number> {
+    const open = this.canvas.session.pages;
+    const opened = new Set(open.map((page) => page.id));
+    let stored: Page[] = [];
+    try {
+      stored = (await this.deps.pages.all()).filter((page) => !opened.has(page.id));
+    } catch {
+      this.deps.toast.show(this.deps.i18n.t('bookmarkCountFail'), 4000);
+    }
+    return AnchorMarks.incoming([...open, ...stored], targets);
   }
 
   private createContents(): ContentsBlock {
@@ -388,6 +405,7 @@ export class EditorView {
       makeId: d.makeId,
       toast: (message) => d.toast.show(message),
       bookmarkSelection: () => void this.bookmarkSelection(),
+      removeBookmarks: (page, ids) => void this.anchors.removeOn(page, ids, null),
       updateContents: (page, item) => this.contents.update(page, item),
     });
   }
@@ -430,11 +448,14 @@ export class EditorView {
       links: new LinkOpener(d.i18n, d.dialogs, (message) => d.toast.show(message)),
       openLink: (hit) => this.inkLinks.open(hit),
       linkEntries: (hit) => this.inkLinks.hitEntries(hit),
+      markerEntries: (page, anchor) => this.anchors.markerEntries(page, anchor),
+      makeLink: (page, card) => void this.anchors.addToCard(page, card),
       targets: new PagePressTargets({
         camera: c.camera,
         layout: c.layout,
         texts: c.texts,
         geometry: c.linkGeometry,
+        markersOn: () => d.prefs.anchorMarkers,
         tool: () => c.tools.kind,
         overSelection: (pt) => c.selection.hit(pt) !== null,
       }),

@@ -815,10 +815,15 @@ describe('how links look', () => {
 describe('a press', () => {
   function targets(tool: 'pen' | 'text' | 'eraser' | 'lasso' | 'highlighter', p: Page): PagePressTargets {
     return new PagePressTargets({
-      camera: { toWorld: (x: number, y: number) => ({ x, y }) },
+      camera: { z: 1, toWorld: (x: number, y: number) => ({ x, y }) },
       layout: { pageAt: () => p, toPage: (_p: Page, at: unknown) => at },
       texts: { linkAt: () => null },
-      geometry: { inkBox: () => ({ x0: 10, y0: 10, x1: 50, y1: 30 }) },
+      geometry: {
+        inkBox: () => ({ x0: 10, y0: 10, x1: 50, y1: 30 }),
+        markerBox: () => ({ x0: 100, y0: 100, x1: 109, y1: 113 }),
+        anchorBox: () => ({ x0: 113, y0: 100, x1: 200, y1: 150 }),
+      },
+      markersOn: () => true,
       tool: () => tool,
       overSelection: () => false,
     } as never);
