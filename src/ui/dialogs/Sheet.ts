@@ -19,6 +19,8 @@ export interface SheetOptions {
   focus?: boolean;
   /** Called once when the sheet closes, however it closes. */
   onClose?: () => void;
+  /** Only code can close it: for work the user must not walk away from. */
+  locked?: boolean;
 }
 
 /**
@@ -42,22 +44,24 @@ export class Sheet {
         'div',
         { class: 'sheet__head' },
         el('h2', { class: 'sheet__title' }, options.title),
-        el(
-          'button',
-          {
-            class: 'icon-btn',
-            attrs: { type: 'button', 'aria-label': i18n.t('close') },
-            on: { click: () => this.close() },
-          },
-          icon('close'),
-        ),
+        options.locked
+          ? null
+          : el(
+              'button',
+              {
+                class: 'icon-btn',
+                attrs: { type: 'button', 'aria-label': i18n.t('close') },
+                on: { click: () => this.close() },
+              },
+              icon('close'),
+            ),
       ),
       el('div', { class: 'sheet__body' }, options.body),
     );
     if (options.actions?.length) box.append(this.footer(options.actions));
     this.scrim = el('div', { class: 'scrim' }, box);
     this.scrim.addEventListener('pointerdown', (e) => {
-      if (e.target === this.scrim) this.close();
+      if (e.target === this.scrim && !options.locked) this.close();
     });
   }
 

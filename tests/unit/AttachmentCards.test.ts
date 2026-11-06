@@ -98,7 +98,15 @@ describe('links on text', () => {
 
   it('a stored link with a dangerous address does not get in', () => {
     const bad = { kind: 'url', href: 'java' + 'script:alert(1)' };
-    const text = { id: 't1', x: 0, y: 0, c: '#000000', fs: 16, t: 'x', paras: [{ runs: [{ t: 'x', link: bad }] }] };
+    const text = {
+      id: 't1',
+      x: 0,
+      y: 0,
+      c: '#000000',
+      fs: 16,
+      t: 'x',
+      paras: [{ runs: [{ t: 'x', link: bad }] }],
+    };
     expect(() => BackupService.parse(backupWithPage({ texts: [text] }))).toThrow();
   });
 });
@@ -181,9 +189,8 @@ describe('backups with attachments', () => {
     await repos.pages.save(page({ cards }));
     await repos.blobs.save('pdffile', new Blob([bytesOf('%PDF-1.7 hello')], { type: 'application/pdf' }));
 
-    const doc = BackupService.parse(JSON.parse(await (await backup.createBackup()).text()));
     const fresh = service();
-    await fresh.backup.restore(doc);
+    await fresh.backup.restore(await fresh.backup.readFile((await backup.createBackup()).file));
     expect((await fresh.repos.pages.all())[0]?.cards).toEqual(cards);
     const file = await fresh.repos.blobs.get('pdffile');
     expect(file && (await file.text())).toBe('%PDF-1.7 hello');
@@ -192,8 +199,9 @@ describe('backups with attachments', () => {
   it('estimates the size of what it would write', async () => {
     const { repos, backup } = service();
     await repos.blobs.save('big', new Blob([new Uint8Array(300_000)], { type: 'image/png' }));
-    expect(await backup.estimateBytes()).toBeGreaterThan(400_000);
-    expect(BackupSize.overLimit(301 * 1024 * 1024)).toBe(true);
+    expect(await backup.estimateBytes()).toBeGreaterThan(300_000);
+    expect(BackupSize.overLimit(301 * 1024 * 1024)).toBe(false);
+    expect(BackupSize.overLimit(4 * 1024 * 1024 * 1024)).toBe(true);
   });
 
   it('an old backup without cards still loads', () => {

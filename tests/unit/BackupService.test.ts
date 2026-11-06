@@ -7,6 +7,7 @@ import { NotebookRepository } from '../../src/storage/NotebookRepository';
 import { PageRepository } from '../../src/storage/PageRepository';
 import { RecordReader } from '../../src/storage/RecordReader';
 import { SubjectRepository } from '../../src/storage/SubjectRepository';
+import { legacyBackup } from './backupHelpers';
 import { backupJson, notebook, page, subject } from './fixtures';
 
 const PNG_1PX =
@@ -43,7 +44,7 @@ describe('BackupService round trip', () => {
   });
 
   it('exports and restores the same data', async () => {
-    const { repos, service } = ctx;
+    const { repos } = ctx;
     await repos.subjects.save(subject());
     await repos.notebooks.save(notebook({ sample: true, view: { pageId: 'pg1', z: 1.2 } }));
     await repos.pages.save(page({ images: [{ id: 'im1', x: 1, y: 2, w: 30, h: 40, blob: 'bl1' }] }));
@@ -52,15 +53,15 @@ describe('BackupService round trip', () => {
       new Blob([Uint8Array.from(atob(PNG_1PX), (c) => c.charCodeAt(0))], { type: 'image/png' }),
     );
 
-    const file = await service.createBackup();
-    const json = JSON.parse(await file.text());
+    const file = await legacyBackup(repos);
+    const json = JSON.parse(file);
     expect(json.app).toBe('krispekt');
     expect(json.version).toBe(1);
     expect(json.pages[0].strokes[0].p).toEqual([10.12, 20.46, 0.5, 30, 40, 0.6]);
     expect(json.blobs[0]).toMatchObject({ id: 'bl1', type: 'image/png' });
 
     const target = setup();
-    const doc = await target.service.readFile(file);
+    const doc = await target.service.readFile(new Blob([file]));
     await target.service.restore(doc);
     expect(await target.repos.subjects.all()).toEqual([subject()]);
     const [nb] = await target.repos.notebooks.all();
@@ -117,6 +118,7 @@ describe('BackupService round trip', () => {
   it('rejects files larger than 300 MB before reading them', async () => {
     const big = {
       size: 301 * 1024 * 1024,
+      slice: () => new Blob(['{']),
       text: () => Promise.reject(new Error('must not read')),
     } as unknown as Blob;
     await expect(ctx.service.readFile(big)).rejects.toMatchObject({ reason: 'too-large' });

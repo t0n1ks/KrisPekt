@@ -2,13 +2,28 @@ import {
   ALLOWED_IMAGE_TYPES,
   BACKUP_APP,
   BACKUP_APP_LEGACY,
+  BACKUP_FORMAT,
   MAX_ATTACHMENT_PDF_BYTES,
+  MAX_BACKUP_ENTRIES,
   MAX_BLOB_BYTES,
 } from '../../core/constants';
 import type { Notebook, Page, Subject } from '../../core/types';
 import { base64DecodedLength, sniffBytes } from '../../core/utils/files';
 import { AnchorMarks } from '../../domain/AnchorMarks';
-import { ValidationError, asArray, asId, asOneOf, asRecord, asString, optionalArray } from './guards';
+import { BackupEntries } from '../../domain/BackupEntries';
+import { StrokeCodec } from '../../domain/StrokeCodec';
+import {
+  MAX_ITEMS,
+  MAX_STROKE_POINTS,
+  ValidationError,
+  asArray,
+  asId,
+  asNumber,
+  asOneOf,
+  asRecord,
+  asString,
+  optionalArray,
+} from './guards';
 import { parseNotebook, parsePage, parseSubject } from './records';
 
 const PDF_TYPE = 'application/pdf';
@@ -58,7 +73,7 @@ function parseBackupBlob(raw: unknown, path: string): BackupBlob {
   return { id: asId(o.id, `${path}.id`), type, data };
 }
 
-function assertUniqueIds(items: readonly { id: string }[], path: string): void {
+export function assertUniqueIds(items: readonly { id: string }[], path: string): void {
   const seen = new Set<string>();
   for (const item of items) {
     if (seen.has(item.id)) throw new ValidationError(path, 'duplicate id ' + item.id);
@@ -76,6 +91,101 @@ function withDerivedMarks(notebook: Notebook, pages: readonly Page[]): Notebook 
   const { marks: _untrusted, ...rest } = notebook;
   const marks = AnchorMarks.of(ordered);
   return marks.length ? { ...rest, marks } : rest;
+}
+
+/** Every notebook's list of anchors, as its pages have them. */
+export function finishNotebooks(notebooks: readonly Notebook[], pages: readonly Page[]): Notebook[] {
+  return notebooks.map((notebook) => withDerivedMarks(notebook, pages));
+}
+
+/** One row of the manifest's list of entries. */
+export interface ManifestEntry {
+  name: string;
+  size: number;
+  sha256: string;
+}
+
+/** The manifest of a ZIP backup. */
+export interface BackupManifest {
+  createdAt: string;
+  entries: ManifestEntry[];
+}
+
+/** Written by a later version of the app: not a broken file, the app just has to be updated. */
+export class NewerBackupError extends ValidationError {
+  constructor(format: number) {
+    super('manifest.format', String(format));
+    this.name = 'NewerBackupError';
+  }
+}
+
+/** Which file holds the content of a stored blob. */
+export interface BlobTableRow {
+  id: string;
+  file: string;
+}
+
+/** The first line of `data.json`. */
+export interface DataHead {
+  subjects: Subject[];
+  notebooks: Notebook[];
+  blobs: BlobTableRow[];
+}
+
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const ENTRY_SIZE_RANGE = [0, 2 ** 40] as const;
+
+function parseManifestEntry(raw: unknown, path: string): ManifestEntry {
+  const o = asRecord(raw, path);
+  const name = asString(o.name, `${path}.name`, 100);
+  if (!BackupEntries.isAllowed(name) || name === BackupEntries.MANIFEST) {
+    throw new ValidationError(`${path}.name`, 'not allowed');
+  }
+  const sha256 = asString(o.sha256, `${path}.sha256`, 64);
+  if (!SHA256_PATTERN.test(sha256)) throw new ValidationError(`${path}.sha256`, 'not a SHA-256');
+  return { name, size: asNumber(o.size, `${path}.size`, ENTRY_SIZE_RANGE), sha256 };
+}
+
+/** Validates a manifest. */
+export function parseManifest(raw: unknown): BackupManifest {
+  const o = asRecord(raw, 'manifest');
+  asOneOf(o.app, [BACKUP_APP] as const, 'manifest.app');
+  if (typeof o.format === 'number' && o.format > BACKUP_FORMAT) throw new NewerBackupError(o.format);
+  if (o.format !== BACKUP_FORMAT) throw new ValidationError('manifest.format', 'unknown');
+  const entries = asArray(o.entries, 'manifest.entries', MAX_BACKUP_ENTRIES).map((v, i) =>
+    parseManifestEntry(v, `manifest.entries[${i}]`),
+  );
+  return { createdAt: asString(o.createdAt, 'manifest.createdAt', 40), entries };
+}
+
+/** Validates the head of `data.json`. */
+export function parseDataHead(raw: unknown): DataHead {
+  const o = asRecord(raw, 'data');
+  const head: DataHead = {
+    subjects: asArray(o.subjects, 'subjects').map((v, i) => parseSubject(v, `subjects[${i}]`)),
+    notebooks: asArray(o.notebooks, 'notebooks').map((v, i) => parseNotebook(v, `notebooks[${i}]`)),
+    blobs: asArray(o.blobs, 'blobs', MAX_ITEMS).map((v, i) => {
+      const row = asRecord(v, `blobs[${i}]`);
+      const file = asString(row.file, `blobs[${i}].file`, 100);
+      if (!BackupEntries.parseFileName(file)) throw new ValidationError(`blobs[${i}].file`, 'not allowed');
+      return { id: asId(row.id, `blobs[${i}].id`), file };
+    }),
+  };
+  assertUniqueIds(head.subjects, 'subjects');
+  assertUniqueIds(head.notebooks, 'notebooks');
+  return head;
+}
+
+/** Validates a page of `data.json`: its strokes unpacked, then the same checks as any other page. */
+export function parseCompactPage(raw: unknown, path: string): Page {
+  const o = asRecord(raw, path);
+  const strokes = optionalArray(o.strokes, `${path}.strokes`).map((value, i) => {
+    const stroke = asRecord(value, `${path}.strokes[${i}]`);
+    const points = StrokeCodec.decode(asArray(stroke.d, `${path}.strokes[${i}].d`, MAX_STROKE_POINTS * 3));
+    if (!points) throw new ValidationError(`${path}.strokes[${i}].d`, 'bad points');
+    return { ...stroke, p: points };
+  });
+  return parsePage({ ...o, strokes }, path);
 }
 
 /**

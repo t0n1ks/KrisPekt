@@ -614,12 +614,13 @@ describe('backups after page operations', () => {
     const r = rig([first, free]);
     await r.db.put('subjects', subject({ id: 'sub1' }));
     await r.repos.pages.save(first, free);
-    await r.repos.blobs.save('photo', new Blob(['jpeg'], { type: 'image/jpeg' }));
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+    await r.repos.blobs.save('photo', new Blob([jpeg], { type: 'image/jpeg' }));
     r.pageOps.duplicate(free);
     r.pageOps.moveTo(first, 2);
     await r.saveQueue.flush();
     const service = new BackupService(r.db, r.repos, () => Promise.resolve(null));
-    const doc = await service.readFile(await service.createBackup());
+    const doc = await service.readFile((await service.createBackup()).file);
     const target = Database.inMemory();
     const reader = new RecordReader(() => undefined);
     const restored = {

@@ -70,6 +70,7 @@ function pdfjsAssets(): Plugin {
 
 export default defineConfig({
   base: BASE,
+  define: { __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '') },
   build: {
     target: 'es2022',
     sourcemap: false,
