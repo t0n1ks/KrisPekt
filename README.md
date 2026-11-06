@@ -10,6 +10,7 @@ Handwritten notes organised by subject: a shelf of notebooks, stylus writing, PD
 
 - **Shelf:** subjects and notebooks with coloured covers, search, reordering, a Trash kept for 30 days, a storage report, backups and automatic backups.
 - **Writing:** pen with stylus pressure and five types (ballpoint, fountain, liner, pencil, brush), highlighter, point and stroke eraser, scratch-out to erase, hold to straighten a line, ruler, lasso (move across pages, resize, recolour, copy), undo and redo.
+- **Hand tool:** scroll, open links and cards, select and move objects; it never draws or erases.
 - **Palm rejection:** a resting hand neither scrolls nor draws. See [Palm rejection](#palm-rejection).
 - **Text boxes:** rich text with size, bold, italic, underline, strikethrough, colour, alignment and lists.
 - **Pages:** an organizer with thumbnails to insert, drag, duplicate and delete pages; per-page size and background; optional page titles.
@@ -95,6 +96,20 @@ reference/       the original prototype (neither built nor published)
 ```
 
 ## How it works
+
+### Who opens what
+
+Tools that write only write: a tap with a pen, the highlighter, the eraser, the lasso or the text tool never opens a link, a card or a bookmark marker. They open with the **Hand** (with a finger, a stylus or a mouse), or with a finger tap while fingers are not drawing (**Draw with finger** is off).
+
+The Hand shares a toolbar button with the lasso: tap it while either is in use to switch, or long-press it for a menu. It can also be shown as its own button in **Customise toolbar**. On a keyboard, its key is **G**.
+
+- One finger or a stylus on empty paper scrolls; pinch zoom works unless the zoom is locked.
+- A tap selects a text box or a photo, and a tap on empty paper or ink lets it go. A tap on a card opens it, so a card is selected by dragging it or through its menu.
+- A stylus or a mouse drags an object at once. A finger holds still first (`HAND_HOLD_MS`, 250 ms), so that a quick swipe over a photo scrolls the page. An object already selected goes at once. Moving across a page edge works as with the lasso, in one undo step.
+- The eraser end or button of a stylus erases while pressed, with any tool, the Hand included.
+- A resting palm stays ignored: for 1.5 s after any stylus event one finger does nothing, as with every tool.
+
+The page button fades while you write and comes back after `PAGE_CHIP_IDLE_MS` (1.5 s). A stylus that lands on it writes on the page below; a finger or a mouse presses it.
 
 ### Links and bookmarks
 
