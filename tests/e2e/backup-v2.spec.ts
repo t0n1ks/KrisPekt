@@ -615,6 +615,7 @@ test('deleting goes to the Trash; restoring brings it back with its links workin
   await page.locator('.notebook-card__title', { hasText: 'Источник' }).click();
   await expect(page.locator('#editor')).toBeVisible();
   await page.waitForTimeout(600);
+  await page.keyboard.press('g');
   await page.mouse.click(link.x, link.y);
   await expect(page.locator('.sheet')).toContainText('Цель удалена');
   await page.locator('.sheet__foot .btn', { hasText: 'Отмена' }).click();
@@ -636,6 +637,7 @@ test('deleting goes to the Trash; restoring brings it back with its links workin
   await page.locator('.notebook-card__title', { hasText: 'Источник' }).click();
   await expect(page.locator('#editor')).toBeVisible();
   await page.waitForTimeout(600);
+  await page.keyboard.press('g');
   await page.mouse.click(link.x, link.y);
   await expect(page.locator('#edTitle')).toHaveText('Цель');
   await expect(page.locator('.sheet')).toHaveCount(0);
