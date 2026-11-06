@@ -219,7 +219,9 @@ test('a file that is not a PDF is refused whatever it calls itself', async ({ pa
   await openInsertMenu(page);
   const chooser = page.waitForEvent('filechooser');
   await menuItem(page, 'PDF-файл').click();
-  await (await chooser).setFiles({
+  await (
+    await chooser
+  ).setFiles({
     name: 'fake.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('<html></html>'),
@@ -233,7 +235,9 @@ test('a damaged PDF gets a card that explains, and can still be saved', async ({
   await openInsertMenu(page);
   const chooser = page.waitForEvent('filechooser');
   await menuItem(page, 'PDF-файл').click();
-  await (await chooser).setFiles({
+  await (
+    await chooser
+  ).setFiles({
     name: 'broken.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-1.4\nthis is not really a pdf'),
@@ -292,11 +296,9 @@ test('a link card asks first, a dangerous address never gets in, and nothing is 
 
   await page.mouse.click(spot.x, spot.y);
   await sheet.getByRole('button', { name: 'Открыть' }).click();
-  expect(await page.evaluate(() => (window as unknown as { openedForTest: unknown[] }).openedForTest[0])).toEqual([
-    'https://example.com/page',
-    '_blank',
-    'noopener,noreferrer',
-  ]);
+  expect(
+    await page.evaluate(() => (window as unknown as { openedForTest: unknown[] }).openedForTest[0]),
+  ).toEqual(['https://example.com/page', '_blank', 'noopener,noreferrer']);
   expect(outside).toEqual([]);
 });
 
