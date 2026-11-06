@@ -287,3 +287,34 @@ test.describe('the longest words', () => {
     expect(await run(page, 'de-320x568', 'de')).toEqual([]);
   });
 });
+
+for (const size of SIZES) {
+  test(`the page chip stays clear of the toolbar at ${size.width}×${size.height}`, async ({ page }) => {
+    await page.setViewportSize(size);
+    await page.goto('./');
+    await page.locator('.subject').first().locator('.shelf__add').click();
+    await page.fill('#nb-title', 'Chip');
+    await page.click('.sheet__foot .btn--primary');
+    await page.locator('#tray [data-tool="pen"]').waitFor();
+    const chip = page.locator('#pageChip');
+    await chip.click();
+    await page.fill('#pageTitle', 'A long title for a page that cannot fit on one line of any phone');
+    await page.click('.sheet__foot .btn--primary');
+    await expect(page.locator('#pageTitle')).toBeHidden();
+    const box = await chip.boundingBox();
+    const others = await Promise.all(['#tray', '#fab'].map((id) => page.locator(id).boundingBox()));
+    if (!box) throw new Error('no chip');
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.x + box.width).toBeLessThanOrEqual(size.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(size.height);
+    for (const other of others) {
+      if (!other) throw new Error('no toolbar');
+      const apart =
+        box.x + box.width <= other.x ||
+        other.x + other.width <= box.x ||
+        box.y + box.height <= other.y ||
+        other.y + other.height <= box.y;
+      expect(apart).toBe(true);
+    }
+  });
+}
