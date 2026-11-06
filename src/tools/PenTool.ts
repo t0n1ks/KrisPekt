@@ -40,6 +40,7 @@ const HOLD_SLOP_PX = 3;
 export class PenTool extends Tool {
   readonly kind: StrokeKind = 'pen';
   private op: StrokeOperation | null = null;
+  private preview: HTMLCanvasElement | null = null;
 
   /** The user's settings for this tool: the current brush's colour and size. */
   protected get settings(): PenPrefs {
@@ -217,6 +218,15 @@ export class PenTool extends Tool {
     return this.ctx.i18n.t('pen');
   }
 
+  /** The preview, which the settings below it draw into as they change. */
+  override createOptionsHeader(): HTMLElement {
+    this.preview = el('canvas', {
+      class: 'popover__preview',
+      attrs: { width: 600, height: 92, 'aria-hidden': 'true' },
+    });
+    return this.preview;
+  }
+
   createOptionsPanel(): HTMLElement {
     const panel = el('div', { class: 'popover__content' });
     this.fillPanel(panel);
@@ -225,16 +235,14 @@ export class PenTool extends Tool {
 
   /** (Re)builds the options for the current settings; a brush switch rebuilds them in place. */
   private fillPanel(panel: HTMLElement): void {
-    const preview = el('canvas', {
-      class: 'popover__preview',
-      attrs: { width: 600, height: 92, 'aria-hidden': 'true' },
-    });
-    const drawPreview = (): void => this.drawPreview(preview);
+    const preview = this.preview;
+    const drawPreview = (): void => {
+      if (preview) this.drawPreview(preview);
+    };
     replaceChildren(
       panel,
       el('h3', { class: 'popover__title' }, this.title),
       ...this.brushPicker(panel),
-      preview,
       this.colorPalette(drawPreview).node,
       this.sizeField(drawPreview),
       ...this.extraOptions(),

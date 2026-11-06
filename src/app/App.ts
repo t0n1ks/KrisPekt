@@ -31,6 +31,7 @@ import { SubjectRepository } from '../storage/SubjectRepository';
 import { DialogFactory } from '../ui/dialogs/DialogFactory';
 import { ExportDialog } from '../ui/dialogs/ExportDialog';
 import { Menu } from '../ui/dialogs/Menu';
+import { PopoverManager } from '../ui/dialogs/PopoverManager';
 import { NotebookDialog } from '../ui/dialogs/NotebookDialog';
 import { StorageInfoDialog } from '../ui/dialogs/StorageInfoDialog';
 import { StorageReportDialog } from '../ui/dialogs/StorageReportDialog';
@@ -62,6 +63,7 @@ export class App {
   private readonly i18n: I18n;
   private readonly sizes: PageSizes;
   private readonly toast = new Toast();
+  private readonly popovers: PopoverManager;
   private readonly menu: Menu;
   private readonly dialogs: DialogFactory;
   private readonly files: FileSaver;
@@ -88,7 +90,8 @@ export class App {
     this.prefs = this.prefsStore.load();
     this.i18n = new I18n(this.prefs.lang ?? I18n.detectLanguage(navigator.languages ?? [navigator.language]));
     this.sizes = new PageSizes(this.i18n);
-    this.menu = new Menu(this.bus);
+    this.popovers = new PopoverManager(document, this.bus);
+    this.menu = new Menu(this.popovers);
     this.dialogs = new DialogFactory(this.i18n, this.bus);
     this.files = new FileSaver(this.i18n, (m) => this.toast.show(m));
     const reader = new RecordReader(() => this.reportCorruptRecord());
@@ -227,6 +230,7 @@ export class App {
       presets,
       sizes: this.sizes,
       menu: this.menu,
+      popovers: this.popovers,
       dialogs: this.dialogs,
       toast: this.toast,
       pages: this.repos.pages,

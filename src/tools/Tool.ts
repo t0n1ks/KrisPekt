@@ -78,6 +78,11 @@ export abstract class Tool implements OverlayPainter {
   /** Contents of the options popover shown when the active tool is tapped again. */
   abstract createOptionsPanel(): HTMLElement;
 
+  /** What stays at the top of the options while they scroll, such as a preview. */
+  createOptionsHeader(): HTMLElement | null {
+    return null;
+  }
+
   protected startOperation(e: PointerEvent): void {
     this.pointerId = e.pointerId;
     this.touchStarted = e.pointerType === 'touch';
