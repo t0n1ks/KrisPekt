@@ -7,6 +7,8 @@ export interface AppEvents {
   'notebook-saved': Notebook;
   /** A dropdown menu or sheet opened; transient popovers close themselves. */
   'menu-opened': undefined;
+  /** A preset changed by itself; the toolbar shows it. */
+  'toolbar-changed': undefined;
 }
 
 type Handler<T> = (payload: T) => void;

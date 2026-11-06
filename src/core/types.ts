@@ -249,6 +249,28 @@ export interface Preferences {
   lastChangeAt: number;
   /** The last export choices. */
   exp: ExportPrefs;
+  /** Pinned tool presets, at most twelve. */
+  presets?: ToolPreset[];
+  /** Toolbar order and hidden items; the default layout when absent. */
+  toolbar?: ToolbarPrefs;
+  /** The base tools' settings while a preset is in use. Loading puts them back. */
+  presetBase?: ToolSettings;
+}
+
+/** The settings of all tools, as the tools read them. */
+export type ToolSettings = Pick<Preferences, 'brush' | 'brushes' | 'hl' | 'er' | 'txt'>;
+
+/** A pinned tool with its settings. */
+export type ToolPreset =
+  | { id: string; tool: 'pen'; brush: BrushKind; c: string; s: number }
+  | { id: string; tool: 'hl'; c: string; s: number }
+  | { id: string; tool: 'eraser'; mode: EraserMode; r: number }
+  | ({ id: string; tool: 'text' } & TextPrefs);
+
+/** The user's toolbar: item ids in order, and the ones hidden. See ToolbarLayout. */
+export interface ToolbarPrefs {
+  order: string[];
+  hidden: string[];
 }
 
 /** A point in screen (stage-local CSS px) or world coordinates. */

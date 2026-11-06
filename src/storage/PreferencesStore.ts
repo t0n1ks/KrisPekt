@@ -21,14 +21,16 @@ import type {
   TextPrefs,
 } from '../core/types';
 import { toClampedNumber } from '../core/utils/math';
+import { ERASER_RANGE, HL_RANGE, TEXT_SIZE_RANGE } from '../domain/ToolPresets';
 import { isLanguage } from '../i18n/I18n';
+import { ToolbarPrefsParser } from './ToolbarPrefsParser';
 import { COLOR_PATTERN, isRecord, type UnknownRecord } from './validation/guards';
 
 /** Value ranges for tool settings (match the sliders and text presets). */
 export const PREF_RANGES = {
-  hl: [6, 40],
-  eraser: [6, 60],
-  textSize: [6, 200],
+  hl: HL_RANGE,
+  eraser: ERASER_RANGE,
+  textSize: TEXT_SIZE_RANGE,
 } as const;
 
 /** Latest accepted timestamp (the ECMAScript date limit). */
@@ -136,7 +138,9 @@ export class PreferencesStore {
   }
 
   /** Builds valid preferences from an untrusted object. */
-  static sanitize(raw: UnknownRecord): Preferences {
+  static sanitize(stored: UnknownRecord): Preferences {
+    // Saved while a preset was in use: the tool settings to come back to are the base tools' own.
+    const raw = { ...stored, ...section(stored, 'presetBase') };
     const d = DEFAULT_PREFS;
     const hl = section(raw, 'hl');
     const er = section(raw, 'er');
@@ -174,6 +178,10 @@ export class PreferencesStore {
       exp: exportPrefs(section(raw, 'exp')),
     };
     if (isLanguage(raw.lang)) prefs.lang = raw.lang;
+    const presets = ToolbarPrefsParser.presets(raw.presets);
+    if (presets.length) prefs.presets = presets;
+    const toolbar = ToolbarPrefsParser.toolbar(raw.toolbar);
+    if (toolbar) prefs.toolbar = toolbar;
     return prefs;
   }
 }

@@ -251,6 +251,18 @@ export const DEFAULT_PREFS: Preferences = {
   exp: { ...DEFAULT_EXPORT },
 };
 
+/* ---------- toolbar ---------- */
+
+/** Most pinned presets on the toolbar. */
+export const MAX_TOOL_PRESETS = 12;
+/**
+ * Sizes the toolbar's overflow rule counts with, so that it never has to measure. They must match
+ * `.tool-tray` in editor.css: the side margins, padding and border, a button, and the gap.
+ */
+export const TOOLBAR_CHROME_WIDTH = 24 + 12;
+export const TOOLBAR_ITEM_WIDTH = 44;
+export const TOOLBAR_GAP = 2;
+
 /* ---------- automatic backup ---------- */
 
 export const AUTO_BACKUP_INTERVALS: readonly AutoBackupInterval[] = ['daily', '3days', 'weekly', 'off'];
