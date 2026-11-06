@@ -1,4 +1,5 @@
 import type { Point } from '../core/types';
+import { LONG_PRESS_MS } from '../core/constants';
 import { now } from '../core/utils/math';
 import type { Camera } from '../canvas/Camera';
 import type { RoleChange, TouchClassifier, TouchRole, TouchSample } from '../domain/TouchClassifier';
@@ -24,12 +25,42 @@ export interface DrawingTarget {
   tap(pt: Point): void;
 }
 
+/**
+ * What a press lands on. `tap`: something that reacts to a tap (a card, a link), which a press that
+ * moves leaves to the tool. `place`: the page while a new card waits for its spot; no tool runs.
+ */
+export type PressKind = 'tap' | 'place';
+
+/** Things on the page that react to being pressed, rather than being drawn over. */
+export interface PressTarget {
+  kindAt(pt: Point, e: PointerEvent): PressKind | null;
+  tap(pt: Point): void;
+  /** A press held without moving. Returns false if it means nothing here. */
+  longPress(pt: Point): boolean;
+}
+
+/** A press being watched to see what it turns out to be. */
+interface HeldPress {
+  id: number;
+  start: Point;
+  /** The event that began it, for the tool if it becomes a stroke. */
+  event: PointerEvent;
+  kind: PressKind;
+  timer: ReturnType<typeof setTimeout>;
+  /** The long press fired; the rest of this press means nothing. */
+  done: boolean;
+}
+
+/** A press that moves further than this many px is a drag, not a tap. */
+const PRESS_SLOP = 8;
+
 export interface InputRouterDeps {
   canvas: HTMLCanvasElement;
   stage: HTMLElement;
   camera: Camera;
   gestures: GestureController;
   tools: DrawingTarget;
+  press: PressTarget;
   classifier: TouchClassifier;
   sizes: TouchSizeProbe;
   /** Runs first on every pointer-down; returns true to swallow the event. */
@@ -52,6 +83,11 @@ export interface InputRouterDeps {
  */
 export class InputRouter {
   private readonly listeners: [EventTarget, string, EventListener, AddEventListenerOptions?][];
+  private held: HeldPress | null = null;
+  /** A finger whose long press already fired, so that lifting it is no tap. */
+  private longPressedTouch: number | null = null;
+  private touchTimer: ReturnType<typeof setTimeout> | undefined;
+  private touchStart: Point | null = null;
 
   constructor(private readonly deps: InputRouterDeps) {
     const { canvas, stage } = deps;
@@ -108,7 +144,56 @@ export class InputRouter {
     }
     if (this.deps.tools.activePointer !== null) return;
     this.capture(e.pointerId);
-    this.deps.tools.begin(e, pt);
+    if (!this.holdPress(e, pt)) this.deps.tools.begin(e, pt);
+  }
+
+  /**
+   * A pen or mouse on a card or link is not yet anything: a tap opens it, a hold brings its menu,
+   * and only a press that moves is a stroke, which then starts where it landed.
+   */
+  private holdPress(e: PointerEvent, pt: Point): boolean {
+    const kind = this.deps.press.kindAt(pt, e);
+    if (!kind) return false;
+    const held: HeldPress = {
+      id: e.pointerId,
+      start: pt,
+      event: e,
+      kind,
+      done: false,
+      timer: setTimeout(() => this.heldLong(held), LONG_PRESS_MS),
+    };
+    this.held = held;
+    return true;
+  }
+
+  private heldLong(held: HeldPress): void {
+    if (this.held !== held || held.kind === 'place') return;
+    if (this.deps.press.longPress(held.start)) held.done = true;
+    else this.releaseHeld(held);
+  }
+
+  /** The press is a stroke after all. */
+  private releaseHeld(held: HeldPress): void {
+    clearTimeout(held.timer);
+    this.held = null;
+    this.deps.tools.begin(held.event, held.start);
+  }
+
+  private moveHeld(held: HeldPress, e: PointerEvent, pt: Point): void {
+    if (held.done || Math.hypot(pt.x - held.start.x, pt.y - held.start.y) <= PRESS_SLOP) return;
+    clearTimeout(held.timer);
+    if (held.kind === 'place') {
+      held.done = true;
+      return;
+    }
+    this.releaseHeld(held);
+    this.deps.tools.move(e);
+  }
+
+  private endHeld(held: HeldPress, cancelled: boolean): void {
+    clearTimeout(held.timer);
+    this.held = null;
+    if (!cancelled && !held.done) this.deps.press.tap(held.start);
   }
 
   private penLanded(): void {
@@ -133,17 +218,37 @@ export class InputRouter {
 
   private touchDown(e: PointerEvent, pt: Point): void {
     const { tools, classifier } = this.deps;
-    const wantsDraw = tools.activePointer === null && tools.acceptsTouchAt(pt);
+    // A finger on a card or link taps or holds it; moved, it scrolls the page rather than drawing.
+    const onTarget = this.deps.press.kindAt(pt, e) !== null;
+    const wantsDraw = tools.activePointer === null && !onTarget && tools.acceptsTouchAt(pt);
     this.capture(e.pointerId);
     this.apply(classifier.touchDown(this.sample(e, pt), wantsDraw), e);
     this.log(e, 'down');
+    if (onTarget) this.watchTouchHold(e.pointerId, pt);
+  }
+
+  private watchTouchHold(id: number, pt: Point): void {
+    clearTimeout(this.touchTimer);
+    this.touchStart = pt;
+    this.touchTimer = setTimeout(() => {
+      // Still one finger, still undecided: not a palm, a pan or a pinch.
+      if (this.deps.classifier.roleOf(id) !== 'pending') return;
+      if (this.deps.press.longPress(pt)) this.longPressedTouch = id;
+    }, LONG_PRESS_MS);
   }
 
   private move(e: PointerEvent): void {
     const { tools, gestures, camera, classifier } = this.deps;
     if (e.pointerType === 'pen' && !e.buttons && tools.activePointer !== e.pointerId) return;
     const pt = camera.toLocal(e.clientX, e.clientY);
+    if (this.held?.id === e.pointerId) {
+      this.moveHeld(this.held, e, pt);
+      return;
+    }
     if (e.pointerType === 'touch') {
+      if (this.touchStart && Math.hypot(pt.x - this.touchStart.x, pt.y - this.touchStart.y) > PRESS_SLOP) {
+        clearTimeout(this.touchTimer);
+      }
       this.apply(classifier.touchMove(this.sample(e, pt)), e);
       this.log(e, 'move');
     }
@@ -154,7 +259,8 @@ export class InputRouter {
   private up(e: PointerEvent, cancelled: boolean): void {
     const { tools, gestures, classifier } = this.deps;
     if (e.pointerType === 'pen') classifier.penEvent('up', now());
-    if (tools.activePointer === e.pointerId) {
+    if (this.held?.id === e.pointerId) this.endHeld(this.held, cancelled);
+    else if (tools.activePointer === e.pointerId) {
       if (cancelled) tools.cancel();
       else tools.end(e);
     }
@@ -169,7 +275,13 @@ export class InputRouter {
     const lifted = classifier.touchUp(e.pointerId, time, cancelled);
     this.log(e, cancelled ? 'cancel' : 'up', lifted.role);
     this.apply(lifted.changes, null);
-    if (lifted.tap) tools.tap(lifted.tap);
+    clearTimeout(this.touchTimer);
+    const longPressed = this.longPressedTouch === e.pointerId;
+    if (longPressed) this.longPressedTouch = null;
+    if (lifted.tap && !longPressed) {
+      if (this.deps.press.kindAt(lifted.tap, e)) this.deps.press.tap(lifted.tap);
+      else tools.tap(lifted.tap);
+    }
     if (quickPinch && !cancelled && lifted.role === 'pinch' && classifier.allowsUndoTap(time)) {
       this.deps.onTwoFingerTap();
     }

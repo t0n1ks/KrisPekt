@@ -102,6 +102,9 @@ export class LassoTool extends Tool {
     for (const im of page.images) {
       if (StrokeGeometry.pointInPolygon(im.x + im.w / 2, im.y + im.h / 2, poly)) ids.add(im.id);
     }
+    for (const card of page.cards) {
+      if (StrokeGeometry.pointInPolygon(card.x + card.w / 2, card.y + card.h / 2, poly)) ids.add(card.id);
+    }
     this.ctx.selection.set(page, ids);
   }
 

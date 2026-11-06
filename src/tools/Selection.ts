@@ -1,12 +1,14 @@
 import { MM, PAPER } from '../core/constants';
 import type { Box, Page, Point, TextItem } from '../core/types';
 import { clamp } from '../core/utils/math';
+import { CardRules } from '../domain/CardRules';
 import { ItemTransform, type ItemMapping, type PageItems } from '../domain/ItemTransform';
 import { RichText } from '../domain/RichText';
 import { SelectionClipboard } from '../domain/SelectionClipboard';
 import { SelectionPlacement, type Rect } from '../domain/SelectionPlacement';
 import type { BitmapCache } from '../canvas/BitmapCache';
 import type { Camera } from '../canvas/Camera';
+import type { CardPainter } from '../canvas/CardPainter';
 import type { LiveLayer, OverlayPainter } from '../canvas/LiveLayer';
 import type { PageLayout } from '../canvas/PageLayout';
 import type { StrokeGeometry } from '../canvas/StrokeGeometry';
@@ -24,6 +26,8 @@ export interface SelectionState {
   dy: number;
   /** Pending uniform scale around the box's top-left corner. */
   s: number;
+  /** Exactly one card is selected: the handle then sets its width, and its text keeps its size. */
+  widthOnly: boolean;
   /** Changes whenever the selected items change; part of the page cache key. */
   token: number;
 }
@@ -36,6 +40,7 @@ export interface SelectionDeps {
   strokes: StrokePainter;
   texts: TextLayout;
   bitmaps: BitmapCache;
+  cards: CardPainter;
   /** Records pages for undo before they change; several pages form one undo step. */
   recordUndo: (...pages: Page[]) => void;
   makeId: () => string;
@@ -78,6 +83,7 @@ export class Selection implements OverlayPainter {
       dx: 0,
       dy: 0,
       s: 1,
+      widthOnly: ids.size === 1 && page.cards.some((card) => ids.has(card.id)),
       token: ++this.tokenSeq,
     };
     this.deps.session.bump(page);
@@ -103,7 +109,7 @@ export class Selection implements OverlayPainter {
     const pos = this.deps.layout.pos(s.page);
     const z = this.deps.camera.z;
     const tl = this.deps.camera.toScreen(pos.x + s.box.x + s.dx, pos.y + s.box.y + s.dy);
-    return { x: tl.x, y: tl.y, w: s.box.w * s.s * z, h: s.box.h * s.s * z };
+    return { x: tl.x, y: tl.y, w: s.box.w * s.s * z, h: s.box.h * (s.widthOnly ? 1 : s.s) * z };
   }
 
   /** What a screen point touches: the resize handle, the selection, or nothing. */
@@ -129,6 +135,10 @@ export class Selection implements OverlayPainter {
     if (!s) return;
     const z = this.deps.camera.z;
     const kx = (s.box.w * z + dxPx) / (s.box.w * z);
+    if (s.widthOnly) {
+      s.s = CardRules.clampWidth(s.box.w * kx, s.page.w * MM) / s.box.w;
+      return;
+    }
     const ky = (s.box.h * z + dyPx) / (s.box.h * z);
     s.s = clamp((kx + ky) / 2, 0.1, 12);
   }
@@ -151,7 +161,12 @@ export class Selection implements OverlayPainter {
     const s = this.state;
     if (!s || (s.dx === 0 && s.dy === 0 && s.s === 1)) return;
     const source = s.page;
-    const moved: Rect = { x: s.box.x + s.dx, y: s.box.y + s.dy, w: s.box.w * s.s, h: s.box.h * s.s };
+    const moved: Rect = {
+      x: s.box.x + s.dx,
+      y: s.box.y + s.dy,
+      w: s.box.w * s.s,
+      h: s.box.h * (s.widthOnly ? 1 : s.s),
+    };
     const target = this.dropTarget(source, moved);
     const offset = this.pageOffset(source, target);
     const shift = SelectionPlacement.clampShift(
@@ -165,6 +180,7 @@ export class Selection implements OverlayPainter {
       k: s.s,
       dx: s.dx + offset.x + shift.x,
       dy: s.dy + offset.y + shift.y,
+      ...(s.widthOnly ? { cardKy: 1 } : {}),
     };
     if (target === source) this.transformOnPage(source, s.ids, mapping);
     else this.moveToPage(source, target, s.ids, mapping);
@@ -201,6 +217,7 @@ export class Selection implements OverlayPainter {
       strokes: [...target.strokes, ...arrived.strokes],
       texts: [...target.texts, ...arrived.texts],
       images: [...target.images, ...arrived.images],
+      cards: [...target.cards, ...arrived.cards],
     });
     this.deps.session.touch(source);
     this.deps.session.touch(target);
@@ -210,6 +227,7 @@ export class Selection implements OverlayPainter {
     page.strokes = items.strokes;
     page.texts = items.texts;
     page.images = items.images;
+    page.cards = items.cards;
   }
 
   /** Recolours selected pen strokes and texts (highlighters and images keep their colours). */
@@ -267,8 +285,9 @@ export class Selection implements OverlayPainter {
     page.strokes = [...page.strokes, ...items.strokes];
     page.texts = [...page.texts, ...items.texts];
     page.images = [...page.images, ...items.images];
+    page.cards = [...page.cards, ...items.cards];
     this.deps.session.touch(page);
-    const ids = [...items.strokes, ...items.texts, ...items.images].map((item) => item.id);
+    const ids = [...items.strokes, ...items.texts, ...items.images, ...items.cards].map((item) => item.id);
     this.set(page, new Set(ids));
     return true;
   }
@@ -282,6 +301,7 @@ export class Selection implements OverlayPainter {
     p.strokes = p.strokes.filter((x) => !s.ids.has(x.id));
     p.texts = p.texts.filter((x) => !s.ids.has(x.id));
     p.images = p.images.filter((x) => !s.ids.has(x.id));
+    p.cards = p.cards.filter((x) => !s.ids.has(x.id));
     this.state = null;
     this.deps.onChange(null);
     this.deps.session.touch(p);
@@ -315,6 +335,7 @@ export class Selection implements OverlayPainter {
     p.strokes = [...p.strokes, ...copies.strokes.map(fresh)];
     p.texts = [...p.texts, ...copies.texts.map(fresh)];
     p.images = [...p.images, ...copies.images.map(fresh)];
+    p.cards = [...p.cards, ...copies.cards.map(fresh)];
     this.deps.session.touch(p);
     this.set(p, ids);
   }
@@ -328,6 +349,11 @@ export class Selection implements OverlayPainter {
     if (!s) return;
     const p = s.page;
     live.usePageSpace(ctx, p);
+    if (s.widthOnly) {
+      this.drawWidenedCard(ctx, s);
+      this.drawFrame(ctx, live);
+      return;
+    }
     ctx.save();
     // Not clipped to the page: while dragging, the items follow the pointer across the gap
     // and onto the next page, where they land on release (see apply()).
@@ -340,10 +366,23 @@ export class Selection implements OverlayPainter {
       if (bm) ctx.drawImage(bm, im.x, im.y, im.w, im.h);
     }
     const backend = this.deps.strokes.canvasBackend(ctx);
+    if (p.cards.some((card) => s.ids.has(card.id))) {
+      const withBitmaps = this.deps.strokes.canvasBackend(ctx, (id) => this.deps.bitmaps.get(id));
+      for (const card of p.cards) if (s.ids.has(card.id)) this.deps.cards.emit(withBitmaps, card);
+    }
     for (const st of p.strokes) if (s.ids.has(st.id)) this.deps.strokes.emit(backend, st);
     for (const t of p.texts) if (s.ids.has(t.id)) this.deps.texts.emit(backend, t);
     ctx.restore();
     this.drawFrame(ctx, live);
+  }
+
+  /** A card follows the handle in width only: scaling the canvas would stretch its text. */
+  private drawWidenedCard(ctx: CanvasRenderingContext2D, s: SelectionState): void {
+    const card = s.page.cards.find((c) => s.ids.has(c.id));
+    if (!card) return;
+    const backend = this.deps.strokes.canvasBackend(ctx, (id) => this.deps.bitmaps.get(id));
+    const moved = { ...card, x: card.x + s.dx, y: card.y + s.dy, w: card.w * s.s };
+    this.deps.cards.emit(backend, moved);
   }
 
   private drawFrame(ctx: CanvasRenderingContext2D, live: LiveLayer): void {
@@ -370,7 +409,8 @@ export class Selection implements OverlayPainter {
     if (t) return this.deps.texts.box(t);
     const im = page.images.find((x) => x.id === id);
     if (im) return { x0: im.x, y0: im.y, x1: im.x + im.w, y1: im.y + im.h };
-    return null;
+    const card = page.cards.find((x) => x.id === id);
+    return card ? CardRules.box(card) : null;
   }
 
   private boundsOf(page: Page, ids: Set<string>): Box | null {

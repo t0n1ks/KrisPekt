@@ -1,6 +1,7 @@
 import { BitmapCache } from '../canvas/BitmapCache';
 import { BrushRegistry } from '../canvas/brushes/BrushRegistry';
 import { Camera } from '../canvas/Camera';
+import { CardPainter, type CardLabels } from '../canvas/CardPainter';
 import { LiveLayer } from '../canvas/LiveLayer';
 import { PageCache, type SkipInfo } from '../canvas/PageCache';
 import { PageLayout } from '../canvas/PageLayout';
@@ -21,7 +22,7 @@ import { TouchClassifier } from '../domain/TouchClassifier';
 import type { I18n } from '../i18n/I18n';
 import { GestureController } from '../input/GestureController';
 import type { InputSample } from '../input/InputLog';
-import { InputRouter } from '../input/InputRouter';
+import { InputRouter, type PressTarget } from '../input/InputRouter';
 import { TouchSizeProbe } from '../input/TouchSizeProbe';
 import type { BlobRepository } from '../storage/BlobRepository';
 import type { SaveQueue } from '../storage/SaveQueue';
@@ -63,6 +64,8 @@ export interface EditorCanvasHooks {
   /** Finish text editing and drop the selection. */
   settle(): void;
   hiddenTextOn(page: Page): string | null;
+  /** Cards, links and placing a new card react to presses on the page. */
+  press: PressTarget;
   editText(page: Page, item: TextItem | null, x: number, y: number): void;
   setTool(kind: ToolKind): void;
   refreshTray(): void;
@@ -77,6 +80,7 @@ export interface EditorCanvasDeps {
   blobs: BlobRepository;
   saveQueue: SaveQueue;
   makeId: () => string;
+  cardLabels: CardLabels;
   hooks: EditorCanvasHooks;
 }
 
@@ -95,6 +99,7 @@ export class EditorCanvas {
   readonly geometry = new StrokeGeometry((stroke) => this.brushes.forStroke(stroke).maxHalfWidth(stroke.s));
   readonly strokes = new StrokePainter(this.brushes, new PencilGrain());
   readonly texts = new TextLayout(context2d(document.createElement('canvas')));
+  readonly cards: CardPainter;
   readonly ruler = new Ruler();
   readonly history = new History();
   readonly session: EditorSession;
@@ -122,7 +127,8 @@ export class EditorCanvas {
     );
     this.bitmaps = new BitmapCache(deps.blobs);
     this.bitmaps.setLoadedHandler((id) => this.onBitmapLoaded(id));
-    this.painter = new PagePainter(new PatternPainter(), this.strokes, this.texts, this.bitmaps);
+    this.cards = new CardPainter(context2d(document.createElement('canvas')), deps.cardLabels);
+    this.painter = new PagePainter(new PatternPainter(), this.strokes, this.texts, this.bitmaps, this.cards);
     this.cache = new PageCache(this.painter, this.strokes);
     this.renderer = this.createRenderer();
     this.live = new LiveLayer(this.liveCanvas, this.camera, this.layout);
@@ -156,6 +162,7 @@ export class EditorCanvas {
       camera: this.camera,
       gestures: this.gestures,
       tools: this.tools,
+      press: hooks.press,
       classifier: new TouchClassifier({
         twoFingerScroll: () => prefs.twoFingerScroll,
         twoFingerUndo: () => prefs.twoFingerUndo,
@@ -192,6 +199,7 @@ export class EditorCanvas {
       strokes: this.strokes,
       texts: this.texts,
       bitmaps: this.bitmaps,
+      cards: this.cards,
       recordUndo: (...pages) => this.undo.record(...pages),
       makeId: this.deps.makeId,
       onChange: (state) => {
@@ -297,7 +305,11 @@ export class EditorCanvas {
 
   private onBitmapLoaded(id: string): void {
     for (const page of this.session.pages) {
-      if (page.bgBlob === id || page.images.some((im) => im.blob === id)) this.session.bump(page);
+      const shown =
+        page.bgBlob === id ||
+        page.images.some((im) => im.blob === id) ||
+        page.cards.some((card) => card.kind === 'pdf' && card.thumb === id);
+      if (shown) this.session.bump(page);
     }
     this.deps.hooks.onBitmapLoaded();
   }
