@@ -13,6 +13,13 @@ interface PdfJs {
 interface PdfDoc {
   numPages: number;
   getPage(n: number): Promise<PdfPage>;
+  getOutline(): Promise<RawOutlineItem[] | null>;
+  getPageIndex(ref: unknown): Promise<number>;
+}
+interface RawOutlineItem {
+  title: string;
+  dest: unknown[] | null;
+  items: RawOutlineItem[];
 }
 interface PdfPage {
   view: number[];
@@ -36,6 +43,14 @@ export interface PdfPageInfo {
   width: number;
   height: number;
   text: string;
+}
+
+/** One line of a PDF's document outline, as a reader shows it. */
+export interface PdfOutlineItem {
+  title: string;
+  /** 1-based. */
+  page: number;
+  items: PdfOutlineItem[];
 }
 
 /**
@@ -68,6 +83,28 @@ export function pdfInfo(page: Page, pdf: Buffer): Promise<PdfPageInfo> {
       }
       const first = await doc.getPage(1);
       return { pages: doc.numPages, width: first.view[2], height: first.view[3], text };
+    },
+    [pdf.toString('base64'), PDFJS_PREFIX] as const,
+  );
+}
+
+/** The document outline of a PDF, read with pdf.js in the browser. */
+export function pdfOutline(page: Page, pdf: Buffer): Promise<PdfOutlineItem[]> {
+  return page.evaluate(
+    async ([b64, prefix]) => {
+      const pdfjs = (await import(prefix + 'pdf.min.mjs')) as PdfJs;
+      pdfjs.GlobalWorkerOptions.workerSrc = prefix + 'pdf.worker.min.mjs';
+      const data = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const doc = await pdfjs.getDocument({ data }).promise;
+      const read = (items: RawOutlineItem[]): Promise<PdfOutlineItem[]> =>
+        Promise.all(
+          items.map(async (item) => ({
+            title: item.title,
+            page: item.dest ? (await doc.getPageIndex(item.dest[0])) + 1 : 0,
+            items: await read(item.items),
+          })),
+        );
+      return read((await doc.getOutline()) ?? []);
     },
     [pdf.toString('base64'), PDFJS_PREFIX] as const,
   );
