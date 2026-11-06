@@ -371,6 +371,15 @@ export const TAP_SLOP_PX = 8;
 export const INPUT_LOG_SIZE = 20;
 /** Holding the stylus still this long straightens the line. */
 export const STRAIGHTEN_HOLD_MS = 650;
+/**
+ * A finger must stay on an object this long before dragging moves it. Sooner, it scrolls the page.
+ * Long enough for a quick swipe to pass, short enough not to feel like waiting.
+ */
+export const HAND_HOLD_MS = 250;
+/** The page button comes back this long after the last sign of writing. */
+export const PAGE_CHIP_IDLE_MS = 1500;
+/** Two taps on a link with a tool that writes, this close together, earn a tip. */
+export const LINK_TIP_WINDOW_MS = 2000;
 /** Holding a tray button this long opens its menu or options instead of a tap action. */
 export const LONG_PRESS_MS = 500;
 /** Two-finger tap → undo, when shorter than this … */
