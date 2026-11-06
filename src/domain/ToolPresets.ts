@@ -1,7 +1,7 @@
 import { BRUSH_SPECS, MAX_TOOL_PRESETS } from '../core/constants';
 import type { Preferences, ToolKind, ToolPreset, ToolSettings } from '../core/types';
 
-/** The tools a preset can hold; the lasso has no settings to remember. */
+/** The tools a preset can hold; the lasso and the Hand have no settings to remember. */
 export type PinnableTool = ToolPreset['tool'];
 
 /** Width ranges of the tools without brush types (they match the tools' sliders). */
@@ -21,7 +21,7 @@ function ratio(value: number, min: number, max: number): number {
 export class ToolPresets {
   /** Whether a tool can be pinned. */
   static isPinnable(kind: ToolKind): kind is PinnableTool {
-    return kind !== 'lasso';
+    return kind !== 'lasso' && kind !== 'hand';
   }
 
   /** A preset with a tool's current settings. */

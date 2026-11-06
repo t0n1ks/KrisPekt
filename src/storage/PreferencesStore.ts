@@ -19,6 +19,7 @@ import type {
   ExportPrefs,
   ExportScope,
   InternalLink,
+  HintCounts,
   PenPrefs,
   Preferences,
   TextPrefs,
@@ -41,6 +42,7 @@ export const PREF_RANGES = {
 
 /** Latest accepted timestamp (the ECMAScript date limit). */
 const MAX_TIMESTAMP = 8.64e15;
+const MAX_HINT_COUNT = 99;
 
 function color(raw: unknown, fallback: string): string {
   return typeof raw === 'string' && COLOR_PATTERN.test(raw) ? raw : fallback;
@@ -119,6 +121,16 @@ function scratchPrefs(raw: UnknownRecord): ScratchPrefs {
     level: SCRATCH_LEVEL_NAMES.find((level) => level === raw.level) ?? d.level,
     hints: Math.floor(toClampedNumber(raw.hints, 0, SCRATCH_HINT_COUNT, d.hints)),
   };
+}
+
+/** The one-time hints' counts; null if nothing valid was stored. */
+function hintCounts(raw: unknown): HintCounts | null {
+  if (!isRecord(raw)) return null;
+  const counts: HintCounts = {};
+  for (const key of ['handToggle', 'linkTip'] as const) {
+    if (raw[key] !== undefined) counts[key] = Math.floor(toClampedNumber(raw[key], 0, MAX_HINT_COUNT, 0));
+  }
+  return counts;
 }
 
 /** The text style flags that are on. */
@@ -214,6 +226,9 @@ export class PreferencesStore {
     if (presets.length) prefs.presets = presets;
     const toolbar = ToolbarPrefsParser.toolbar(raw.toolbar);
     if (toolbar) prefs.toolbar = toolbar;
+    const hints = hintCounts(raw.hints);
+    if (hints) prefs.hints = hints;
+    if (raw.lassoSlot === 'lasso' || raw.lassoSlot === 'hand') prefs.lassoSlot = raw.lassoSlot;
     return prefs;
   }
 }

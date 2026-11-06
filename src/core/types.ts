@@ -5,7 +5,7 @@ export type Language = 'uk' | 'ru' | 'de' | 'en';
 export type Background = 'plain' | 'grid' | 'gridm' | 'lines' | 'dots';
 
 /** Editor tools selectable in the tray. */
-export type ToolKind = 'pen' | 'hl' | 'eraser' | 'lasso' | 'text';
+export type ToolKind = 'pen' | 'hl' | 'eraser' | 'lasso' | 'text' | 'hand';
 
 /** Stroke flavours: an ink pen (filled outline) or a highlighter (wide translucent centre line). */
 export type StrokeKind = 'pen' | 'hl';
@@ -371,6 +371,18 @@ export interface Preferences {
   toolbar?: ToolbarPrefs;
   /** The base tools' settings while a preset is in use. Loading puts them back. */
   presetBase?: ToolSettings;
+  /** How many times each one-time hint has been shown. */
+  hints?: HintCounts;
+  /** Which of the two tools sharing a toolbar button was used last. */
+  lassoSlot?: 'lasso' | 'hand';
+}
+
+/** How many times each one-time hint has been shown; a missing one has not been. */
+export interface HintCounts {
+  /** "Tap again: Lasso ↔ Hand". */
+  handToggle?: number;
+  /** "To open links, use the Hand or your finger". */
+  linkTip?: number;
 }
 
 /** How readily a scribble counts as crossing out. */

@@ -92,6 +92,15 @@
 .stage__canvas--crosshair {
   cursor: crosshair;
 }
+.stage__canvas--grab {
+  cursor: grab;
+}
+.stage__canvas--grab:active {
+  cursor: grabbing;
+}
+.stage__canvas--pointer {
+  cursor: pointer;
+}
 
 /* tool tray */
 .tool-tray {

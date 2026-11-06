@@ -3,6 +3,7 @@ import type { Anchor, CardItem, CardKind, LinkCard, Page, PdfCard, Point, UrlLin
 import { el } from '../../core/utils/dom';
 import { pickFile } from '../../core/utils/files';
 import { CardRules } from '../../domain/CardRules';
+import { EraserModes } from '../../domain/EraserModes';
 import { FileNames } from '../../domain/FileNames';
 import type { EditorSession } from '../../editor/EditorSession';
 import type { LinkHit, PagePressTargets } from '../../editor/PagePressTargets';
@@ -40,6 +41,10 @@ export interface CardControllerDeps {
   /** Makes a card a place links can lead to. */
   makeLink: (page: Page, card: CardItem) => void;
   targets: PagePressTargets;
+  /** Whether a press by this kind of pointer opens things, with the selected tool. */
+  opens: (pointerType: string) => boolean;
+  /** A link or a card was tapped with a tool that writes, which did not open it. */
+  drawnOverTarget: () => void;
   session: EditorSession;
   undo: Pick<UndoController, 'record'>;
   makeId: () => string;
@@ -107,8 +112,14 @@ export class CardController implements PressTarget {
   kindAt(pt: Point, e: PointerEvent): PressKind | null {
     if (this.pending) return this.deps.targets.pageAt(pt) ? 'place' : null;
     // The eraser end of a stylus erases, whatever is under it.
-    if (e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) !== 0)) return null;
+    if (EraserModes.isStylusEraser(e) || !this.deps.opens(e.pointerType)) return null;
     return this.deps.targets.at(pt) ? 'tap' : null;
+  }
+
+  /** A dot on a link or a card may have been meant as a tap; a bookmark's marker has no such look. */
+  drawnTap(pt: Point): void {
+    const hit = this.deps.targets.at(pt);
+    if (hit && hit.kind !== 'anchor') this.deps.drawnOverTarget();
   }
 
   tap(pt: Point): void {

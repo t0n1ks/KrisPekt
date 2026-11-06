@@ -34,6 +34,21 @@ export abstract class Tool implements OverlayPainter {
     return false;
   }
 
+  /** Whether this tool is for getting around: fingers never draw with it, and the page keeps coasting. */
+  get navigates(): boolean {
+    return false;
+  }
+
+  /** Whether a finger held here picks something up, instead of scrolling. */
+  holdableAt(_pt: Point): boolean {
+    return false;
+  }
+
+  /** Shows what a held finger is about to pick up, or (null) stops showing it. */
+  showHold(_pt: Point | null): void {
+    /* optional */
+  }
+
   /** Pointer went down on the stage at a stage-local point. */
   abstract onPointerDown(e: PointerEvent, pt: Point): void;
 

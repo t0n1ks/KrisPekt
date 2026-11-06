@@ -2,6 +2,8 @@ import type { EventBus } from '../../app/EventBus';
 import type { Preferences, ToolKind, ToolbarPrefs } from '../../core/types';
 import { el } from '../../core/utils/dom';
 import { ColorLists } from '../../domain/ColorLists';
+import { LassoHandToggle, type SharedTool } from '../../domain/LassoHandToggle';
+import { OneTimeHints } from '../../domain/OneTimeHints';
 import { ToolbarLayout } from '../../domain/ToolbarLayout';
 import { ToolPresets } from '../../domain/ToolPresets';
 import type { ToolPresetController } from '../../editor/ToolPresetController';
@@ -44,6 +46,9 @@ export interface EditorToolbarDeps {
  * tap on what is in use opens its settings, except the eraser, where it switches the mode, as it
  * always has. A long press opens the settings of a base tool and the Edit, Duplicate and Unpin
  * menu of a preset.
+ *
+ * The lasso's button is shared with the Hand: a tap on it while either is in use switches to the
+ * other, and a long press offers both.
  */
 export class EditorToolbar {
   private readonly items: ToolbarItemFactory;
@@ -57,6 +62,8 @@ export class EditorToolbar {
     this.items = new ToolbarItemFactory(deps.i18n, {
       tool: (kind, button) => this.onToolTap(kind, button),
       toolOptions: (kind) => this.openToolOptions(kind),
+      sharedTool: () => this.onSharedTap(),
+      sharedMenu: (button) => this.openSharedMenu(button),
       preset: (id, button) => this.onPresetTap(id, button),
       presetMenu: (id, button) => this.openPresetMenu(id, button),
       swatch: (color) => this.onSwatch(color),
@@ -95,6 +102,7 @@ export class EditorToolbar {
   /** The selected tool changed. */
   toolChanged(tool: Tool): void {
     this.deps.presets.toolChanged(tool.kind);
+    this.rememberShared(tool.kind);
     this.render();
   }
 
@@ -149,6 +157,7 @@ export class EditorToolbar {
       activeItem: active ? ToolbarLayout.presetItem(active.id) : tools().kind,
       prefs,
       base: presets.base,
+      sharedTool: LassoHandToggle.shown(active ? null : tools().kind, prefs.lassoSlot),
       presets: presets.presets,
       rulerOn: rulerOn(),
       canUndo: this.canUndo,
@@ -187,6 +196,50 @@ export class EditorToolbar {
     }
     if (tools().current.onActiveTap()) popover().close();
     else popover().toggle(button, tools().current);
+  }
+
+  private rememberShared(kind: ToolKind): void {
+    const { prefs, savePrefs } = this.deps;
+    if (!LassoHandToggle.isShared(kind) || prefs.lassoSlot === kind) return;
+    prefs.lassoSlot = kind;
+    savePrefs();
+  }
+
+  /** A tap on the button the lasso and the Hand share. */
+  private onSharedTap(): void {
+    const { presets, prefs, tools } = this.deps;
+    const active = presets.active ? null : tools().kind;
+    if (presets.active) presets.leave();
+    this.deps.setTool(LassoHandToggle.afterTap(active, prefs.lassoSlot));
+    if (active && LassoHandToggle.isShared(active)) this.hintToggle();
+  }
+
+  /** The first switch shows that this is a switch. */
+  private hintToggle(): void {
+    const { prefs, savePrefs, toast, i18n } = this.deps;
+    if (!OneTimeHints.due(prefs.hints, 'handToggle')) return;
+    prefs.hints = OneTimeHints.shown(prefs.hints, 'handToggle');
+    savePrefs();
+    toast.show(i18n.t('handToggleHint'), 3200);
+  }
+
+  private openSharedMenu(button: HTMLButtonElement): void {
+    const { i18n, menu, presets, tools } = this.deps;
+    const active = presets.active ? null : tools().kind;
+    const entry = (kind: SharedTool) => ({
+      label: i18n.t(kind),
+      icon: kind,
+      check: active === kind,
+      onClick: () => this.pickShared(kind),
+    });
+    menu.show(button, [entry('lasso'), entry('hand')]);
+  }
+
+  private pickShared(kind: SharedTool): void {
+    const { presets, tools } = this.deps;
+    if (presets.active) presets.leave();
+    if (tools().kind !== kind) this.deps.setTool(kind);
+    else this.render();
   }
 
   /** A long press on a base tool: select it if needed and open its options. */

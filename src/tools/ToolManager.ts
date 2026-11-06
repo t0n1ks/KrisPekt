@@ -61,7 +61,19 @@ export class ToolManager implements DrawingTarget, OverlayPainter {
 
   /** Fingers draw when finger drawing is on, or where the tool itself wants touch (selection drag). */
   acceptsTouchAt(pt: Point): boolean {
-    return this.prefs().fingerDraw || this.active.acceptsTouchAt(pt);
+    return (this.prefs().fingerDraw && !this.active.navigates) || this.active.acceptsTouchAt(pt);
+  }
+
+  get navigates(): boolean {
+    return this.active.navigates;
+  }
+
+  holdableAt(pt: Point): boolean {
+    return this.active.holdableAt(pt);
+  }
+
+  showHold(pt: Point | null): void {
+    this.active.showHold(pt);
   }
 
   begin(e: PointerEvent, pt: Point): void {

@@ -1,5 +1,6 @@
 import type { CardLabels } from '../../canvas/CardPainter';
 import { formatSize } from '../../core/utils/format';
+import { now } from '../../core/utils/math';
 import { SCRATCH_HINT_MS } from '../../core/constants';
 import type { EventBus } from '../../app/EventBus';
 import type {
@@ -18,6 +19,9 @@ import { ColorLists } from '../../domain/ColorLists';
 import { LinkClipboard } from '../../domain/LinkClipboard';
 import type { LinkDirectory } from '../../domain/LinkDirectory';
 import { LinkRules } from '../../domain/LinkRules';
+import { LinkTapTip } from '../../domain/LinkTapTip';
+import { OneTimeHints } from '../../domain/OneTimeHints';
+import { ToolRules } from '../../domain/ToolRules';
 import { PageRepair } from '../../domain/PageRepair';
 import { PageSizePolicy } from '../../domain/PageSizePolicy';
 import type { PageSizes } from '../../domain/PageSizes';
@@ -482,6 +486,8 @@ export class EditorView {
       linkEntries: (hit) => this.inkLinks.hitEntries(hit),
       markerEntries: (page, anchor) => this.anchors.markerEntries(page, anchor),
       makeLink: (page, card) => void this.anchors.addToCard(page, card),
+      opens: (pointerType) => ToolRules.opensTargets(c.tools.kind, pointerType, d.prefs.fingerDraw),
+      drawnOverTarget: () => this.tipAboutOpening(),
       targets: new PagePressTargets({
         camera: c.camera,
         layout: c.layout,
@@ -500,7 +506,7 @@ export class EditorView {
       dismissToast: () => d.toast.hide(),
       settle: () => this.settle(),
       selectCard: (page, card) => {
-        this.setTool('lasso');
+        this.toSelectingTool();
         c.selection.set(page, new Set([card.id]));
       },
       insertPages: (file) => this.insertPdfPages(file),
@@ -563,6 +569,9 @@ export class EditorView {
         kindAt: (pt, event) => this.cards.kindAt(pt, event),
         tap: (pt) => this.cards.tap(pt),
         longPress: (pt) => this.cards.longPress(pt),
+        drawnTap: (pt) => {
+          if (ToolRules.writes(this.canvas.tools.kind)) this.cards.drawnTap(pt);
+        },
       },
       hiddenTextOn: (page) => this.textEditor.hiddenOn(page),
       editText: (page, item, x, y) => {
@@ -958,7 +967,7 @@ export class EditorView {
     const c = this.canvas;
     const page = c.session.currentPage();
     if (!page || !c.selection.canPaste) return false;
-    if (c.tools.kind !== 'lasso') c.tools.select('lasso');
+    this.toSelectingTool();
     const center = c.layout.toPage(page, c.camera.toWorld(c.camera.width / 2, c.camera.height / 2));
     return c.selection.paste(page, center);
   }
@@ -967,7 +976,7 @@ export class EditorView {
   private showPasteOrNothing(): void {
     const c = this.canvas;
     if (c.selection.current) return;
-    if (c.tools.kind === 'lasso' && c.selection.canPaste && c.session.isOpen) {
+    if (ToolRules.keepsSelection(c.tools.kind) && c.selection.canPaste && c.session.isOpen) {
       this.selectionBar.showPaste();
       this.positionOverlays();
     } else this.selectionBar.hide();
@@ -987,8 +996,22 @@ export class EditorView {
   setTool(kind: ToolKind): void {
     this.textEditor.commit();
     this.popover.close();
-    if (kind !== 'lasso') this.canvas.selection.clear();
+    if (!ToolRules.keepsSelection(kind)) this.canvas.selection.clear();
     this.canvas.tools.select(kind);
+  }
+
+  /** Something is about to be selected: the lasso, unless the tool in use can hold a selection. */
+  private toSelectingTool(): void {
+    if (!ToolRules.keepsSelection(this.canvas.tools.kind)) this.setTool('lasso');
+  }
+
+  /** Two taps with a tool that writes on what looks tappable: says once how to open it. */
+  private tipAboutOpening(): void {
+    const { prefs, i18n, savePrefs, toast } = this.deps;
+    if (!OneTimeHints.due(prefs.hints, 'linkTip') || !this.linkTapTip.tapped(now())) return;
+    prefs.hints = OneTimeHints.shown(prefs.hints, 'linkTip');
+    savePrefs();
+    toast.show(i18n.t('handLinkTip'), 4000);
   }
 
   private onToolChange(tool: Tool): void {
@@ -1181,7 +1204,7 @@ export class EditorView {
       c.undo.record(page);
       page.images.push(item);
       c.session.touch(page);
-      this.setTool('lasso');
+      this.toSelectingTool();
       c.selection.set(page, new Set([item.id]));
     } catch (error) {
       this.deps.toast.show(this.imageErrorText(error));

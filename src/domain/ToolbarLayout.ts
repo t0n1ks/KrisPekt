@@ -1,7 +1,9 @@
 import type { ToolKind, ToolPreset, ToolbarPrefs } from '../core/types';
 
-const TOOLS: readonly ToolKind[] = ['pen', 'hl', 'eraser', 'lasso', 'text'];
+const TOOLS: readonly ToolKind[] = ['pen', 'hl', 'eraser', 'lasso', 'hand', 'text'];
 const DEFAULT_ORDER: readonly string[] = [...TOOLS, 'colors', 'ruler', 'image', 'attach', 'undo', 'redo'];
+/** On the bar only if asked for: the lasso's button also gives the Hand. */
+const HIDDEN_BY_DEFAULT: readonly string[] = ['hand'];
 /** Always reachable, so they cannot be hidden. The More button is not a movable item at all. */
 const ESSENTIAL: ReadonlySet<string> = new Set(['undo', 'redo']);
 const PRESET_PREFIX = 'preset:';
@@ -14,6 +16,7 @@ const PRIORITY: Readonly<Record<string, number>> = {
   eraser: 90,
   hl: 70,
   lasso: 65,
+  hand: 64,
   text: 60,
   colors: 40,
   ruler: 30,
@@ -41,12 +44,13 @@ export class ToolbarLayout {
 
   /** The default layout: the base items, with presets right after the tools. */
   static defaults(presets: readonly ToolPreset[]): ToolbarPrefs {
-    return ToolbarLayout.resolve({ order: [...DEFAULT_ORDER], hidden: [] }, presets);
+    return ToolbarLayout.resolve({ order: [...DEFAULT_ORDER], hidden: [...HIDDEN_BY_DEFAULT] }, presets);
   }
 
   /**
    * A stored layout made whole: unknown items go, base items it does not know yet come back at
-   * their default place, and new presets land right after the last tool or preset.
+   * their default place (hidden, if that is how they start), and new presets land right after the
+   * last tool or preset.
    */
   static resolve(stored: ToolbarPrefs | undefined, presets: readonly ToolPreset[]): ToolbarPrefs {
     const presetItems = presets.map((p) => ToolbarLayout.presetItem(p.id));
@@ -58,7 +62,10 @@ export class ToolbarLayout {
     for (const id of presetItems) {
       if (!order.includes(id)) order.splice(ToolbarLayout.afterLastTool(order), 0, id);
     }
-    const hidden = [...new Set(stored?.hidden ?? [])].filter((id) => known.has(id) && !ESSENTIAL.has(id));
+    const unseen = HIDDEN_BY_DEFAULT.filter((id) => !stored?.order.includes(id));
+    const hidden = [...new Set([...(stored?.hidden ?? []), ...unseen])].filter(
+      (id) => known.has(id) && !ESSENTIAL.has(id),
+    );
     return { order, hidden };
   }
 

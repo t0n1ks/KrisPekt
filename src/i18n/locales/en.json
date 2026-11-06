@@ -169,6 +169,7 @@
   "hl": "Highlighter",
   "eraser": "Eraser",
   "lasso": "Lasso",
+  "hand": "Hand",
   "ruler": "Ruler",
   "penColor": "Pen, color {c}",
   "thickness": "Thickness",
@@ -197,6 +198,9 @@
   "txtHeading": "Heading",
   "textHint": "Tap the page to type. Tap a text box to select it, then tap it again to edit.",
   "lassoHint": "Circle notes to select them. Drag the selection to move it, or the circle in the corner to resize.",
+  "handHint": "Scroll the page and open links. Tap text or a photo to select it, and drag to move it. The Hand never draws or erases.",
+  "handToggleHint": "Tap again: Lasso ↔ Hand",
+  "handLinkTip": "To open links, use the Hand or your finger",
   "rulerHint": "Ruler: drag with one finger, rotate with two. Draw along its edge with the stylus.",
   "cm": "cm",
   "penColorNames": [
