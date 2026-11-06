@@ -309,7 +309,7 @@ test('a word in a text box carries a link: coloured, asks before opening, and ca
   await page.mouse.click(spot.x, spot.y);
   await page.keyboard.type('hello');
   await page.keyboard.press('Control+A');
-  await page.locator('.text-bar__button[aria-label="Ссылка"]').click();
+  await page.locator('.text-bar__button[aria-label="Вставить ссылку"]').click();
   await page.fill('#linkUrl', 'example.org');
   await page.click('.sheet__foot .btn--primary');
   await expect(page.locator('[data-href="https://example.org/"]')).toHaveText('hello');
@@ -382,7 +382,7 @@ test('a vector PDF export has link cards and linked words as clickable annotatio
   await page.mouse.click(spot.x, spot.y);
   await page.keyboard.type('hello');
   await page.keyboard.press('Control+A');
-  await page.locator('.text-bar__button[aria-label="Ссылка"]').click();
+  await page.locator('.text-bar__button[aria-label="Вставить ссылку"]').click();
   await page.fill('#linkUrl', 'example.org/word');
   await page.click('.sheet__foot .btn--primary');
   await page.locator('#tray [data-tool="pen"]').click();

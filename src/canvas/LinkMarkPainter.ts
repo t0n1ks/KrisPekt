@@ -2,12 +2,8 @@ import { PAPER } from '../core/constants';
 import type { LinkTarget, Page } from '../core/types';
 import type { PathSink } from './brushes/PathSink';
 import type { DrawSink } from './draw/DrawSink';
-import type { LinkGeometry } from './LinkGeometry';
+import { MARK_HEIGHT, MARK_WIDTH, type LinkGeometry } from './LinkGeometry';
 
-/** The bookmark marker, in page px; small enough to stay out of the way of writing. */
-const MARK_WIDTH = 9;
-const MARK_HEIGHT = 13;
-const MARK_GAP = 4;
 const MARK_NOTCH = 3.5;
 const MARK_ALPHA = 0.85;
 /** The dots under linked ink, in page px. */
@@ -48,10 +44,8 @@ export class LinkMarkPainter {
     if (!this.markersOn()) return;
     for (const anchor of page.anchors) {
       if (skip && anchor.items.some((id) => skip.has(id))) continue;
-      const box = this.geometry.anchorBox(page, anchor);
-      const x = Math.max(MARK_GAP / 2, box.x0 - MARK_WIDTH - MARK_GAP);
-      const y = anchor.items.length ? box.y0 : MARK_GAP;
-      LinkMarkPainter.mark(sink, anchor.items.length ? x : MARK_GAP, y);
+      const box = this.geometry.markerBox(page, anchor);
+      LinkMarkPainter.mark(sink, box.x0, box.y0);
     }
   }
 

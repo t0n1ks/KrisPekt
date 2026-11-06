@@ -10,7 +10,7 @@ import { icon, type IconName } from '../icons';
 export interface AnchorsPanelHandlers {
   jump(link: InternalLink): void;
   rename(anchorId: string): Promise<void>;
-  remove(anchorId: string): void;
+  remove(anchorId: string): Promise<void>;
   copyLink(link: InternalLink): void;
   /** Bookmarks the current page. */
   addToCurrentPage(): Promise<unknown>;
@@ -91,8 +91,8 @@ export class AnchorsPanel {
         this.render();
       }),
       this.action('copy', i18n.t('cardCopyLink'), () => handlers.copyLink(target)),
-      this.action('trash', i18n.t('bookmarkDelete'), () => {
-        handlers.remove(id);
+      this.action('trash', i18n.t('bookmarkDelete'), async () => {
+        await handlers.remove(id);
         this.render();
       }),
     );

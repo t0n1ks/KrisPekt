@@ -6,6 +6,7 @@ import type { LinkTarget, Page, TextItem, TextParagraph, TextPrefs, TextStyle } 
 import { byId } from '../../core/utils/dom';
 import { clamp } from '../../core/utils/math';
 import type { EditorSession } from '../../editor/EditorSession';
+import { AnchorMarks } from '../../domain/AnchorMarks';
 import { PastedText } from '../../domain/PastedText';
 import { RichText, type ParagraphPatch, type StylePatch } from '../../domain/RichText';
 import type { LinkChoice, LinkDialogOptions } from '../dialogs/LinkDialog';
@@ -77,6 +78,8 @@ export interface TextBoxEditorDeps {
   askLink: (options: LinkDialogOptions) => Promise<LinkChoice | null>;
   /** Bookmarks a saved box, or a stretch of it. */
   addBookmark: (page: Page, item: TextItem, range: [number, number] | null) => Promise<unknown>;
+  /** Removes the bookmarks of a saved box, or of a stretch of it. */
+  removeBookmark: (page: Page, item: TextItem, range: [number, number] | null) => Promise<unknown>;
   /** Writes a table of contents again. */
   updateContents: (page: Page, item: TextItem) => void;
   /** Redraws after the camera moved to keep the caret in view. */
@@ -122,7 +125,8 @@ export class TextBoxEditor {
       paragraph: (patch) => this.paragraph(patch),
       stepSize: (delta) => this.stepSize(delta),
       link: () => void this.editLink(),
-      bookmark: () => void this.bookmark(),
+      bookmark: () => void this.withSavedBox(this.deps.addBookmark),
+      removeBookmark: () => void this.withSavedBox(this.deps.removeBookmark),
       updateContents: () => this.updateContents(),
       undo: () => this.undo(),
       redo: () => this.redo(),
@@ -700,8 +704,10 @@ export class TextBoxEditor {
     return choice.kind === 'internal' ? choice.link : { kind: 'url', href: choice.href };
   }
 
-  /** The box must be on the page to be bookmarked, so what is open is saved first. */
-  private async bookmark(): Promise<void> {
+  /** The box must be on the page to change its bookmarks, so what is open is saved first. */
+  private async withSavedBox(
+    action: (page: Page, item: TextItem, range: [number, number] | null) => Promise<unknown>,
+  ): Promise<void> {
     const s = this.open;
     if (!s) return;
     this.deps.menu.close();
@@ -716,7 +722,7 @@ export class TextBoxEditor {
     const range: [number, number] | null =
       s.editing && start !== end ? [start, Math.min(end, item.t.length)] : null;
     this.askingLink = true;
-    await this.deps.addBookmark(s.page, item, range).finally(() => (this.askingLink = false));
+    await action(s.page, item, range).finally(() => (this.askingLink = false));
     if (this.open === s && s.editing) this.focusEditor(s);
   }
 
@@ -762,6 +768,7 @@ export class TextBoxEditor {
         align: 'left',
         list: null,
         link: false,
+        bookmark: false,
         toc: false,
         canUndo: false,
         canRedo: false,
@@ -769,6 +776,8 @@ export class TextBoxEditor {
     }
     const d = s.draft;
     const range = s.editing ? s.selection : { start: 0, end: RichText.length(d.paras) };
+    const selected: [number, number] | null =
+      s.editing && range.start !== range.end ? [range.start, range.end] : null;
     const style = RichText.patchedStyle(
       { fs: d.fs, c: d.c, ...RichText.commonStyle(d.paras, range.start, range.end) } as TextStyle,
       s.pending ?? {},
@@ -783,6 +792,7 @@ export class TextBoxEditor {
       align: para?.align ?? 'left',
       list: para?.list ?? null,
       link: this.linkRange(s)?.link !== undefined,
+      bookmark: AnchorMarks.on(s.page, new Set([d.id]), selected).length > 0,
       toc: d.toc === true,
       canUndo: s.editing ? s.history.canUndo : this.deps.canUndoPage(),
       canRedo: s.editing ? s.history.canRedo : this.deps.canRedoPage(),

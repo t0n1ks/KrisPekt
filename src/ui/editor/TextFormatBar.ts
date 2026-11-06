@@ -18,6 +18,8 @@ export interface FormatState {
   list: 'bullet' | 'number' | null;
   /** The selected text carries a link. */
   link: boolean;
+  /** The selected text, or the box, carries a bookmark. */
+  bookmark: boolean;
   /** The box is a table of contents. */
   toc: boolean;
   canUndo: boolean;
@@ -33,6 +35,8 @@ export interface TextFormatHandlers {
   link(): void;
   /** Bookmarks the box, or the selected text. */
   bookmark(): void;
+  /** Removes the bookmarks of the box, or of the selected text. */
+  removeBookmark(): void;
   /** Writes a table of contents again. */
   updateContents(): void;
   undo(): void;
@@ -230,7 +234,14 @@ export class TextFormatBar {
         pressed: (s) => s.list === 'number',
       },
       { key: 'link', label: 'fmtLink', icon: 'link', run: () => h.link(), pressed: (s) => s.link },
-      { key: 'bookmark', label: 'bookmarkAdd', icon: 'bookmark', run: () => h.bookmark() },
+      { key: 'bookmark', label: 'linkMakeTitle', icon: 'bookmark', run: () => h.bookmark() },
+      {
+        key: 'unbookmark',
+        label: 'bookmarkRemoveHere',
+        icon: 'trash',
+        run: () => h.removeBookmark(),
+        shownIf: (s) => s.bookmark,
+      },
       {
         key: 'contents',
         label: 'contentsUpdate',
