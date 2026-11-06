@@ -188,6 +188,8 @@ export class LibraryService {
       texts: [],
       images: [],
       cards: [],
+      anchors: [],
+      inkLinks: [],
       updatedAt: Date.now(),
     };
   }
@@ -212,7 +214,10 @@ export class LibraryService {
   async deleteNotebook(nb: Notebook): Promise<void> {
     const pages = await this.repos.pages.ofNotebook(nb.id);
     await this.repos.pages.deleteMany(pages.map((p) => p.id));
-    const spared = await this.repos.blobs.deleteUnreferenced(PageRepository.blobIds(pages), this.blobsInUse());
+    const spared = await this.repos.blobs.deleteUnreferenced(
+      PageRepository.blobIds(pages),
+      this.blobsInUse(),
+    );
     if (spared) this.onBlobsSpared();
     await this.repos.notebooks.delete(nb.id);
     this.notebooks = this.notebooks.filter((n) => n !== nb);

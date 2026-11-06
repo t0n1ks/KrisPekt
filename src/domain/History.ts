@@ -1,5 +1,5 @@
 import { UNDO_LIMIT } from '../core/constants';
-import type { Background, CardItem, ImageItem, Page, Stroke, TextItem } from '../core/types';
+import type { Anchor, Background, CardItem, ImageItem, InkLink, Page, Stroke, TextItem } from '../core/types';
 import { CardRules } from './CardRules';
 
 /**
@@ -12,6 +12,8 @@ export interface PageSnapshot {
   texts: TextItem[];
   images: ImageItem[];
   cards: CardItem[];
+  anchors: Anchor[];
+  inkLinks: InkLink[];
   w: number;
   h: number;
   locked: boolean;
@@ -30,10 +32,21 @@ export interface HistoryStep {
   resized: boolean;
 }
 
-/** Undo/redo stacks of page snapshots (max 150 undo steps). */
+/** A notebook's steps while another notebook is open. */
+interface ParkedSteps {
+  undo: HistoryEntry[];
+  redo: HistoryEntry[];
+}
+
+/**
+ * Undo/redo stacks of page snapshots (max 150 undo steps). Following a link to another notebook and
+ * coming back keeps each notebook's steps; leaving for the shelf ends them ({@link clear}).
+ */
 export class History {
   private undoStack: HistoryEntry[] = [];
   private redoStack: HistoryEntry[] = [];
+  private owner: string | null = null;
+  private readonly parked = new Map<string, ParkedSteps>();
 
   constructor(private readonly limit = UNDO_LIMIT) {}
 
@@ -44,6 +57,8 @@ export class History {
       texts: page.texts.slice(),
       images: page.images.slice(),
       cards: page.cards.slice(),
+      anchors: page.anchors.slice(),
+      inkLinks: page.inkLinks.slice(),
       w: page.w,
       h: page.h,
       locked: page.locked,
@@ -58,6 +73,8 @@ export class History {
     page.texts = snap.texts;
     page.images = snap.images;
     page.cards = snap.cards;
+    page.anchors = snap.anchors;
+    page.inkLinks = snap.inkLinks;
     page.w = snap.w;
     page.h = snap.h;
     page.locked = snap.locked;
@@ -105,10 +122,22 @@ export class History {
     this.redoStack = drop(this.redoStack);
   }
 
+  /** Switches to a notebook's steps, keeping the current ones for when it comes back. */
+  use(notebookId: string): void {
+    if (this.owner === notebookId) return;
+    if (this.owner !== null) this.parked.set(this.owner, { undo: this.undoStack, redo: this.redoStack });
+    const steps = this.parked.get(notebookId);
+    this.parked.delete(notebookId);
+    this.undoStack = steps?.undo ?? [];
+    this.redoStack = steps?.redo ?? [];
+    this.owner = notebookId;
+  }
+
   /** Ids of every blob the steps could bring back; these must stay stored. */
   blobIds(): Set<string> {
     const ids = new Set<string>();
-    for (const entry of [...this.undoStack, ...this.redoStack]) {
+    const parked = [...this.parked.values()].flatMap((steps) => [...steps.undo, ...steps.redo]);
+    for (const entry of [...this.undoStack, ...this.redoStack, ...parked]) {
       for (const snap of entry) {
         for (const image of snap.images) ids.add(image.blob);
         for (const card of snap.cards) for (const id of CardRules.blobIds(card)) ids.add(id);
@@ -120,6 +149,8 @@ export class History {
   clear(): void {
     this.undoStack = [];
     this.redoStack = [];
+    this.owner = null;
+    this.parked.clear();
   }
 
   /** Restores every page of the newest entry that still exists, atomically. */

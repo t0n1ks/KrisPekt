@@ -38,6 +38,12 @@ export class UndoController {
     this.notify();
   }
 
+  /** Switches to a notebook's steps; those of the one left wait for it. */
+  use(notebookId: string): void {
+    this.deps.history.use(notebookId);
+    this.notify();
+  }
+
   clear(): void {
     this.deps.history.clear();
     this.notify();

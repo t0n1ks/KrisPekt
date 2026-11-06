@@ -118,6 +118,8 @@ export class SampleSeeder {
       texts: [],
       images: [],
       cards: [],
+      anchors: [],
+      inkLinks: [],
       updatedAt: now,
     };
   }

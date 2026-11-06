@@ -1,16 +1,22 @@
-import { BRUSH_KINDS, MAX_ATTACHMENT_PDF_BYTES, MAX_URL_LENGTH } from '../../core/constants';
+import { BRUSH_KINDS, MAX_ANCHOR_NAME, MAX_ATTACHMENT_PDF_BYTES, MAX_URL_LENGTH } from '../../core/constants';
 import type {
+  Anchor,
+  AnchorMark,
   CardItem,
   ImageItem,
+  InkLink,
+  InternalLink,
   LinkTarget,
   Notebook,
   NotebookView,
   Page,
+  PageRect,
   Stroke,
   Subject,
   TextItem,
   TextParagraph,
   TextSpan,
+  UrlLink,
 } from '../../core/types';
 import { FileNames } from '../../domain/FileNames';
 import { RichText } from '../../domain/RichText';
@@ -60,6 +66,15 @@ function parseView(raw: unknown, path: string): NotebookView | null {
   };
 }
 
+function parseMark(raw: unknown, path: string): AnchorMark {
+  const o = asRecord(raw, path);
+  return {
+    id: asId(o.id, `${path}.id`),
+    pageId: asId(o.pageId, `${path}.pageId`),
+    name: asString(o.name, `${path}.name`, MAX_ANCHOR_NAME),
+  };
+}
+
 export function parseNotebook(raw: unknown, path = 'notebook'): Notebook {
   const o = asRecord(raw, path);
   const base = asRecord(o.base, `${path}.base`);
@@ -82,6 +97,8 @@ export function parseNotebook(raw: unknown, path = 'notebook'): Notebook {
   if (o.order !== undefined) notebook.order = asNumber(o.order, `${path}.order`, LIMITS.order);
   if (o.zoomLock !== undefined)
     notebook.zoomLock = asNumber(o.zoomLock, `${path}.zoomLock`, LIMITS.lockedZoom);
+  const marks = optionalArray(o.marks, `${path}.marks`);
+  if (marks.length) notebook.marks = marks.map((v, i) => parseMark(v, `${path}.marks[${i}]`));
   return notebook;
 }
 
@@ -122,13 +139,27 @@ function parseFlag(value: unknown, path: string): true {
   return true;
 }
 
-/** Only known kinds of link, and only addresses that may be opened; anything else rejects the record. */
-export function parseLink(raw: unknown, path: string): LinkTarget {
+/** A web address, only if it may be opened. */
+function parseUrlLink(raw: unknown, path: string): UrlLink {
   const o = asRecord(raw, path);
   asOneOf(o.kind, ['url'] as const, `${path}.kind`);
   const href = SafeUrl.strict(asString(o.href, `${path}.href`, MAX_URL_LENGTH));
   if (!href) throw new ValidationError(`${path}.href`, 'address not allowed');
   return { kind: 'url', href };
+}
+
+/** A place in the notes. It need not exist: a link to something deleted is shown as broken. */
+export function parseInternalLink(raw: unknown, path: string): InternalLink {
+  const o = asRecord(raw, path);
+  const kind = asOneOf(o.kind, ['anchor', 'page', 'notebook'] as const, `${path}.kind`);
+  const nb = asId(o.nb, `${path}.nb`);
+  return kind === 'notebook' ? { kind, nb } : { kind, nb, id: asId(o.id, `${path}.id`) };
+}
+
+/** Only known kinds of link, and only addresses that may be opened; anything else rejects the record. */
+export function parseLink(raw: unknown, path: string): LinkTarget {
+  const { kind } = asRecord(raw, path);
+  return kind === 'url' ? parseUrlLink(raw, path) : parseInternalLink(raw, path);
 }
 
 function parseRun(raw: unknown, path: string): TextSpan {
@@ -172,6 +203,7 @@ export function parseText(raw: unknown, path = 'text'): TextItem {
     c: asColor(o.c, `${path}.c`),
   };
   if (o.auto !== undefined) item.auto = parseFlag(o.auto, `${path}.auto`);
+  if (o.toc !== undefined) item.toc = parseFlag(o.toc, `${path}.toc`);
   if (o.paras === undefined) return item;
   const rawParas = asArray(o.paras, `${path}.paras`, MAX_LEN.text + 1);
   if (rawParas.length === 0) throw new ValidationError(`${path}.paras`, 'no paragraphs');
@@ -205,7 +237,7 @@ export function parseCard(raw: unknown, path = 'card'): CardItem {
     h: asNumber(o.h, `${path}.h`, LIMITS.extent),
   };
   if (asOneOf(o.kind, ['pdf', 'link'] as const, `${path}.kind`) === 'link') {
-    const link = parseLink(o.link, `${path}.link`);
+    const link = parseUrlLink(o.link, `${path}.link`);
     const title = FileNames.label(asString(o.title, `${path}.title`, MAX_LEN.name), MAX_LEN.name);
     return { ...base, kind: 'link', link, title };
   }
@@ -221,6 +253,54 @@ export function parseCard(raw: unknown, path = 'card'): CardItem {
   if (o.problem !== undefined)
     card.problem = asOneOf(o.problem, ['locked', 'broken'] as const, `${path}.problem`);
   return card;
+}
+
+function parseRect(raw: unknown, path: string): PageRect {
+  const o = asRecord(raw, path);
+  return {
+    x: asNumber(o.x, `${path}.x`, LIMITS.coord),
+    y: asNumber(o.y, `${path}.y`, LIMITS.coord),
+    w: asNumber(o.w, `${path}.w`, LIMITS.extent),
+    h: asNumber(o.h, `${path}.h`, LIMITS.extent),
+  };
+}
+
+function parseItemIds(raw: unknown, path: string): string[] {
+  return asArray(raw, path).map((id, i) => asId(id, `${path}[${i}]`));
+}
+
+export function parseAnchor(raw: unknown, path = 'anchor'): Anchor {
+  const o = asRecord(raw, path);
+  const name = FileNames.label(asString(o.name, `${path}.name`, MAX_ANCHOR_NAME), MAX_ANCHOR_NAME);
+  if (!name) throw new ValidationError(`${path}.name`, 'no name');
+  const anchor: Anchor = {
+    id: asId(o.id, `${path}.id`),
+    name,
+    items: parseItemIds(o.items, `${path}.items`),
+    rect: parseRect(o.rect, `${path}.rect`),
+  };
+  if (o.range !== undefined) {
+    const range = asArray(o.range, `${path}.range`, 2).map((v, i) =>
+      asNumber(v, `${path}.range[${i}]`, [0, MAX_LEN.text]),
+    );
+    const [start, end] = range;
+    if (start === undefined || end === undefined || start > end || anchor.items.length !== 1)
+      throw new ValidationError(`${path}.range`, 'bad range');
+    anchor.range = [start, end];
+  }
+  return anchor;
+}
+
+export function parseInkLink(raw: unknown, path = 'inkLink'): InkLink {
+  const o = asRecord(raw, path);
+  const items = parseItemIds(o.items, `${path}.items`);
+  if (!items.length) throw new ValidationError(`${path}.items`, 'no items');
+  return {
+    id: asId(o.id, `${path}.id`),
+    items,
+    rect: parseRect(o.rect, `${path}.rect`),
+    link: parseLink(o.link, `${path}.link`),
+  };
 }
 
 export function parsePage(raw: unknown, path = 'page'): Page {
@@ -239,6 +319,8 @@ export function parsePage(raw: unknown, path = 'page'): Page {
     texts: list('texts', parseText),
     images: list('images', parseImage),
     cards: list('cards', parseCard),
+    anchors: list('anchors', parseAnchor),
+    inkLinks: list('inkLinks', parseInkLink),
     updatedAt: o.updatedAt === undefined ? 0 : asNumber(o.updatedAt, `${path}.updatedAt`, LIMITS.timestamp),
   };
 }

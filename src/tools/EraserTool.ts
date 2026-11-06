@@ -3,6 +3,7 @@ import type { EraserMode, Point, Stroke, ToolKind } from '../core/types';
 import { el } from '../core/utils/dom';
 import type { LiveLayer } from '../canvas/LiveLayer';
 import { StrokeGeometry } from '../canvas/StrokeGeometry';
+import { ItemBindings } from '../domain/ItemBindings';
 import { EraserModes } from '../domain/EraserModes';
 import { icon } from '../ui/icons';
 import { Segmented } from '../ui/widgets/Segmented';
@@ -62,13 +63,15 @@ export class EraserTool extends Tool {
       const o = layout.pos(page);
       if (w.x < o.x - r || w.x > o.x + page.w * MM + r || w.y < o.y - r || w.y > o.y + page.h * MM + r)
         continue;
-      const kept = this.eraseStrokes(page.strokes, w.x - o.x, w.y - o.y, r, prefs.er.mode);
+      const cut = new Map<string, string[]>();
+      const kept = this.eraseStrokes(page.strokes, w.x - o.x, w.y - o.y, r, prefs.er.mode, cut);
       if (!kept) continue;
       if (!this.touchedPages.has(page.id)) {
         this.touchedPages.add(page.id);
         this.ctx.recordUndo(page);
       }
       page.strokes = kept;
+      for (const [id, parts] of cut) ItemBindings.replaceItem(page, id, parts);
       session.touch(page);
     }
   }
@@ -80,6 +83,7 @@ export class EraserTool extends Tool {
     y: number,
     r: number,
     mode: EraserMode,
+    cut: Map<string, string[]>,
   ): Stroke[] | null {
     let out: Stroke[] | null = null;
     for (let i = 0; i < strokes.length; i++) {
@@ -101,6 +105,10 @@ export class EraserTool extends Tool {
       if (parts) {
         out ??= strokes.slice(0, i);
         out.push(...parts);
+        cut.set(
+          st.id,
+          parts.map((part) => part.id),
+        );
       } else out?.push(st);
     }
     return out;

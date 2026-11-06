@@ -41,6 +41,7 @@ export class NotebookRepository {
     if (nb.sample) record.sample = true;
     if (nb.order !== undefined) record.order = nb.order;
     if (nb.zoomLock !== undefined) record.zoomLock = nb.zoomLock;
+    if (nb.marks?.length) record.marks = nb.marks.map((mark) => ({ ...mark }));
     return record;
   }
 }

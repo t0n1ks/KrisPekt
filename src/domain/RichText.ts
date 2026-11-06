@@ -1,4 +1,5 @@
 import type { LinkTarget, TextItem, TextParagraph, TextSpan, TextStyle } from '../core/types';
+import { LinkRules } from './LinkRules';
 
 /** A style change: `false` turns a flag off. */
 export interface StylePatch {
@@ -60,12 +61,7 @@ export class RichText {
 
   /** Whether two runs look the same. */
   static sameStyle(a: TextStyle, b: TextStyle): boolean {
-    return STYLE_KEYS.every((key) => a[key] === b[key]) && RichText.sameLink(a.link, b.link);
-  }
-
-  /** Whether two links lead to the same place. */
-  static sameLink(a: LinkTarget | undefined, b: LinkTarget | undefined): boolean {
-    return a?.kind === b?.kind && a?.href === b?.href;
+    return STYLE_KEYS.every((key) => a[key] === b[key]) && LinkRules.same(a.link, b.link);
   }
 
   /** The style fields of a run, without its text. */
@@ -147,7 +143,7 @@ export class RichText {
     for (const run of runs) {
       const next: TextStyle = {};
       for (const key of STYLE_KEYS) if (common[key] === run[key]) Object.assign(next, { [key]: common[key] });
-      if (common.link && RichText.sameLink(common.link, run.link)) next.link = common.link;
+      if (common.link && LinkRules.same(common.link, run.link)) next.link = common.link;
       common = RichText.styleOf(next);
     }
     return common;
@@ -162,6 +158,20 @@ export class RichText {
       at += len + 1;
     }
     return paras[paras.length - 1];
+  }
+
+  /** The text with every stretch that leads to this place no longer a link. */
+  static withoutLink(paras: TextParagraph[], link: LinkTarget): TextParagraph[] {
+    const ranges: [number, number][] = [];
+    let at = 0;
+    for (const para of paras) {
+      for (const run of para.runs) {
+        if (LinkRules.same(run.link, link)) ranges.push([at, at + run.t.length]);
+        at += run.t.length;
+      }
+      at += 1;
+    }
+    return ranges.reduce((out, [start, end]) => RichText.applyStyle(out, start, end, { link: null }), paras);
   }
 
   /** The linked run at an offset; a caret at either end of it counts. */

@@ -3,6 +3,7 @@ import type { PagePainter } from '../../canvas/PagePainter';
 import { MM, PDF_FONT_NAME, PDF_PATTERN_SCALE, PT_PER_PX } from '../../core/constants';
 import type { Page, RasterDpi } from '../../core/types';
 import { ExportSizing } from '../../domain/ExportSizing';
+import { PdfLinkMap } from '../../domain/PdfLinkMap';
 import type { I18n } from '../../i18n/I18n';
 import type { PageRasterizer } from '../export/PageRasterizer';
 import { PdfFont } from './PdfFont';
@@ -90,6 +91,7 @@ export class PdfExporter {
   private async build(jspdf: JsPdfModule, pages: readonly Page[], mode: PdfMode): Promise<PdfResult | null> {
     const { i18n, notify } = this.deps;
     const lowered: LoweredPage[] = [];
+    const links = new PdfLinkMap(pages);
     let doc: JsPdfDocument | null = null;
     let page: Page | undefined;
     for (let i = 0; (page = pages[i]); i++) {
@@ -98,7 +100,7 @@ export class PdfExporter {
       doc = PdfExporter.addPage(jspdf, doc, page);
       if (mode.kind === 'vector') {
         if (fresh && !(await this.registerFont(doc))) return null;
-        await this.addVectorPage(jspdf, doc, page);
+        await this.addVectorPage(jspdf, doc, page, links);
       } else {
         const dpi = await this.addRasterPage(doc, page, mode.dpi);
         if (dpi < mode.dpi) lowered.push({ index: i + 1, dpi });
@@ -136,13 +138,19 @@ export class PdfExporter {
     });
   }
 
-  private async addVectorPage(jspdf: JsPdfModule, doc: JsPdfDocument, page: Page): Promise<void> {
+  private async addVectorPage(
+    jspdf: JsPdfModule,
+    doc: JsPdfDocument,
+    page: Page,
+    links: PdfLinkMap,
+  ): Promise<void> {
     const backend = new PdfVectorBackend(jspdf, doc, {
       k: PT_PER_PX,
       font: PDF_FONT_NAME,
       baseline: (this.baseline ??= PdfFont.baseline()),
       pencilTone: (this.pencilTone ??= PencilGrain.meanCoverage()),
       images: await this.deps.images.forPage(page),
+      pageOf: (link) => links.pageNumber(link),
     });
     backend.beginPage(page.w * MM, page.h * MM);
     this.deps.painter.emit(backend, page, { scale: PDF_PATTERN_SCALE, highlightersFirst: true });

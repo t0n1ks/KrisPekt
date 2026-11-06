@@ -1,6 +1,7 @@
 import type { Camera } from '../canvas/Camera';
 import type { PageLayout } from '../canvas/PageLayout';
 import type { Background, Page } from '../core/types';
+import { ItemBindings } from '../domain/ItemBindings';
 import { PageSizePolicy } from '../domain/PageSizePolicy';
 import type { PageSizes } from '../domain/PageSizes';
 import type { I18n } from '../i18n/I18n';
@@ -142,7 +143,12 @@ export class PageOperations {
     // Blobs are only removed once no page uses them, so the copy can share them with the original.
     // Items get ids of their own: a selection moved onto the copy must not end up with two items
     // of one id.
-    const fresh = <T extends { id: string }>(item: T): T => ({ ...item, id: this.deps.makeId() });
+    const copies = new Map<string, string>();
+    const fresh = <T extends { id: string }>(item: T): T => {
+      const id = this.deps.makeId();
+      copies.set(item.id, id);
+      return { ...item, id };
+    };
     const copy: Page = {
       ...PageRepository.toRecord(page),
       id: this.deps.makeId(),
@@ -150,8 +156,13 @@ export class PageOperations {
       texts: page.texts.map(fresh),
       images: page.images.map(fresh),
       cards: page.cards.map(fresh),
+      anchors: [],
+      inkLinks: [],
       updatedAt: Date.now(),
     };
+    // Anchors get new ids: links lead to the original, and a copy can be linked to on its own.
+    copy.anchors = ItemBindings.copiedAnchors(page.anchors, copies, this.deps.makeId);
+    copy.inkLinks = ItemBindings.copiedInkLinks(page.inkLinks, copies, this.deps.makeId);
     this.insert(page, [copy]);
     this.deps.viewport.scrollTo(copy);
   }

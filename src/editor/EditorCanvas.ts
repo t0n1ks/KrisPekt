@@ -2,6 +2,8 @@ import { BitmapCache } from '../canvas/BitmapCache';
 import { BrushRegistry } from '../canvas/brushes/BrushRegistry';
 import { Camera } from '../canvas/Camera';
 import { CardPainter, type CardLabels } from '../canvas/CardPainter';
+import { LinkGeometry } from '../canvas/LinkGeometry';
+import { LinkMarkPainter } from '../canvas/LinkMarkPainter';
 import { LiveLayer } from '../canvas/LiveLayer';
 import { PageCache, type SkipInfo } from '../canvas/PageCache';
 import { PageLayout } from '../canvas/PageLayout';
@@ -15,7 +17,7 @@ import { StrokeGeometry } from '../canvas/StrokeGeometry';
 import { StrokePainter } from '../canvas/StrokePainter';
 import { TextLayout } from '../canvas/TextLayout';
 import { ThemeColors } from '../canvas/ThemeColors';
-import type { Page, Preferences, Stroke, TextItem, ToolKind } from '../core/types';
+import type { LinkTarget, Page, Preferences, Stroke, TextItem, ToolKind } from '../core/types';
 import { byId, context2d } from '../core/utils/dom';
 import { History } from '../domain/History';
 import { TouchClassifier } from '../domain/TouchClassifier';
@@ -36,6 +38,7 @@ import { TextTool } from '../tools/TextTool';
 import type { Tool } from '../tools/Tool';
 import type { ToolContext } from '../tools/ToolContext';
 import { ToolManager } from '../tools/ToolManager';
+import { BindingKeeper } from './BindingKeeper';
 import { EditorSession } from './EditorSession';
 import { ScratchOutController, type ScratchReport } from './ScratchOutController';
 import { UndoController } from './UndoController';
@@ -81,6 +84,8 @@ export interface EditorCanvasDeps {
   saveQueue: SaveQueue;
   makeId: () => string;
   cardLabels: CardLabels;
+  /** Whether a link's target is gone. */
+  isLinkBroken: (link: LinkTarget) => boolean;
   hooks: EditorCanvasHooks;
 }
 
@@ -98,7 +103,9 @@ export class EditorCanvas {
   readonly brushes = new BrushRegistry();
   readonly geometry = new StrokeGeometry((stroke) => this.brushes.forStroke(stroke).maxHalfWidth(stroke.s));
   readonly strokes = new StrokePainter(this.brushes, new PencilGrain());
-  readonly texts = new TextLayout(context2d(document.createElement('canvas')));
+  readonly texts: TextLayout;
+  readonly linkGeometry: LinkGeometry;
+  readonly bindings: BindingKeeper;
   readonly cards: CardPainter;
   readonly ruler = new Ruler();
   readonly history = new History();
@@ -120,15 +127,40 @@ export class EditorCanvas {
 
   constructor(private readonly deps: EditorCanvasDeps) {
     const { hooks, saveQueue } = deps;
+    this.texts = new TextLayout(context2d(document.createElement('canvas')), deps.isLinkBroken);
+    this.linkGeometry = new LinkGeometry(this.geometry, this.texts);
     this.session = new EditorSession(
       () => this.renderer.request(),
-      (page) => saveQueue.markPageDirty(page),
-      () => saveQueue.markNotebookDirty(),
+      (page) => {
+        this.bindings.pageChanged(page);
+        saveQueue.markPageDirty(page);
+      },
+      () => {
+        this.bindings.listChanged();
+        saveQueue.markNotebookDirty();
+      },
     );
+    this.bindings = new BindingKeeper({
+      session: this.session,
+      geometry: this.linkGeometry,
+      markNotebookDirty: () => saveQueue.markNotebookDirty(),
+    });
     this.bitmaps = new BitmapCache(deps.blobs);
     this.bitmaps.setLoadedHandler((id) => this.onBitmapLoaded(id));
     this.cards = new CardPainter(context2d(document.createElement('canvas')), deps.cardLabels);
-    this.painter = new PagePainter(new PatternPainter(), this.strokes, this.texts, this.bitmaps, this.cards);
+    const linkMarks = new LinkMarkPainter(
+      this.linkGeometry,
+      deps.isLinkBroken,
+      () => deps.prefs.anchorMarkers,
+    );
+    this.painter = new PagePainter(
+      new PatternPainter(),
+      this.strokes,
+      this.texts,
+      this.bitmaps,
+      this.cards,
+      linkMarks,
+    );
     this.cache = new PageCache(this.painter, this.strokes);
     this.renderer = this.createRenderer();
     this.live = new LiveLayer(this.liveCanvas, this.camera, this.layout);

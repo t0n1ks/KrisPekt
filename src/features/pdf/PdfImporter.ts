@@ -81,7 +81,8 @@ export class PdfImporter {
       return null;
     }
     try {
-      return await pdfjs.getDocument(PdfLoader.documentOptions(new Uint8Array(await file.arrayBuffer()))).promise;
+      return await pdfjs.getDocument(PdfLoader.documentOptions(new Uint8Array(await file.arrayBuffer())))
+        .promise;
     } catch {
       notify(i18n.t('pdfOpenFail'), 3500);
       return null;
@@ -135,6 +136,8 @@ export class PdfImporter {
       texts: [],
       images: [],
       cards: [],
+      anchors: [],
+      inkLinks: [],
       updatedAt: Date.now(),
     };
   }

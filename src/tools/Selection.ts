@@ -2,6 +2,7 @@ import { MM, PAPER } from '../core/constants';
 import type { Box, Page, Point, TextItem } from '../core/types';
 import { clamp } from '../core/utils/math';
 import { CardRules } from '../domain/CardRules';
+import { ItemBindings } from '../domain/ItemBindings';
 import { ItemTransform, type ItemMapping, type PageItems } from '../domain/ItemTransform';
 import { RichText } from '../domain/RichText';
 import { SelectionClipboard } from '../domain/SelectionClipboard';
@@ -9,6 +10,7 @@ import { SelectionPlacement, type Rect } from '../domain/SelectionPlacement';
 import type { BitmapCache } from '../canvas/BitmapCache';
 import type { Camera } from '../canvas/Camera';
 import type { CardPainter } from '../canvas/CardPainter';
+import { LinkGeometry } from '../canvas/LinkGeometry';
 import type { LiveLayer, OverlayPainter } from '../canvas/LiveLayer';
 import type { PageLayout } from '../canvas/PageLayout';
 import type { StrokeGeometry } from '../canvas/StrokeGeometry';
@@ -62,8 +64,11 @@ export class Selection implements OverlayPainter {
   private state: SelectionState | null = null;
   private tokenSeq = 0;
   private readonly clipboard = new SelectionClipboard();
+  private readonly boxes: LinkGeometry;
 
-  constructor(private readonly deps: SelectionDeps) {}
+  constructor(private readonly deps: SelectionDeps) {
+    this.boxes = new LinkGeometry(deps.geometry, deps.texts);
+  }
 
   get current(): SelectionState | null {
     return this.state;
@@ -219,6 +224,7 @@ export class Selection implements OverlayPainter {
       images: [...target.images, ...arrived.images],
       cards: [...target.cards, ...arrived.cards],
     });
+    ItemBindings.carry(source, target, ids);
     this.deps.session.touch(source);
     this.deps.session.touch(target);
   }
@@ -253,7 +259,8 @@ export class Selection implements OverlayPainter {
     const s = this.state;
     if (!s) return false;
     const box = { x0: s.box.x, y0: s.box.y, x1: s.box.x + s.box.w, y1: s.box.y + s.box.h };
-    this.clipboard.copy(ItemTransform.split(s.page, s.ids).picked, box);
+    const links = s.page.inkLinks.filter((link) => link.items.every((id) => s.ids.has(id)));
+    this.clipboard.copy(ItemTransform.split(s.page, s.ids).picked, box, links);
     return true;
   }
 
@@ -286,6 +293,7 @@ export class Selection implements OverlayPainter {
     page.texts = [...page.texts, ...items.texts];
     page.images = [...page.images, ...items.images];
     page.cards = [...page.cards, ...items.cards];
+    page.inkLinks = [...page.inkLinks, ...items.inkLinks];
     this.deps.session.touch(page);
     const ids = [...items.strokes, ...items.texts, ...items.images, ...items.cards].map((item) => item.id);
     this.set(page, new Set(ids));
@@ -327,15 +335,18 @@ export class Selection implements OverlayPainter {
       ItemTransform.translation(off + shift.x, off + shift.y),
     );
     const ids = new Set<string>();
+    const copied = new Map<string, string>();
     const fresh = <T extends { id: string }>(item: T): T => {
       const copy = { ...item, id: this.deps.makeId() };
       ids.add(copy.id);
+      copied.set(item.id, copy.id);
       return copy;
     };
     p.strokes = [...p.strokes, ...copies.strokes.map(fresh)];
     p.texts = [...p.texts, ...copies.texts.map(fresh)];
     p.images = [...p.images, ...copies.images.map(fresh)];
     p.cards = [...p.cards, ...copies.cards.map(fresh)];
+    p.inkLinks = [...p.inkLinks, ...ItemBindings.copiedInkLinks(p.inkLinks, copied, this.deps.makeId)];
     this.deps.session.touch(p);
     this.set(p, ids);
   }
@@ -403,30 +414,11 @@ export class Selection implements OverlayPainter {
 
   /** Bounding box of one item on a page. */
   itemBox(page: Page, id: string): Box | null {
-    const st = page.strokes.find((s) => s.id === id);
-    if (st) return this.deps.geometry.bbox(st);
-    const t = page.texts.find((x) => x.id === id);
-    if (t) return this.deps.texts.box(t);
-    const im = page.images.find((x) => x.id === id);
-    if (im) return { x0: im.x, y0: im.y, x1: im.x + im.w, y1: im.y + im.h };
-    const card = page.cards.find((x) => x.id === id);
-    return card ? CardRules.box(card) : null;
+    return this.boxes.itemBox(page, id);
   }
 
   private boundsOf(page: Page, ids: Set<string>): Box | null {
-    let x0 = Infinity;
-    let y0 = Infinity;
-    let x1 = -Infinity;
-    let y1 = -Infinity;
-    for (const id of ids) {
-      const b = this.itemBox(page, id);
-      if (!b) continue;
-      x0 = Math.min(x0, b.x0);
-      y0 = Math.min(y0, b.y0);
-      x1 = Math.max(x1, b.x1);
-      y1 = Math.max(y1, b.y1);
-    }
-    return Number.isFinite(x0) ? { x0, y0, x1, y1 } : null;
+    return this.boxes.itemsBox(page, ids);
   }
 
   private requireState(): SelectionState {

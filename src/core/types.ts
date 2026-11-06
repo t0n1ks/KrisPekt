@@ -40,6 +40,13 @@ export interface NotebookView {
   z: number;
 }
 
+/** An anchor as the notebook lists it; see `AnchorMarks`. */
+export interface AnchorMark {
+  id: string;
+  pageId: string;
+  name: string;
+}
+
 export interface Notebook {
   id: string;
   subjectId: string;
@@ -59,6 +66,8 @@ export interface Notebook {
   view: NotebookView | null;
   /** The zoom the user locked this notebook at; absent means unlocked. */
   zoomLock?: number;
+  /** Its anchors, derived from its pages, so links can be checked without loading any page. */
+  marks?: AnchorMark[];
 }
 
 /**
@@ -87,11 +96,15 @@ export interface StrokeLike {
 }
 
 /** Character styling. An absent field means the box's own size or colour, or "off". */
-/**
- * Where a link leads. Only web addresses for now; further kinds (pages, notebooks) are added here,
- * and everything that opens a link goes through this type.
- */
-export type LinkTarget = { kind: 'url'; href: string };
+/** A web address. */
+export type UrlLink = { kind: 'url'; href: string };
+
+/** A place in the notes, named by ids, so that it survives pages being reordered. */
+export type InternalLink =
+  { kind: 'anchor' | 'page'; nb: string; id: string } | { kind: 'notebook'; nb: string };
+
+/** Where a link leads. Everything that opens a link goes through this type. */
+export type LinkTarget = UrlLink | InternalLink;
 
 export interface TextStyle {
   /** Font size in world px. */
@@ -140,6 +153,8 @@ export interface TextItem {
   auto?: true;
   /** The styled text. */
   paras?: TextParagraph[];
+  /** A table of contents, which the app can write again; otherwise an ordinary box. */
+  toc?: true;
 }
 
 export interface ImageItem {
@@ -182,11 +197,39 @@ export interface PdfCard extends CardBase {
 /** A web link. No preview, title or icon is ever fetched for it. */
 export interface LinkCard extends CardBase {
   kind: 'link';
-  link: LinkTarget;
+  link: UrlLink;
   title: string;
 }
 
 export type CardItem = PdfCard | LinkCard;
+
+/** A rectangle on a page, in world px. */
+export interface PageRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** A place in the notes that links can lead to. */
+export interface Anchor {
+  id: string;
+  name: string;
+  /** The items it covers, and it moves with them. None: the whole page. */
+  items: string[];
+  /** A stretch of the text box in `items`, by character offsets. */
+  range?: [number, number];
+  /** Where the items last were; stands in when they cannot be measured. */
+  rect: PageRect;
+}
+
+/** Handwriting (or any other items) that works as a link, and moves with them. */
+export interface InkLink {
+  id: string;
+  items: string[];
+  rect: PageRect;
+  link: LinkTarget;
+}
 
 export interface Page {
   id: string;
@@ -205,6 +248,9 @@ export interface Page {
   images: ImageItem[];
   /** Attachment cards; pages stored before they existed load with none. */
   cards: CardItem[];
+  /** Anchors and ink links live on the page, so one undo step restores them with its items. */
+  anchors: Anchor[];
+  inkLinks: InkLink[];
   updatedAt: number;
 }
 
@@ -297,6 +343,10 @@ export interface Preferences {
   exp: ExportPrefs;
   /** Scribbling over content deletes it. */
   scratch: ScratchPrefs;
+  /** Bookmark markers on the pages; never in exports. */
+  anchorMarkers: boolean;
+  /** Places recently linked to, newest first. */
+  recentLinks: InternalLink[];
   /** Pinned tool presets, at most twelve. */
   presets?: ToolPreset[];
   /** Toolbar order and hidden items; the default layout when absent. */

@@ -2,6 +2,7 @@ import { MM, PAPER } from '../core/constants';
 import type { Page, Stroke } from '../core/types';
 import type { BitmapCache } from './BitmapCache';
 import type { CardPainter } from './CardPainter';
+import type { LinkMarkPainter } from './LinkMarkPainter';
 import type { PathSink } from './brushes/PathSink';
 import type { DrawSink } from './draw/DrawSink';
 import type { PatternPainter } from './PatternPainter';
@@ -24,7 +25,7 @@ export interface SceneOptions {
    * them first keeps ink on top of them, as the multiply blend does on screen.
    */
   highlightersFirst?: boolean;
-  /** The ⋮ button on cards; only on screen. */
+  /** The ⋮ button on cards and the bookmark markers; only on screen. */
   cardChrome?: boolean;
 }
 
@@ -46,6 +47,7 @@ export class PagePainter {
     private readonly texts: TextLayout,
     private readonly bitmaps: BitmapCache,
     private readonly cards: CardPainter,
+    private readonly linkMarks: Pick<LinkMarkPainter, 'emitInkLinks' | 'emitMarkers'>,
   ) {}
 
   /** Emits a page into any drawing backend. */
@@ -69,6 +71,8 @@ export class PagePainter {
       if (!skip?.has(st.id)) this.strokes.emit(sink, st);
     }
     for (const t of page.texts) if (!skip?.has(t.id)) this.texts.emit(sink, t);
+    this.linkMarks.emitInkLinks(sink, page, skip);
+    if (options.cardChrome) this.linkMarks.emitMarkers(sink, page, skip);
   }
 
   /** Paints a page on a canvas in its current transform (screen, thumbnails, PNG and raster PDF). */

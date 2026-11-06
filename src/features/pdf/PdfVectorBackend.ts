@@ -25,6 +25,8 @@ export interface PdfVectorOptions {
   pencilTone: number;
   /** Images of the page by blob id; null when one could not be read. */
   images: ReadonlyMap<string, PdfImage | null>;
+  /** The page of this file an internal link leads to, if it is in the file. */
+  pageOf: (link: LinkTarget) => number | null;
 }
 
 /** The slant of synthetic italic: what Chromium applies to a font without an italic face. */
@@ -148,6 +150,11 @@ export class PdfVectorBackend implements DrawSink<PathRecorder> {
   /** A clickable link annotation. The address was validated when it entered the app. */
   link(x: number, y: number, w: number, h: number, target: LinkTarget): void {
     const k = this.options.k;
+    if (target.kind !== 'url') {
+      const pageNumber = this.options.pageOf(target);
+      if (pageNumber !== null) this.doc.link(x * k, y * k, w * k, h * k, { pageNumber, magFactor: 'Fit' });
+      return;
+    }
     // Brackets end a PDF string, so they are percent-encoded, which means the same in a URL.
     const url = target.href.replace(/[()\\]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
     this.doc.link(x * k, y * k, w * k, h * k, { url });

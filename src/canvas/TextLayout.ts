@@ -1,4 +1,4 @@
-import { TEXT_LINE_HEIGHT } from '../core/constants';
+import { PAPER, TEXT_LINE_HEIGHT } from '../core/constants';
 import type { Box, LinkTarget, TextItem } from '../core/types';
 import { RichText } from '../domain/RichText';
 import { RichTextLayout, type LaidGlyph, type LaidText, type TextMeasurer } from '../domain/RichTextLayout';
@@ -13,6 +13,8 @@ const STRIKE_AT = 0.27;
 const DECORATION_THICKNESS = 0.07;
 /** Onest's ascent share of its em box, when the measurer cannot tell. */
 const FALLBACK_EM_ASCENT = 970 / 1275;
+/** A broken link's underline is dashed, so that colour is not the only difference. */
+const BROKEN_DASH = 0.45;
 
 /** The drawing commands text needs. */
 export interface TextSink {
@@ -35,7 +37,11 @@ export class TextLayout {
   private laidCache = new WeakMap<TextItem, LaidText>();
   private readonly rich: RichTextLayout;
 
-  constructor(private readonly measurer: TextMeasurer) {
+  constructor(
+    private readonly measurer: TextMeasurer,
+    /** Whether a link's target is gone. Asked when drawing: the target may go at any time. */
+    private readonly isBroken: (link: LinkTarget) => boolean = () => false,
+  ) {
     this.rich = new RichTextLayout(measurer);
   }
 
@@ -194,7 +200,7 @@ export class TextLayout {
     if (!sink.link) return;
     for (const line of this.laid(item).lines) {
       for (const run of line.runs) {
-        if (!run.style.link || !run.text.trim()) continue;
+        if (!run.style.link || !run.text.trim() || this.isBroken(run.style.link)) continue;
         sink.link(item.x + run.x, item.y + line.top, run.width, line.height, run.style.link);
       }
     }
@@ -207,7 +213,11 @@ export class TextLayout {
       if (line.marker) {
         out.push(TextLayout.run(line.marker.text, item.x, baseline, line.marker.style));
       }
-      for (const run of line.runs) out.push(TextLayout.run(run.text, item.x + run.x, baseline, run.style));
+      for (const run of line.runs) {
+        const broken = run.style.link !== undefined && this.isBroken(run.style.link);
+        const style = broken ? { ...run.style, c: PAPER.linkBroken } : run.style;
+        out.push(TextLayout.run(run.text, item.x + run.x, baseline, style));
+      }
     }
     return out;
   }
@@ -224,6 +234,19 @@ export class TextLayout {
     return run;
   }
 
+  private static dashes(
+    sink: TextSink,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    dash: number,
+  ): void {
+    for (let at = 0; at < width; at += dash * 2) {
+      sink.fillRect(x + at, y, Math.min(dash, width - at), height, PAPER.linkBroken);
+    }
+  }
+
   /** Underline and strikethrough as thin rectangles, the same on screen and in every export. */
   private emitDecorations(sink: TextSink, item: TextItem): void {
     for (const line of this.laid(item).lines) {
@@ -233,6 +256,11 @@ export class TextLayout {
         if (!run.text.trim() || (!u && !s)) continue;
         const thickness = Math.max(0.5, fs * DECORATION_THICKNESS);
         const x = item.x + run.x;
+        if (run.style.link && this.isBroken(run.style.link)) {
+          const y = baseline + fs * UNDERLINE_AT;
+          TextLayout.dashes(sink, x, y, run.width, thickness, fs * BROKEN_DASH);
+          continue;
+        }
         if (u) sink.fillRect(x, baseline + fs * UNDERLINE_AT, run.width, thickness, c);
         if (s) sink.fillRect(x, baseline - fs * STRIKE_AT, run.width, thickness, c);
       }

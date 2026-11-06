@@ -65,6 +65,10 @@ export const PAPER = {
   eraserRing: 'rgba(30,40,60,.7)',
   /** Linked words on the page. */
   link: '#1D4ED8',
+  /** A link whose target was deleted. */
+  linkBroken: '#B3261E',
+  /** The bookmark marker at an anchor. */
+  anchorMark: '#C9822B',
   cardFill: '#F6F8FB',
   cardEdge: '#C5CFDC',
   cardTitle: '#1B2433',
@@ -254,6 +258,8 @@ export const DEFAULT_PREFS: Preferences = {
   twoFingerScroll: false,
   straighten: true,
   scratch: { on: true, level: 'normal', hints: 0 },
+  anchorMarkers: true,
+  recentLinks: [],
   seeded: false,
   blobSweepDue: true,
   autoBackup: '3days',
@@ -380,6 +386,18 @@ export const PINCH_ZOOM_SLOP_PX = 20;
 export const PINCH_SPREAD_PER_TRAVEL = 0.5;
 /** "Zoom locked at …" appears at most this often when a gesture tries to zoom. */
 export const ZOOM_LOCK_HINT_MS = 5000;
+
+/* ---------- anchors and internal links ---------- */
+
+export const MAX_ANCHOR_NAME = 80;
+/** How many jumps "Back" remembers. */
+export const NAV_HISTORY_LIMIT = 20;
+/** How long the place a link led to stays highlighted; the animation in editor.css matches. */
+export const JUMP_HIGHLIGHT_MS = 1000;
+/** Recently used link targets offered first. */
+export const MAX_RECENT_LINKS = 6;
+/** The text of a new table of contents, in world px. */
+export const CONTENTS_FONT_SIZE = 16;
 
 /* ---------- import / export limits ---------- */
 

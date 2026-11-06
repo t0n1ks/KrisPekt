@@ -68,6 +68,8 @@ export class PageRepository {
       texts: p.texts,
       images: p.images,
       cards: p.cards,
+      anchors: p.anchors,
+      inkLinks: p.inkLinks,
       updatedAt: p.updatedAt || Date.now(),
     };
   }

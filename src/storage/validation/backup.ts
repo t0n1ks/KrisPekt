@@ -7,6 +7,7 @@ import {
 } from '../../core/constants';
 import type { Notebook, Page, Subject } from '../../core/types';
 import { base64DecodedLength, sniffBytes } from '../../core/utils/files';
+import { AnchorMarks } from '../../domain/AnchorMarks';
 import { ValidationError, asArray, asId, asOneOf, asRecord, asString, optionalArray } from './guards';
 import { parseNotebook, parsePage, parseSubject } from './records';
 
@@ -66,6 +67,18 @@ function assertUniqueIds(items: readonly { id: string }[], path: string): void {
 }
 
 /**
+ * A notebook's list of anchors comes from its pages, whatever the file says: a list that disagrees
+ * could otherwise make links look valid or broken when they are not.
+ */
+function withDerivedMarks(notebook: Notebook, pages: readonly Page[]): Notebook {
+  const own = new Map(pages.filter((page) => page.nbId === notebook.id).map((page) => [page.id, page]));
+  const ordered = notebook.pageIds.flatMap((id) => own.get(id) ?? []);
+  const { marks: _untrusted, ...rest } = notebook;
+  const marks = AnchorMarks.of(ordered);
+  return marks.length ? { ...rest, marks } : rest;
+}
+
+/**
  * Validates a parsed backup JSON value. Accepts files written by KrisPekt (`app: 'krispekt'`)
  * and by its predecessor (`app: 'konspektnik'`). Throws ValidationError on any mismatch,
  * so a file is either imported whole or not at all.
@@ -83,5 +96,6 @@ export function parseBackup(raw: unknown): BackupDocument {
   assertUniqueIds(doc.notebooks, 'notebooks');
   assertUniqueIds(doc.pages, 'pages');
   assertUniqueIds(doc.blobs, 'blobs');
+  doc.notebooks = doc.notebooks.map((notebook) => withDerivedMarks(notebook, doc.pages));
   return doc;
 }

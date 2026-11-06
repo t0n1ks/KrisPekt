@@ -18,6 +18,7 @@ import type {
   ExportFormat,
   ExportPrefs,
   ExportScope,
+  InternalLink,
   PenPrefs,
   Preferences,
   TextPrefs,
@@ -27,7 +28,9 @@ import { toClampedNumber } from '../core/utils/math';
 import { ERASER_RANGE, HL_RANGE, TEXT_SIZE_RANGE } from '../domain/ToolPresets';
 import { isLanguage } from '../i18n/I18n';
 import { ToolbarPrefsParser } from './ToolbarPrefsParser';
+import { MAX_RECENT_LINKS } from '../core/constants';
 import { COLOR_PATTERN, isRecord, type UnknownRecord } from './validation/guards';
+import { parseInternalLink } from './validation/records';
 
 /** Value ranges for tool settings (match the sliders and text presets). */
 export const PREF_RANGES = {
@@ -41,6 +44,18 @@ const MAX_TIMESTAMP = 8.64e15;
 
 function color(raw: unknown, fallback: string): string {
   return typeof raw === 'string' && COLOR_PATTERN.test(raw) ? raw : fallback;
+}
+
+/** Valid entries only: a damaged one is dropped, and costs no more than a shorter list. */
+function recentLinks(raw: unknown): InternalLink[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, MAX_RECENT_LINKS).flatMap((value) => {
+    try {
+      return [parseInternalLink(value, 'recentLinks')];
+    } catch {
+      return [];
+    }
+  });
 }
 
 function bool(raw: unknown, fallback: boolean): boolean {
@@ -190,6 +205,8 @@ export class PreferencesStore {
       lastBackupBytes: toClampedNumber(raw.lastBackupBytes, 0, Number.MAX_SAFE_INTEGER, d.lastBackupBytes),
       lastChangeAt: toClampedNumber(raw.lastChangeAt, 0, MAX_TIMESTAMP, d.lastChangeAt),
       exp: exportPrefs(section(raw, 'exp')),
+      anchorMarkers: bool(raw.anchorMarkers, d.anchorMarkers),
+      recentLinks: recentLinks(raw.recentLinks),
     };
     if (isLanguage(raw.lang)) prefs.lang = raw.lang;
     const presets = ToolbarPrefsParser.presets(raw.presets);

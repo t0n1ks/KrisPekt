@@ -75,6 +75,8 @@ export class PageSizePolicy {
       texts: [],
       images: [],
       cards: [],
+      anchors: [],
+      inkLinks: [],
       updatedAt: Date.now(),
     };
   }
