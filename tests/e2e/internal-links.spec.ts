@@ -489,14 +489,19 @@ async function firstLinkPixel(page: Page): Promise<{ x: number; y: number }> {
     if (!ctx) return null;
     ctx.drawImage(image, 0, 0);
     const { data: px, width, height } = ctx.getImageData(0, 0, image.width, image.height);
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const at = (y * width + x) * 4;
-        const [r, g, b] = [px[at] ?? 0, px[at + 1] ?? 0, px[at + 2] ?? 0];
-        if (r < 70 && g < 110 && b > 190) return { x, y };
-      }
-    }
-    return null;
+    const isLink = (x: number, y: number): boolean => {
+      const at = (y * width + x) * 4;
+      return (px[at] ?? 0) < 70 && (px[at + 1] ?? 0) < 110 && (px[at + 2] ?? 0) > 190;
+    };
+    const columns = Array.from({ length: width }, (_, x) => x);
+    const rows = Array.from({ length: height }, (_, y) => y);
+    const top = rows.find((y) => columns.some((x) => isLink(x, y)));
+    if (top === undefined) return null;
+    // The topmost pixel can be any glyph of the line, even its last (fonts differ by system), and
+    // the caller's point moves right from here. So x comes from the left edge of the line.
+    const line = rows.slice(top, top + 12);
+    const left = columns.find((x) => line.some((y) => isLink(x, y)));
+    return left === undefined ? null : { x: left, y: top };
   }, shot.toString('base64'));
   if (!found) throw new Error('no link on screen');
   return { x: stage.x + found.x + 8, y: stage.y + found.y + 2 };
