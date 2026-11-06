@@ -1,0 +1,12 @@
+title = "KrisPekt secret scan"
+
+[extend]
+useDefault = true
+
+# The name of the localStorage key looks like a credential to the generic rule because it is
+# assigned to a variable called "key". Only this exact value is allowed: anything longer or
+# different is still reported, in any file.
+[[allowlists]]
+description = "The localStorage key name, which is not a secret"
+regexTarget = "secret"
+regexes = ['''^konspektnik\.prefs\.v1$''']

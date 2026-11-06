@@ -70,7 +70,12 @@ The repository is **public**. Anything pushed can be seen and copied by anyone, 
 ### How to commit
 - Write `.gitignore` **before** the first `git add`.
 - Never use `git add .` or `git add -A` blindly. Before every commit, run `git status` and `git diff --cached --stat`, and check that every staged file is intended. Flag any file over 1 MB that is not an intended asset.
-- Before the first push, scan for secrets (for example `npx gitleaks detect --no-git -v`, or `gitleaks` if installed). Repeat the scan before later pushes.
+- **Secret scan before every push.** A finding, or a scan that could not run, must stop the push.
+  - The `.githooks/pre-push` hook runs `scripts/secret-scan.sh` (gitleaks, pinned version, needs Go) and cancels the push on any non-zero exit. It is switched on per clone: `git config core.hooksPath .githooks`. Check that this prints `.githooks` before pushing: `git config --get core.hooksPath`.
+  - Procedure: `sh scripts/secret-scan.sh` on its own line and read the result, then `git push`, and report the scan result to the owner.
+  - Never pipe the scan into `tail`, `head`, `grep` or anything else, and never chain a push after a pipeline that contains it: a pipe reports the exit code of its last command, which is how a failed scan once went unnoticed.
+  - Never use `git push --no-verify`, and never unset `core.hooksPath`, to get past the hook.
+  - On a finding: stop and look at it. A false positive goes into `.gitleaks.toml` as one exact value (`^value$`), never as a broad pattern, a whole file or a whole rule. Anything else is a real secret: see the last point of this list.
 - **Author email:**
   - Commits show the author email publicly.
   - Before the first commit, ask the owner whether to use their GitHub no-reply address (`<id>+<username>@users.noreply.github.com`) for this repository: `git config user.email ...` in this repository only.

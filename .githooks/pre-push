@@ -1,0 +1,19 @@
+#!/bin/sh
+# Blocks a push when the secret scan finds anything or cannot run. Git passes one line per ref on
+# standard input, and any non-zero exit here cancels the whole push.
+set -eu
+
+all_zeros='^0+$'
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # A deleted branch has nothing to scan.
+  if printf '%s' "$local_sha" | grep -Eq "$all_zeros"; then
+    continue
+  fi
+  echo "pre-push: scanning $local_ref for secrets"
+  # The scanner must not read the rest of this hook's input.
+  if ! sh scripts/secret-scan.sh "$local_sha" </dev/null; then
+    echo "pre-push: PUSH BLOCKED. Do not bypass this; see section 4A of CLAUDE.md." >&2
+    exit 1
+  fi
+done
