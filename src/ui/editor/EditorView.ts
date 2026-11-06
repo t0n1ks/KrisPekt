@@ -65,6 +65,7 @@ import { InkLinkController } from './InkLinkController';
 import { InputDiagnosticsOverlay } from './InputDiagnosticsOverlay';
 import { LinkNavigator } from './LinkNavigator';
 import { ScratchOutMenu } from './ScratchOutMenu';
+import { PageChip } from './PageChip';
 import { PagesPanel } from './PagesPanel';
 import { RulerWidget } from './RulerWidget';
 import { SelectionBar } from './SelectionBar';
@@ -146,6 +147,8 @@ export class EditorView {
   private readonly inkLinks: InkLinkController;
   private readonly contents: ContentsBlock;
   private readonly anchorsPanel: AnchorsPanel;
+  private readonly pageChip: PageChip;
+  private readonly linkTapTip = new LinkTapTip();
 
   constructor(private readonly deps: EditorViewDeps) {
     const { i18n, sizes, menu } = deps;
@@ -205,6 +208,12 @@ export class EditorView {
       toast: (message) => deps.toast.show(message),
     });
     this.topBar = new TopBar(i18n, sizes, this.topBarHandlers());
+    this.pageChip = new PageChip({
+      open: () => void this.renamePage(c.session.currentPage()),
+      forwardPen: (e) => c.router.down(e),
+      isPalm: (e) => c.router.isPalmTouch(e),
+      writes: () => !c.tools.navigates,
+    });
     this.toolbar = new EditorToolbar({
       stage: c.stage,
       i18n,
@@ -543,7 +552,10 @@ export class EditorView {
       onTwoFingerTap: () => {
         if (this.canvas.undo.undo()) d.toast.show(d.i18n.t('undone'), 1000);
       },
-      onInputSample: (sample) => this.diagnostics.record(sample),
+      onInputSample: (sample) => {
+        this.diagnostics.record(sample);
+        this.pageChip.input(sample);
+      },
       onScratchReport: (report) => this.diagnostics.noteScratch(report),
       onScratchHint: () => this.showScratchHint(),
       settle: () => this.settle(),
@@ -574,7 +586,6 @@ export class EditorView {
       title: () => this.deps.actions.editNotebook(c().session.nb),
       zoom: (anchor: HTMLElement) => this.deps.menu.show(anchor, this.zoom.entries()),
       lock: () => this.openPageSettings(c().session.currentPage()),
-      pageTitle: () => void this.renamePage(c().session.currentPage()),
       pages: () => {
         this.settle();
         this.popover.close();

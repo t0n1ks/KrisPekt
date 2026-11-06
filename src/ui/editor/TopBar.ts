@@ -12,7 +12,6 @@ export interface TopBarHandlers {
   lock(): void;
   pages(): void;
   /** The page's number or title was tapped. */
-  pageTitle(): void;
   more(anchor: HTMLElement): void;
 }
 
@@ -47,7 +46,6 @@ export class TopBar {
     bind(this.zoom, () => handlers.zoom(this.zoom));
     bind(this.lock, handlers.lock);
     bind(this.pages, handlers.pages);
-    bind(this.pageChip, handlers.pageTitle);
     bind(this.moreButton, () => handlers.more(this.moreButton));
   }
 
