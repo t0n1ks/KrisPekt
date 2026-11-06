@@ -58,6 +58,22 @@ export class BlobRepository {
     return this.db.sweepBlobs(referencedBlobs, (id) => inUse.has(id) || this.savedNow.has(id));
   }
 
+  /**
+   * Deletes these blobs unless a stored page references them or they are in `inUse`. A blob may
+   * be shared: an item copied between notebooks, or the same PDF attached twice.
+   * Returns how many were spared because of `inUse` or having just been saved.
+   */
+  async deleteUnreferenced(ids: ReadonlySet<string>, inUse: ReadonlySet<string>): Promise<number> {
+    let spared = 0;
+    await this.db.sweepBlobs(referencedBlobs, (id) => {
+      if (!ids.has(id)) return true;
+      const keep = inUse.has(id) || this.savedNow.has(id);
+      if (keep) spared++;
+      return keep;
+    });
+    return spared;
+  }
+
   deleteMany(ids: readonly string[]): Promise<void> {
     return this.db.deleteMany('blobs', ids);
   }

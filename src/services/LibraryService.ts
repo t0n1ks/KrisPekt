@@ -35,6 +35,10 @@ export class LibraryService {
     private readonly makeId: () => string,
     /** Content was written (used to decide whether an automatic backup is needed). */
     private readonly onChange: () => void = () => undefined,
+    /** Blobs that stored pages may not reference but the app still needs (the lasso's clipboard). */
+    private readonly blobsInUse: () => ReadonlySet<string> = () => new Set(),
+    /** Blobs were left for a later cleanup. */
+    private readonly onBlobsSpared: () => void = () => undefined,
   ) {}
 
   /** (Re)loads subjects and notebooks from storage. */
@@ -203,11 +207,12 @@ export class LibraryService {
     return baseChanged;
   }
 
-  /** Deletes a notebook with its pages and every image they use. */
+  /** Deletes a notebook with its pages and every blob that nothing else uses. */
   async deleteNotebook(nb: Notebook): Promise<void> {
     const pages = await this.repos.pages.ofNotebook(nb.id);
     await this.repos.pages.deleteMany(pages.map((p) => p.id));
-    await this.repos.blobs.deleteMany([...PageRepository.blobIds(pages)]);
+    const spared = await this.repos.blobs.deleteUnreferenced(PageRepository.blobIds(pages), this.blobsInUse());
+    if (spared) this.onBlobsSpared();
     await this.repos.notebooks.delete(nb.id);
     this.notebooks = this.notebooks.filter((n) => n !== nb);
     this.onChange();

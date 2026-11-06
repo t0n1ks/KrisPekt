@@ -88,7 +88,13 @@ export class App {
       pages: new PageRepository(db, reader),
       blobs: new BlobRepository(db, reader),
     };
-    this.library = new LibraryService(this.repos, uid, () => this.contentChanged());
+    this.library = new LibraryService(
+      this.repos,
+      uid,
+      () => this.contentChanged(),
+      () => this.editor.blobsInUse(),
+      () => this.sweeper.markDue(),
+    );
     this.saveQueue = new SaveQueue(
       this.repos.pages,
       () => this.storageError(),

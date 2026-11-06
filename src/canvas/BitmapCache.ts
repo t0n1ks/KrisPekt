@@ -5,6 +5,11 @@ import type { BlobRepository } from '../storage/BlobRepository';
 /** `false` marks a blob that is missing or could not be decoded, so it is not retried every frame. */
 type Entry = ImageBitmap | false;
 
+/** An entry used this recently is on the page being painted, so it is not evicted. */
+const IN_USE_MS = 2000;
+/** The limit may grow this many times over for one page that needs that many bitmaps. */
+const OVERFLOW_FACTOR = 8;
+
 /**
  * Decoded images and PDF page backgrounds, in an LRU of 8 entries. Rendering asks with
  * {@link get}, which never waits: on a miss it starts loading and calls `onLoaded` when the
@@ -12,6 +17,7 @@ type Entry = ImageBitmap | false;
  */
 export class BitmapCache {
   private readonly entries = new Map<string, Entry>();
+  private readonly lastUsed = new Map<string, number>();
   private readonly loading = new Map<string, Promise<Entry>>();
   private onLoaded: (id: string) => void = () => undefined;
 
@@ -19,6 +25,7 @@ export class BitmapCache {
     private readonly blobs: BlobRepository,
     private readonly decode: (blob: Blob) => Promise<ImageBitmap> = (b) => createImageBitmap(b),
     private readonly limit = BITMAP_LRU_SIZE,
+    private readonly clock: () => number = () => performance.now(),
   ) {}
 
   /** Sets the callback for bitmaps that finished loading after a {@link get} miss. */
@@ -72,13 +79,22 @@ export class BitmapCache {
     return out;
   }
 
+  /**
+   * Keeps the entry and evicts the least recently used ones. A page may need more bitmaps than the
+   * limit; evicting those would make each repaint miss, load, and ask for yet another repaint.
+   */
   private remember(id: string, entry: Entry): void {
+    const time = this.clock();
     this.entries.delete(id);
     this.entries.set(id, entry);
+    this.lastUsed.set(id, time);
     while (this.entries.size > this.limit) {
       const oldest = this.entries.keys().next().value;
       if (oldest === undefined) break;
+      const inUse = time - (this.lastUsed.get(oldest) ?? 0) < IN_USE_MS;
+      if (inUse && this.entries.size <= this.limit * OVERFLOW_FACTOR) break;
       this.entries.delete(oldest);
+      this.lastUsed.delete(oldest);
     }
   }
 }
