@@ -59,7 +59,14 @@ function painterParts(): { painter: PagePainter; strokes: StrokePainter; texts: 
   const texts = new TextLayout(measurer);
   const bitmaps = { get: () => null } as unknown as BitmapCache;
   const cards = { emit: () => undefined } as unknown as CardPainter;
-  return { painter: new PagePainter(new PatternPainter(), strokes, texts, bitmaps, cards), strokes, texts };
+  return {
+    painter: new PagePainter(new PatternPainter(), strokes, texts, bitmaps, cards, {
+      emitInkLinks: () => undefined,
+      emitMarkers: () => undefined,
+    }),
+    strokes,
+    texts,
+  };
 }
 
 function points(n: number): number[] {

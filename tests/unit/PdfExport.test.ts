@@ -86,7 +86,15 @@ function exporter(): PdfExporter {
   const strokes = new StrokePainter(new BrushRegistry(), new PencilGrain());
   const bitmaps = { get: () => null } as unknown as BitmapCache;
   const cards = { emit: () => undefined } as unknown as CardPainter;
-  const painter = new PagePainter(new PatternPainter(), strokes, new TextLayout(measurer), bitmaps, cards);
+  const linkMarks = { emitInkLinks: () => undefined, emitMarkers: () => undefined };
+  const painter = new PagePainter(
+    new PatternPainter(),
+    strokes,
+    new TextLayout(measurer),
+    bitmaps,
+    cards,
+    linkMarks,
+  );
   const photo = new Blob([base64Bytes(PHOTO_JPEG)], { type: 'image/jpeg' });
   const blobs = {
     get: (id: string) => Promise.resolve(id === 'photo' ? photo : null),
@@ -159,7 +167,14 @@ describe('vector PDF export', () => {
     const messages: string[] = [];
     const strokes = new StrokePainter(new BrushRegistry(), new PencilGrain());
     const failing = new PdfExporter({
-      painter: new PagePainter(new PatternPainter(), strokes, new TextLayout(measurer), {} as BitmapCache, {} as CardPainter),
+      painter: new PagePainter(
+        new PatternPainter(),
+        strokes,
+        new TextLayout(measurer),
+        {} as BitmapCache,
+        {} as CardPainter,
+        { emitInkLinks: () => undefined, emitMarkers: () => undefined },
+      ),
       rasterizer: {} as PageRasterizer,
       images: new PdfImages({ get: () => Promise.resolve(null) } as unknown as BlobRepository),
       font: new PdfFont(() => Promise.reject(new Error('offline'))),
