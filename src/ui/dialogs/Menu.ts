@@ -61,6 +61,7 @@ export class Menu {
     menu.addEventListener('mousedown', (e) => {
       if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
     });
+    this.ignoreStrayTaps(menu);
     const r = anchor.getBoundingClientRect();
     const mw = menu.offsetWidth;
     const mh = menu.offsetHeight;
@@ -78,6 +79,25 @@ export class Menu {
     this.node = menu;
     // Defer so the click that opened the menu does not close it.
     setTimeout(() => document.addEventListener('pointerdown', this.outside, true), 0);
+  }
+
+  /**
+   * A long press can open a menu under the finger, and lifting the finger then makes the browser
+   * send a click to whatever is there. Only a press that began on the menu counts as a choice, or
+   * an item, even Delete, could run by itself. A click from the keyboard has detail 0.
+   */
+  private ignoreStrayTaps(menu: HTMLElement): void {
+    let pressed = false;
+    menu.addEventListener('pointerdown', () => (pressed = true), true);
+    menu.addEventListener(
+      'click',
+      (e) => {
+        if (pressed || e.detail === 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+      },
+      true,
+    );
   }
 
   /** Whether a menu is open. */

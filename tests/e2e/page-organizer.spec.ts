@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { exportDownload } from './downloads';
 import { pdfInfo, servePdfJs } from './pdf-view';
 
 interface StoredNotebook {
@@ -268,7 +269,7 @@ test('export follows the new order', async ({ page }) => {
   await card.locator('button[aria-haspopup], .notebook-card__more, .icon-btn').first().click();
   await page.getByText('Экспорт…').first().click();
   await page.locator('.sheet').getByText('PDF (вектор').click();
-  const download = page.waitForEvent('download');
+  const download = exportDownload(page);
   await page.locator('.sheet__foot .btn--primary').click();
   const file = await download;
   const path = await file.path();
@@ -546,4 +547,39 @@ test.describe('touch', () => {
     await touch.end();
     await expect(menuItem(page, 'Дублировать')).toBeVisible();
   });
+
+  test('a still long press near the edge of the list does not scroll it', async ({ page }) => {
+    await seedNotebook(
+      page,
+      'Edge',
+      Array.from({ length: 30 }, (_, i) => 'E' + i),
+    );
+    await openNotebook(page, 'Edge');
+    await openOrganizer(page);
+    const touch = await finger(page);
+    await page.locator('#plist').evaluate((list) => (list.scrollTop = 400));
+    const box = await page.locator('#plist').boundingBox();
+    if (!box) throw new Error('no layout');
+    await touch.start(box.x + box.width / 2, box.y + 12);
+    await page.waitForTimeout(650);
+    const scrolled = await page.locator('#plist').evaluate((list) => list.scrollTop);
+    await touch.end();
+    expect(scrolled).toBe(400);
+  });
+});
+
+test('the tap that ends a long press cannot choose from the menu it opened', async ({ page }) => {
+  await seedNotebook(page, 'Stray', ['A', 'B']);
+  await openNotebook(page, 'Stray');
+  await openOrganizer(page);
+  await thumb(page, 0).click({ button: 'right' });
+  const item = menuItem(page, 'Дублировать');
+  await expect(item).toBeVisible();
+  // What a browser may send after lifting a finger: a click with no press on the menu before it.
+  await item.evaluate((node) => node.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+  await expect(item).toBeVisible();
+  expect(await labels(page, 'Stray')).toHaveLength(2);
+  // A real tap on the menu still works.
+  await item.click();
+  await expect.poll(async () => (await labels(page, 'Stray')).length).toBe(3);
 });

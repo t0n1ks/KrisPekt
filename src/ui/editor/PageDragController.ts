@@ -199,7 +199,8 @@ export class PageDragController {
     let speed = 0;
     if (fromTop < EDGE_PX) speed = -MAX_SCROLL_PER_FRAME * (1 - Math.max(fromTop, 0) / EDGE_PX);
     else if (fromBottom < EDGE_PX) speed = MAX_SCROLL_PER_FRAME * (1 - Math.max(fromBottom, 0) / EDGE_PX);
-    if (speed && this.isInside(drag.at)) {
+    // A finger holding still only asks for the page's menu, and the list must stay where it is.
+    if (speed && drag.moved && this.isInside(drag.at)) {
       list.scrollTop += speed;
       this.updateGap(drag);
     }
