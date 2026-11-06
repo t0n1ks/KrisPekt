@@ -391,5 +391,20 @@
   "moveItemRight": "Перемістити праворуч: {item}",
   "showItem": "Показати: {item}",
   "hideItem": "Приховати: {item}",
-  "dragItem": "Перетягнути: {item}"
+  "dragItem": "Перетягнути: {item}",
+  "scratchOut": "Стирати закреслюванням",
+  "scratchOffShort": "вимк.",
+  "scratchOn": "Закреслювання тепер стирає",
+  "scratchOff": "Закреслювання більше не стирає",
+  "scratchLevelLow": "Низька чутливість",
+  "scratchLevelNormal": "Звичайна чутливість",
+  "scratchLevelHigh": "Висока чутливість",
+  "scratchLevelSet": "Закреслювання: {level}",
+  "scratchHint": "Закреслене видалено",
+  "scratchDiagShape": "Останній штрих: розвороти {reversals} (мін. {minReversals}), щільність {density} (мін. {minDensity}), крок {pitch} (макс. {maxPitch}), закрут {winding} (макс. {maxWinding})",
+  "scratchDiagCoverage": "Покриття: видалено {hit} із {near} поруч, найкраще {best}% (мін. {min}%)",
+  "scratchDiagOff": "залишено: закреслювання вимкнено",
+  "scratchDiagWriting": "залишено: схоже на письмо",
+  "scratchDiagNothing": "залишено: нічого не закрито достатньо",
+  "scratchDiagErased": "закреслювання: видалено"
 }

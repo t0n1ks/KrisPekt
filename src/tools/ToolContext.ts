@@ -29,6 +29,8 @@ export interface ToolContext {
   recordUndo(page: Page): void;
   /** Adds a finished stroke to a page (undo, save, incremental cache update). */
   commitStroke(page: Page, stroke: Stroke): void;
+  /** Whether a finished pen stroke was a scribble that deleted what it covers; it is then not added. */
+  scratchOut(page: Page, stroke: Stroke): boolean;
   requestRender(): void;
   requestLive(): void;
   toast(message: string, ms?: number): void;

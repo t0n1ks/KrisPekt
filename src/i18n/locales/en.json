@@ -391,5 +391,20 @@
   "moveItemRight": "Move right: {item}",
   "showItem": "Show: {item}",
   "hideItem": "Hide: {item}",
-  "dragItem": "Drag to move: {item}"
+  "dragItem": "Drag to move: {item}",
+  "scratchOut": "Scratch out to erase",
+  "scratchOffShort": "off",
+  "scratchOn": "Scratching out now erases",
+  "scratchOff": "Scratching out no longer erases",
+  "scratchLevelLow": "Low sensitivity",
+  "scratchLevelNormal": "Normal sensitivity",
+  "scratchLevelHigh": "High sensitivity",
+  "scratchLevelSet": "Scratch out: {level}",
+  "scratchHint": "Crossed-out content deleted",
+  "scratchDiagShape": "Last stroke: reversals {reversals} (min {minReversals}), density {density} (min {minDensity}), pitch {pitch} (max {maxPitch}), winding {winding} (max {maxWinding})",
+  "scratchDiagCoverage": "Coverage: {hit} deleted of {near} nearby, best {best}% (min {min}%)",
+  "scratchDiagOff": "kept: scratch out is off",
+  "scratchDiagWriting": "kept: looks like writing",
+  "scratchDiagNothing": "kept: nothing mostly covered",
+  "scratchDiagErased": "scribble: deleted"
 }

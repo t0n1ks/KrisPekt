@@ -391,5 +391,20 @@
   "moveItemRight": "Nach rechts: {item}",
   "showItem": "Einblenden: {item}",
   "hideItem": "Ausblenden: {item}",
-  "dragItem": "Zum Verschieben ziehen: {item}"
+  "dragItem": "Zum Verschieben ziehen: {item}",
+  "scratchOut": "Durchkritzeln zum Löschen",
+  "scratchOffShort": "aus",
+  "scratchOn": "Durchkritzeln löscht jetzt",
+  "scratchOff": "Durchkritzeln löscht nicht mehr",
+  "scratchLevelLow": "Niedrige Empfindlichkeit",
+  "scratchLevelNormal": "Normale Empfindlichkeit",
+  "scratchLevelHigh": "Hohe Empfindlichkeit",
+  "scratchLevelSet": "Durchkritzeln: {level}",
+  "scratchHint": "Durchgekritzeltes gelöscht",
+  "scratchDiagShape": "Letzter Strich: Umkehrungen {reversals} (min. {minReversals}), Dichte {density} (min. {minDensity}), Abstand {pitch} (max. {maxPitch}), Drehung {winding} (max. {maxWinding})",
+  "scratchDiagCoverage": "Abdeckung: {hit} von {near} in der Nähe gelöscht, beste {best} % (min. {min} %)",
+  "scratchDiagOff": "behalten: Durchkritzeln ist aus",
+  "scratchDiagWriting": "behalten: sieht nach Schrift aus",
+  "scratchDiagNothing": "behalten: nichts ausreichend abgedeckt",
+  "scratchDiagErased": "Gekritzel: gelöscht"
 }

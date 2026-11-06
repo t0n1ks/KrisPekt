@@ -8,6 +8,7 @@ import { PencilGrain } from '../canvas/brushes/PencilGrain';
 import { PagePainter } from '../canvas/PagePainter';
 import { PatternPainter } from '../canvas/PatternPainter';
 import { Renderer } from '../canvas/Renderer';
+import { ScratchFade } from '../canvas/ScratchFade';
 import { StageCanvas } from '../canvas/StageCanvas';
 import { StrokeGeometry } from '../canvas/StrokeGeometry';
 import { StrokePainter } from '../canvas/StrokePainter';
@@ -35,6 +36,7 @@ import type { Tool } from '../tools/Tool';
 import type { ToolContext } from '../tools/ToolContext';
 import { ToolManager } from '../tools/ToolManager';
 import { EditorSession } from './EditorSession';
+import { ScratchOutController, type ScratchReport } from './ScratchOutController';
 import { UndoController } from './UndoController';
 import { Viewport } from './Viewport';
 
@@ -54,6 +56,10 @@ export interface EditorCanvasHooks {
   onZoomBlocked(): void;
   /** Every routed pointer event, for the input diagnostics overlay. */
   onInputSample(sample: InputSample): void;
+  /** How the last pen stroke was judged as a scribble, for the input diagnostics overlay. */
+  onScratchReport(report: ScratchReport): void;
+  /** Tells the user that a scribble deleted something, with a way to undo it. */
+  onScratchHint(): void;
   /** Finish text editing and drop the selection. */
   settle(): void;
   hiddenTextOn(page: Page): string | null;
@@ -100,6 +106,8 @@ export class EditorCanvas {
   readonly undo: UndoController;
   readonly viewport: Viewport;
   readonly selection: Selection;
+  readonly scratchFade: ScratchFade;
+  readonly scratchOut: ScratchOutController;
   readonly tools: ToolManager;
   readonly gestures: GestureController;
   readonly router: InputRouter;
@@ -127,8 +135,10 @@ export class EditorCanvas {
       onStateChange: (u, r) => hooks.onUndoState(u, r),
     });
     this.selection = this.createSelection();
+    this.scratchFade = new ScratchFade(this.strokes, () => this.live.request());
+    this.scratchOut = this.createScratchOut();
     this.tools = this.createTools();
-    this.live.setPainters([this.tools, this.selection]);
+    this.live.setPainters([this.scratchFade, this.tools, this.selection]);
     this.gestures = new GestureController({
       camera: this.camera,
       layout: this.layout,
@@ -207,6 +217,25 @@ export class EditorCanvas {
     );
   }
 
+  private createScratchOut(): ScratchOutController {
+    const { hooks, prefs, savePrefs } = this.deps;
+    return new ScratchOutController({
+      prefs,
+      savePrefs,
+      strokeBox: (stroke) => this.geometry.bbox(stroke),
+      textBox: (item) => this.texts.box(item),
+      richText: (item) => this.texts.migrated(item),
+      glyphs: (item, near) => this.texts.glyphs(item, near),
+      naturalWidth: (item) => this.texts.naturalWidth(item),
+      hiddenTextOn: (page) => hooks.hiddenTextOn(page),
+      recordUndo: (page) => this.undo.record(page),
+      touch: (page) => this.session.touch(page),
+      fade: (page, strokes, glyphs) => this.scratchFade.start(page, strokes, glyphs),
+      report: (report) => hooks.onScratchReport(report),
+      hint: () => hooks.onScratchHint(),
+    });
+  }
+
   private toolContext(): ToolContext {
     const { hooks, i18n, prefs, makeId } = this.deps;
     return {
@@ -225,6 +254,7 @@ export class EditorCanvas {
       savePrefs: () => this.deps.savePrefs(),
       recordUndo: (page) => this.undo.record(page),
       commitStroke: (page, stroke) => this.commitStroke(page, stroke),
+      scratchOut: (page, stroke) => this.scratchOut.tryErase(page, stroke, this.camera.z),
       requestRender: () => this.renderer.request(),
       requestLive: () => this.live.request(),
       toast: (message, ms) => hooks.toast(message, ms),

@@ -104,7 +104,9 @@ export class PenTool extends Tool {
       };
       // Ballpoint is the default: leaving `b` out keeps such strokes identical to older ones.
       if (op.brush && op.brush !== 'ballpoint') stroke.b = op.brush;
-      this.ctx.commitStroke(op.page, stroke);
+      // Not the highlighter; and a line held straight or guided by the ruler was meant as a line.
+      const mayScratch = op.kind === 'pen' && !op.straight && !op.snap;
+      if (!mayScratch || !this.ctx.scratchOut(op.page, stroke)) this.ctx.commitStroke(op.page, stroke);
     }
     this.ctx.requestLive();
   }

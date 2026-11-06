@@ -391,5 +391,20 @@
   "moveItemRight": "Переместить вправо: {item}",
   "showItem": "Показать: {item}",
   "hideItem": "Скрыть: {item}",
-  "dragItem": "Перетащить: {item}"
+  "dragItem": "Перетащить: {item}",
+  "scratchOut": "Стирать зачёркиванием",
+  "scratchOffShort": "выкл.",
+  "scratchOn": "Зачёркивание теперь стирает",
+  "scratchOff": "Зачёркивание больше не стирает",
+  "scratchLevelLow": "Низкая чувствительность",
+  "scratchLevelNormal": "Обычная чувствительность",
+  "scratchLevelHigh": "Высокая чувствительность",
+  "scratchLevelSet": "Зачёркивание: {level}",
+  "scratchHint": "Зачёркнутое удалено",
+  "scratchDiagShape": "Последний штрих: развороты {reversals} (мин. {minReversals}), плотность {density} (мин. {minDensity}), шаг {pitch} (макс. {maxPitch}), закрутка {winding} (макс. {maxWinding})",
+  "scratchDiagCoverage": "Покрытие: удалено {hit} из {near} рядом, лучшее {best}% (мин. {min}%)",
+  "scratchDiagOff": "оставлено: зачёркивание выключено",
+  "scratchDiagWriting": "оставлено: похоже на письмо",
+  "scratchDiagNothing": "оставлено: ничего не закрыто в достаточной мере",
+  "scratchDiagErased": "зачёркивание: удалено"
 }

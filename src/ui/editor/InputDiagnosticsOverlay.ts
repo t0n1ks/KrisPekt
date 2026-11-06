@@ -1,12 +1,21 @@
 import { PALM_SIZE_PX } from '../../core/constants';
+import type { ScratchDecision, ScratchReport } from '../../editor/ScratchOutController';
 import { byId } from '../../core/utils/dom';
-import type { I18n } from '../../i18n/I18n';
+import type { I18n, TextKey } from '../../i18n/I18n';
 import { InputLog, type InputLogEntry, type InputSample } from '../../input/InputLog';
+
+const DECISIONS: Record<ScratchDecision, TextKey> = {
+  off: 'scratchDiagOff',
+  writing: 'scratchDiagWriting',
+  nothing: 'scratchDiagNothing',
+  erased: 'scratchDiagErased',
+};
 
 /**
  * Hidden "input diagnostics" overlay: the last pointer events with their type, id, contact size,
  * pressure, buttons and how the router classified them, to tune palm rejection on a real tablet.
- * It also shows how many lost items were moved back onto their pages when the notebook opened.
+ * It also shows how many lost items were moved back onto their pages when the notebook opened, and
+ * how the last pen stroke was judged as a scribble, to tune scratch-out.
  *
  * Opened by a long press on "Draw with finger" in the editor's ⋯ menu. Off by default, never
  * stored, plain text only (`textContent`); nothing leaves the device.
@@ -16,6 +25,7 @@ export class InputDiagnosticsOverlay {
   private readonly log = new InputLog();
   private frame = 0;
   private repaired = 0;
+  private scratch: ScratchReport | null = null;
 
   constructor(private readonly i18n: I18n) {}
 
@@ -34,6 +44,12 @@ export class InputDiagnosticsOverlay {
   /** How many items lying outside their pages were moved back when the notebook was opened. */
   noteRepaired(count: number): void {
     this.repaired = count;
+    if (this.visible) this.update();
+  }
+
+  /** How the last pen stroke was judged; kept while hidden, to be there when the overlay opens. */
+  noteScratch(report: ScratchReport): void {
+    this.scratch = report;
     if (this.visible) this.update();
   }
 
@@ -56,6 +72,7 @@ export class InputDiagnosticsOverlay {
   render(): void {
     const head = [this.i18n.t('inputDiagTitle', { n: PALM_SIZE_PX }), this.i18n.t('inputDiagLegend')];
     if (this.repaired) head.push(this.i18n.t('inputDiagRepaired', { n: this.repaired }));
+    if (this.scratch) head.push(...this.scratchLines(this.scratch));
     this.node.textContent = [...head, ...this.log.entries.map(InputDiagnosticsOverlay.line)].join('\n');
   }
 
@@ -63,6 +80,31 @@ export class InputDiagnosticsOverlay {
   destroy(): void {
     cancelAnimationFrame(this.frame);
     this.frame = 0;
+  }
+
+  /** Each measure with the limit it has to meet, so that it is clear which one decided. */
+  private scratchLines(report: ScratchReport): string[] {
+    const { metrics, limits, coverage, decision } = report;
+    const { i18n } = this;
+    const shape = i18n.t('scratchDiagShape', {
+      reversals: metrics.reversals,
+      minReversals: limits.minReversals,
+      density: metrics.density.toFixed(1),
+      minDensity: limits.minDensity,
+      pitch: metrics.pitch.toFixed(2),
+      maxPitch: limits.maxPitch,
+      winding: metrics.winding.toFixed(2),
+      maxWinding: limits.maxWinding,
+    });
+    const covered = coverage
+      ? i18n.t('scratchDiagCoverage', {
+          hit: coverage.hit,
+          near: coverage.near,
+          best: Math.round(coverage.best * 100),
+          min: Math.round(limits.minCoverage * 100),
+        })
+      : null;
+    return [shape, ...(covered ? [covered] : []), '→ ' + i18n.t(DECISIONS[decision])];
   }
 
   /** One event: `touch #7 34×29 p1.00 b1 move×12 → palm ✎` (`*`: size from Touch Events). */

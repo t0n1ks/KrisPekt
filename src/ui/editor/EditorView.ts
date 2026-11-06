@@ -1,3 +1,4 @@
+import { SCRATCH_HINT_MS } from '../../core/constants';
 import type { EventBus } from '../../app/EventBus';
 import type { Language, Notebook, Page, Preferences, Stroke, TextItem, ToolKind } from '../../core/types';
 import { byId } from '../../core/utils/dom';
@@ -34,6 +35,7 @@ import type { Toast } from '../dialogs/Toast';
 import { icon } from '../icons';
 import { languageMenu, languageShort } from '../widgets/languageMenu';
 import { InputDiagnosticsOverlay } from './InputDiagnosticsOverlay';
+import { ScratchOutMenu } from './ScratchOutMenu';
 import { PagesPanel } from './PagesPanel';
 import { RulerWidget } from './RulerWidget';
 import { SelectionBar } from './SelectionBar';
@@ -259,6 +261,8 @@ export class EditorView {
         if (this.canvas.undo.undo()) d.toast.show(d.i18n.t('undone'), 1000);
       },
       onInputSample: (sample) => this.diagnostics.record(sample),
+      onScratchReport: (report) => this.diagnostics.noteScratch(report),
+      onScratchHint: () => this.showScratchHint(),
       settle: () => this.settle(),
       hiddenTextOn: (page) => this.textEditor.hiddenOn(page),
       editText: (page, item, x, y) => {
@@ -712,6 +716,7 @@ export class EditorView {
         check: prefs.twoFingerScroll,
         onClick: () => this.toggleTwoFingerScroll(),
       },
+      this.scratchEntry(),
       { label: i18n.t('nbSettings'), icon: 'edit', onClick: () => actions.editNotebook(nb) },
       {
         label: i18n.t('language') + ' · ' + languageShort(i18n.language),
@@ -723,6 +728,31 @@ export class EditorView {
           ),
       },
     ];
+  }
+
+  private scratchEntry(): MenuEntry {
+    const { i18n, prefs, toast, savePrefs } = this.deps;
+    const menu = new ScratchOutMenu(i18n, prefs, (message) => {
+      savePrefs();
+      toast.show(message);
+    });
+    return {
+      label: menu.summary(),
+      icon: 'scribble',
+      onClick: () => this.deps.menu.show(this.topBarMoreAnchor(), menu.entries()),
+    };
+  }
+
+  /** The first few times, says what happened to the content and offers to bring it back. */
+  private showScratchHint(): void {
+    const { i18n } = this.deps;
+    this.snackbar.show({
+      message: i18n.t('scratchHint'),
+      action: i18n.t('undo'),
+      ms: SCRATCH_HINT_MS,
+      onAction: () => this.canvas.undo.undo(),
+      onExpire: () => undefined,
+    });
   }
 
   private topBarMoreAnchor(): HTMLElement {
