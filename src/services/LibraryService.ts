@@ -1,6 +1,8 @@
 import type { Background, Notebook, Page, PageSize, Subject } from '../core/types';
+import { StorageBreakdown, type StorageReport } from '../domain/StorageBreakdown';
 import type { SampleSeeder } from '../domain/SampleSeeder';
 import { ShelfOrder } from '../domain/ShelfOrder';
+import { TrashRules, type TrashListing } from '../domain/TrashRules';
 import type { BlobRepository } from '../storage/BlobRepository';
 import type { NotebookRepository } from '../storage/NotebookRepository';
 import { PageRepository } from '../storage/PageRepository';
@@ -27,8 +29,11 @@ export interface LibraryRepositories {
  * here and call its methods; they never touch the repositories directly.
  */
 export class LibraryService {
+  /** What is on the shelf. Everything that lists, searches or links reads only these. */
   subjects: Subject[] = [];
   notebooks: Notebook[] = [];
+  private trashedSubjects: Subject[] = [];
+  private trashedNotebooks: Notebook[] = [];
 
   constructor(
     private readonly repos: LibraryRepositories,
@@ -39,18 +44,24 @@ export class LibraryService {
     private readonly blobsInUse: () => ReadonlySet<string> = () => new Set(),
     /** Blobs were left for a later cleanup. */
     private readonly onBlobsSpared: () => void = () => undefined,
+    private readonly clock: () => number = () => Date.now(),
   ) {}
 
   /** (Re)loads subjects and notebooks from storage. */
   async load(): Promise<void> {
-    [this.subjects, this.notebooks] = await Promise.all([
-      this.repos.subjects.all(),
-      this.repos.notebooks.all(),
-    ]);
+    const [subjects, notebooks] = await Promise.all([this.repos.subjects.all(), this.repos.notebooks.all()]);
+    const shelf = TrashRules.partition(subjects, notebooks);
+    this.subjects = shelf.subjects;
+    this.notebooks = shelf.notebooks;
+    this.trashedSubjects = shelf.trashedSubjects;
+    this.trashedNotebooks = shelf.trashedNotebooks;
+    for (const subject of shelf.revived) delete subject.deletedAt;
+    if (shelf.revived.length) await this.repos.subjects.save(...shelf.revived);
   }
 
+  /** Nothing anywhere, not even in the Trash: only then does a first start add the sample. */
   get isEmpty(): boolean {
-    return !this.subjects.length && !this.notebooks.length;
+    return !this.subjects.length && !this.notebooks.length && !this.trashCount;
   }
 
   /** Stores the first-run sample shelf. */
@@ -139,11 +150,20 @@ export class LibraryService {
     this.onChange();
   }
 
-  /** Deletes a subject with all its notebooks, pages and images. */
+  /** Moves a subject and its notebooks to the Trash; nothing is removed from storage. */
   async deleteSubject(subject: Subject): Promise<void> {
-    for (const nb of this.notebooks.filter((n) => n.subjectId === subject.id)) await this.deleteNotebook(nb);
+    const deletedAt = this.clock();
+    const notebooks = this.notebooks.filter((n) => n.subjectId === subject.id);
+    subject.deletedAt = deletedAt;
+    for (const nb of notebooks) {
+      nb.deletedAt = deletedAt;
+      nb.deletedWithSubject = true;
+    }
+    await this.repos.notebooks.saveWithSubject(subject, notebooks);
     this.subjects = this.subjects.filter((s) => s !== subject);
-    await this.repos.subjects.delete(subject.id);
+    this.notebooks = this.notebooks.filter((n) => !notebooks.includes(n));
+    this.trashedSubjects.push(subject);
+    this.trashedNotebooks.push(...notebooks);
     this.onChange();
   }
 
@@ -210,18 +230,136 @@ export class LibraryService {
     return baseChanged;
   }
 
-  /** Deletes a notebook with its pages and every blob that nothing else uses. */
+  /** Moves a notebook to the Trash; its pages and files stay stored. */
   async deleteNotebook(nb: Notebook): Promise<void> {
-    const pages = await this.repos.pages.ofNotebook(nb.id);
-    await this.repos.pages.deleteMany(pages.map((p) => p.id));
-    const spared = await this.repos.blobs.deleteUnreferenced(
-      PageRepository.blobIds(pages),
-      this.blobsInUse(),
-    );
-    if (spared) this.onBlobsSpared();
-    await this.repos.notebooks.delete(nb.id);
+    nb.deletedAt = this.clock();
+    await this.repos.notebooks.save(nb);
     this.notebooks = this.notebooks.filter((n) => n !== nb);
+    this.trashedNotebooks.push(nb);
     this.onChange();
+  }
+
+  /* ---------- the Trash ---------- */
+
+  /** What the Trash shows. */
+  trash(): TrashListing {
+    return TrashRules.listing(this.trashedSubjects, this.trashedNotebooks);
+  }
+
+  /** How many items the Trash holds, however they are listed. */
+  get trashCount(): number {
+    return this.trashedSubjects.length + this.trashedNotebooks.length;
+  }
+
+  /** A subject's notebooks that went to the Trash with it. */
+  deletedWith(subject: Subject): Notebook[] {
+    return this.trashedNotebooks.filter((n) => n.subjectId === subject.id && n.deletedWithSubject);
+  }
+
+  /** Brings back a subject with the notebooks deleted along with it. */
+  async restoreSubject(subject: Subject): Promise<void> {
+    const notebooks = this.deletedWith(subject);
+    delete subject.deletedAt;
+    for (const nb of notebooks) LibraryService.clearDeletion(nb);
+    await this.repos.notebooks.saveWithSubject(subject, notebooks);
+    this.trashedSubjects = this.trashedSubjects.filter((s) => s !== subject);
+    this.trashedNotebooks = this.trashedNotebooks.filter((n) => !notebooks.includes(n));
+    this.subjects.push(subject);
+    this.notebooks.push(...notebooks);
+    this.onChange();
+  }
+
+  /**
+   * Brings back one notebook. A notebook needs its subject, so a subject in the Trash comes back
+   * too, and is returned so the user can be told. The notebooks deleted along with that subject
+   * stay in the Trash, each on its own: the user asked for this one. A subject that is gone for
+   * good is replaced by a new one called `fallbackName`.
+   */
+  async restoreNotebook(nb: Notebook, fallbackName: string): Promise<Subject | null> {
+    LibraryService.clearDeletion(nb);
+    const trashed = this.trashedSubjects.find((s) => s.id === nb.subjectId);
+    if (trashed) {
+      const siblings = this.deletedWith(trashed);
+      delete trashed.deletedAt;
+      for (const sibling of siblings) delete sibling.deletedWithSubject;
+      await this.repos.notebooks.saveWithSubject(trashed, [nb, ...siblings]);
+      this.trashedSubjects = this.trashedSubjects.filter((s) => s !== trashed);
+      this.subjects.push(trashed);
+    } else if (!this.subject(nb.subjectId)) {
+      const replacement = await this.createSubject(fallbackName, nb.color);
+      nb.subjectId = replacement.id;
+      await this.repos.notebooks.save(nb);
+    } else await this.repos.notebooks.save(nb);
+    this.trashedNotebooks = this.trashedNotebooks.filter((n) => n !== nb);
+    this.notebooks.push(nb);
+    this.onChange();
+    return trashed ?? null;
+  }
+
+  /** Removes a notebook from the Trash for good, with every file nothing else uses. */
+  async deleteNotebookForever(nb: Notebook): Promise<void> {
+    await this.removeStored([nb]);
+    this.trashedNotebooks = this.trashedNotebooks.filter((n) => n !== nb);
+    this.onChange();
+  }
+
+  /**
+   * Removes a subject from the Trash for good, with all its notebooks in the Trash: a notebook
+   * deleted earlier on its own would otherwise lose its subject.
+   */
+  async deleteSubjectForever(subject: Subject): Promise<void> {
+    const notebooks = this.trashedNotebooks.filter((n) => n.subjectId === subject.id);
+    await this.removeStored(notebooks);
+    await this.repos.subjects.delete(subject.id);
+    this.trashedNotebooks = this.trashedNotebooks.filter((n) => !notebooks.includes(n));
+    this.trashedSubjects = this.trashedSubjects.filter((s) => s !== subject);
+    this.onChange();
+  }
+
+  /** Removes everything in the Trash for good. */
+  async emptyTrash(): Promise<void> {
+    for (const subject of [...this.trashedSubjects]) await this.deleteSubjectForever(subject);
+    for (const nb of [...this.trashedNotebooks]) await this.deleteNotebookForever(nb);
+  }
+
+  /** Removes what has been in the Trash for 30 days. Returns how many items went. */
+  async purgeExpired(now: number): Promise<number> {
+    const count = this.trashCount;
+    const expired = (item: { deletedAt?: number }): boolean =>
+      item.deletedAt !== undefined && TrashRules.isExpired(item.deletedAt, now);
+    for (const nb of this.trashedNotebooks.filter(expired)) await this.deleteNotebookForever(nb);
+    for (const subject of this.trashedSubjects.filter(expired)) await this.deleteSubjectForever(subject);
+    return count - this.trashCount;
+  }
+
+  private static clearDeletion(nb: Notebook): void {
+    delete nb.deletedAt;
+    delete nb.deletedWithSubject;
+  }
+
+  /** Removes notebooks from storage. Files go only when no remaining page uses them. */
+  private async removeStored(notebooks: readonly Notebook[]): Promise<void> {
+    for (const nb of notebooks) {
+      const pages = await this.repos.pages.ofNotebook(nb.id);
+      await this.repos.pages.deleteMany(pages.map((p) => p.id));
+      const spared = await this.repos.blobs.deleteUnreferenced(
+        PageRepository.blobIds(pages),
+        this.blobsInUse(),
+      );
+      if (spared) this.onBlobsSpared();
+      await this.repos.notebooks.delete(nb.id);
+    }
+  }
+
+  /** What everything takes in storage, the Trash included. */
+  async measureStorage(): Promise<StorageReport> {
+    const [pages, blobs] = await Promise.all([this.repos.pages.all(), this.repos.blobs.all()]);
+    return StorageBreakdown.measure({
+      subjects: [...this.subjects, ...this.trashedSubjects],
+      notebooks: [...this.notebooks, ...this.trashedNotebooks],
+      pages,
+      blobs: blobs.map(({ id, blob }) => ({ id, size: blob.size, type: blob.type })),
+    });
   }
 
   /** Pages of a notebook in order (for export of a closed notebook). */

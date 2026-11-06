@@ -39,6 +39,7 @@ describe('regressions found before attachments', () => {
     const first = service.notebooks.find((nb) => nb.id === 'nba');
     if (!first) throw new Error('notebook missing');
     await service.deleteNotebook(first);
+    await service.deleteNotebookForever(first);
     expect(await blobs.get('shared')).not.toBeNull();
   });
 
@@ -52,6 +53,8 @@ describe('regressions found before attachments', () => {
     const first = service.notebooks.find((nb) => nb.id === 'nba');
     if (!first) throw new Error('notebook missing');
     await service.deleteNotebook(first);
+    expect(await blobs.get('own')).not.toBeNull();
+    await service.deleteNotebookForever(first);
     expect(await blobs.get('own')).toBeNull();
   });
 
