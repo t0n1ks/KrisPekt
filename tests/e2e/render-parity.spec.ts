@@ -15,6 +15,10 @@ async function canvasPng(page: Page): Promise<Buffer> {
  * commands; every later change is compared against them.
  */
 test('the editor draws the fixture page exactly as before', async ({ page }) => {
+  test.skip(
+    process.platform !== 'win32',
+    'The baseline images are Windows renderings; other systems draw text differently.',
+  );
   await page.setViewportSize({ width: 1000, height: 1300 });
   await page.goto('./');
   await seedFixtureNotebook(page, 'Parity');
