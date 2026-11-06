@@ -21,6 +21,11 @@
   min-height: 54px;
   flex: none;
 }
+/* 44 px to press without making the bar taller: the stage, and so the page, stay where they are. */
+.top-bar > .icon-btn,
+.top-bar > .pill {
+  margin-block: -2px;
+}
 .top-bar__title {
   flex: 1;
   min-width: 0;
@@ -234,8 +239,9 @@
   gap: 8px;
   width: min(340px, calc(100vw - 32px));
   padding: 6px;
-  max-height: 70vh;
-  overflow-y: auto;
+}
+.menu--sheet .toolbar-more {
+  width: 100%;
 }
 .toolbar-grid {
   display: grid;
@@ -344,7 +350,8 @@
 .toolbar-custom__label {
   flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
   font-size: 14px;
 }
 .toolbar-custom__button {
@@ -371,20 +378,47 @@
 }
 /* The options can be long: the pin stays in view at the bottom of the card. */
 .popover__pin {
-  position: sticky;
-  bottom: 0;
-  background: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   width: 100%;
   min-height: 44px;
-  margin-top: 10px;
 }
 @media (max-width: 640px) {
   .toolbar-custom {
-    padding: 12px 12px 76px;
+    padding: 12px 8px 76px;
+  }
+  .toolbar-custom__card {
+    padding: 10px 8px;
+  }
+  .toolbar-custom__foot {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .toolbar-custom__foot .btn {
+    height: auto;
+    white-space: normal;
+  }
+  .toolbar-custom__done {
+    grid-column: 1 / -1;
+  }
+}
+/* A short screen, such as a phone on its side: the card takes all there is. */
+@media (max-height: 480px) {
+  .toolbar-custom {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .toolbar-custom__card {
+    overflow-y: auto;
+  }
+  .toolbar-custom__list {
+    flex: none;
+    overflow-y: visible;
+  }
+  .toolbar-custom .hint {
+    display: none;
   }
 }
 
@@ -634,8 +668,8 @@
 }
 .text-bar__button {
   position: relative;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   flex: none;
 }
 .text-bar__button[aria-pressed='true'] {
@@ -671,7 +705,10 @@
   position: absolute;
   z-index: 3;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 2px;
+  max-width: calc(100% - 16px);
   padding: 4px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -679,8 +716,8 @@
   box-shadow: 0 10px 24px -12px var(--shadow);
 }
 .selection-bar__button {
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
 }
 
 /* tool options popover */
@@ -692,14 +729,53 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-xl);
-  padding: 14px;
   box-shadow: 0 20px 40px -18px var(--shadow);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  /* max-height is set from the space next to the tray; long options scroll */
+  /* max-height is set from the space next to the tray; only the body below the head scrolls */
+  overflow: hidden;
+}
+.popover__head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.popover__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 14px;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+@media (max-width: 480px) {
+  .popover {
+    width: calc(100% - 24px);
+  }
+  .popover__head {
+    padding: 8px;
+  }
+  .popover__body {
+    padding: 8px;
+  }
+}
+/* On a short screen the head stays one row, so that the settings keep the room. */
+@media (max-height: 480px) {
+  .popover__head {
+    flex-direction: row;
+    align-items: center;
+  }
+  .popover__preview {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 44px;
+  }
+  .popover__pin {
+    flex: none;
+    width: auto;
+  }
 }
 .popover__title {
   margin: 0;
@@ -710,6 +786,7 @@
   color: var(--muted);
 }
 .popover__preview {
+  display: block;
   width: 100%;
   height: 46px;
   border-radius: var(--r-md);
@@ -846,19 +923,28 @@
 }
 .page-item__insert {
   position: absolute;
-  left: -26px;
-  top: 76px;
+  left: -33px;
+  top: 69px;
   z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
+  color: var(--accent);
+  touch-action: manipulation;
+}
+/* The circle is smaller than the area that takes the press. */
+.page-item__insert::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
   border-radius: var(--r-pill);
   background: var(--surface);
-  color: var(--accent);
   box-shadow: 0 0 0 1px var(--line);
-  touch-action: manipulation;
+}
+.page-item__insert > * {
+  position: relative;
 }
 .page-item__check {
   display: none;
@@ -907,8 +993,8 @@
   text-overflow: ellipsis;
 }
 .page-item__more {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
 }
 .page-item__add {
   display: flex;
@@ -942,7 +1028,7 @@
     column-gap: 14px;
   }
   .page-item__insert {
-    left: -22px;
+    left: -29px;
   }
 }
 .popover__content {

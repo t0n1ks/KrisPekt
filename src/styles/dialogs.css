@@ -129,15 +129,26 @@
   border-radius: 14px;
   padding: 6px;
   box-shadow: 0 22px 50px -20px var(--shadow);
+  /* max-height is set from what is left of the screen; a long menu scrolls inside */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .menu--content {
   min-width: 0;
+}
+/* a large menu on a narrow screen: along the bottom edge instead of hanging from its button */
+.menu--sheet {
+  max-width: none;
+  border-width: 1px 0 0;
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
 }
 .menu__item {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
+  min-height: 44px;
   padding: 10px 12px;
   border-radius: 9px;
   text-align: left;
@@ -244,6 +255,20 @@
   gap: 2px;
   max-height: min(46dvh, 420px);
   overflow-y: auto;
+}
+/* There is no room for a list inside a list: on a short screen the whole sheet scrolls. */
+@media (max-height: 480px) {
+  .link-pick__list,
+  .anchor-list {
+    max-height: none;
+    overflow-y: visible;
+  }
+  .scrim {
+    padding: 0;
+  }
+  .sheet {
+    max-height: 100%;
+  }
 }
 
 .link-pick__heading {

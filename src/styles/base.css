@@ -67,7 +67,7 @@ input[type='range'] {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 42px;
+  min-height: 44px;
   padding: 0 16px;
   border-radius: var(--r-lg);
   background: var(--surface);
@@ -93,8 +93,8 @@ input[type='range'] {
   width: 100%;
 }
 .icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   flex: none;
   display: grid;
   place-items: center;
@@ -108,7 +108,7 @@ input[type='range'] {
   color: var(--danger);
 }
 .pill {
-  height: 36px;
+  height: 44px;
   padding: 0 10px;
   border-radius: var(--r-md);
   display: inline-flex;

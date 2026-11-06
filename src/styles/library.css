@@ -168,8 +168,8 @@
 
 /* subject reordering */
 .subject__handle {
-  width: 32px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   margin-right: -6px;
   color: var(--muted);
   cursor: grab;
@@ -348,6 +348,6 @@
   font-variant-numeric: tabular-nums;
 }
 .notebook-card__more {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
 }
