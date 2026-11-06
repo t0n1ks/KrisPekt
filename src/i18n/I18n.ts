@@ -12,8 +12,8 @@ export type TextKey = { [K in keyof Dictionary]: Dictionary[K] extends string ? 
 export type ListKey = {
   [K in keyof Dictionary]: Dictionary[K] extends string[] ? K : never;
 }[keyof Dictionary];
-/** Nouns with plural forms (`pl_subj`, `pl_nb`, `pl_pg`, `pl_mark`). */
-export type PluralNoun = 'subj' | 'nb' | 'pg' | 'mark';
+/** Nouns with plural forms (`pl_subj`, `pl_nb`, `pl_pg`, `pl_mark`, `pl_day`). */
+export type PluralNoun = 'subj' | 'nb' | 'pg' | 'mark' | 'day';
 
 type LooseDictionary = Partial<Record<string, string | string[]>>;
 

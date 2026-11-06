@@ -48,13 +48,17 @@ import {
 
 export function parseSubject(raw: unknown, path = 'subject'): Subject {
   const o = asRecord(raw, path);
-  return {
+  const subject: Subject = {
     id: asId(o.id, `${path}.id`),
     name: asString(o.name, `${path}.name`, MAX_LEN.name),
     color: asColor(o.color, `${path}.color`),
     order: asNumber(o.order, `${path}.order`, LIMITS.order),
     createdAt: asNumber(o.createdAt, `${path}.createdAt`, LIMITS.timestamp),
   };
+  if (o.deletedAt !== undefined) {
+    subject.deletedAt = asNumber(o.deletedAt, `${path}.deletedAt`, LIMITS.timestamp);
+  }
+  return subject;
 }
 
 function parseView(raw: unknown, path: string): NotebookView | null {
@@ -99,6 +103,10 @@ export function parseNotebook(raw: unknown, path = 'notebook'): Notebook {
     notebook.zoomLock = asNumber(o.zoomLock, `${path}.zoomLock`, LIMITS.lockedZoom);
   const marks = optionalArray(o.marks, `${path}.marks`);
   if (marks.length) notebook.marks = marks.map((v, i) => parseMark(v, `${path}.marks[${i}]`));
+  if (o.deletedAt !== undefined) {
+    notebook.deletedAt = asNumber(o.deletedAt, `${path}.deletedAt`, LIMITS.timestamp);
+  }
+  if (o.deletedWithSubject === true) notebook.deletedWithSubject = true;
   return notebook;
 }
 

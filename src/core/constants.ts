@@ -206,6 +206,8 @@ export const DB_OPEN_TIMEOUT_MS = 5000;
 export const PREFS_KEY = 'konspektnik.prefs.v1';
 export const BACKUP_APP = 'krispekt';
 export const BACKUP_APP_LEGACY = 'konspektnik';
+/** The ZIP backup. Old JSON backups have `version: 1`. */
+export const BACKUP_FORMAT = 2;
 
 /* ---------- pen brushes ---------- */
 
@@ -260,6 +262,7 @@ export const DEFAULT_PREFS: Preferences = {
   scratch: { on: true, level: 'normal', hints: 0 },
   anchorMarkers: true,
   recentLinks: [],
+  keepOriginalPhotos: false,
   seeded: false,
   blobSweepDue: true,
   autoBackup: '3days',
@@ -399,9 +402,33 @@ export const MAX_RECENT_LINKS = 6;
 /** The text of a new table of contents, in world px. */
 export const CONTENTS_FONT_SIZE = 16;
 
+/* ---------- trash ---------- */
+
+/** Deleted notebooks and subjects stay this long. */
+export const TRASH_DAYS = 30;
+/** How often an app left open looks for items whose time is up. */
+export const TRASH_PURGE_INTERVAL_MS = 60 * 60 * 1000;
+
 /* ---------- import / export limits ---------- */
 
+/** Largest old JSON backup: it has to fit in one string in memory. */
 export const MAX_BACKUP_BYTES = 300 * 1024 * 1024;
+/* What a ZIP backup may hold. Restoring reads it entry by entry, so these are not memory limits for the whole. */
+export const MAX_BACKUP_ENTRIES = 60_000;
+/** Largest file in a backup; each is in memory while it is checked. */
+export const MAX_BACKUP_ENTRY_BYTES = 256 * 1024 * 1024;
+/** Largest manifest: its list of entries, at most about 7 MB. */
+export const MAX_BACKUP_MANIFEST_BYTES = 16 * 1024 * 1024;
+export const MAX_BACKUP_DATA_BYTES = 2 * 1024 * 1024 * 1024;
+/** Longest line in `data.json`: one page, or the head. */
+export const MAX_BACKUP_LINE_BYTES = 128 * 1024 * 1024;
+/** Sum of all entries, unpacked. */
+export const MAX_BACKUP_TOTAL_BYTES = 16 * 1024 * 1024 * 1024;
+/** A ZIP without ZIP64 cannot be larger than 4 GiB; this leaves room for its directory. */
+export const MAX_BACKUP_FILE_BYTES = 4 * 1024 * 1024 * 1024 - 16 * 1024 * 1024;
+/** How much an entry may shrink, once it is over the floor. Deflate tops out near 1030:1. */
+export const MAX_BACKUP_RATIO = 500;
+export const MAX_BACKUP_RATIO_FLOOR = 1024 * 1024;
 export const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 export const MAX_BLOB_BYTES = 25 * 1024 * 1024;
 export const MAX_PDF_BYTES = 200 * 1024 * 1024;
@@ -435,8 +462,19 @@ export const VIEWER_ZOOM_MAX = 5;
 export const VIEWER_RENDER_MARGIN = 900;
 /** Rendered pages kept in the viewer; the farthest are released first. */
 export const VIEWER_KEEP_PAGES = 6;
-export const IMAGE_MAX_EDGE = 2200;
+/** New photos are at most this long on their longer side. */
+export const IMAGE_MAX_EDGE = 2560;
+/** WebP or JPEG quality of new photos. */
+export const IMAGE_QUALITY = 0.85;
+/** The same with "Keep original photo quality", which also keeps the full size. */
+export const IMAGE_ORIGINAL_QUALITY = 0.95;
+/** Longer side of the small copy that tells whether an image has transparency. */
+export const IMAGE_ALPHA_SAMPLE_EDGE = 512;
+/** Files of a type backups do not allow are converted to JPEG this large and this good. */
+export const IMAGE_LEGACY_MAX_EDGE = 2200;
 export const IMAGE_JPEG_QUALITY = 0.88;
+/** A WebP photo goes into a vector PDF as JPEG (PDF has no WebP); a PNG could be ten times larger. */
+export const PDF_WEBP_JPEG_QUALITY = 0.92;
 export const PDF_IMPORT_WIDTH = 1800;
 export const PDF_IMPORT_MAX_SCALE = 3;
 export const PDF_IMPORT_JPEG_QUALITY = 0.86;

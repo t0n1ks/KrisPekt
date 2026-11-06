@@ -1,4 +1,4 @@
-import type { Notebook } from '../core/types';
+import type { Notebook, Subject } from '../core/types';
 import type { Database } from './Database';
 import type { RecordReader } from './RecordReader';
 import { parseNotebook } from './validation/records';
@@ -18,6 +18,14 @@ export class NotebookRepository {
   /** Inserts or replaces notebooks. */
   save(...notebooks: Notebook[]): Promise<void> {
     return this.db.putMany('notebooks', notebooks.map(NotebookRepository.toRecord));
+  }
+
+  /** Writes a subject together with its notebooks: going to the Trash or back is all or nothing. */
+  saveWithSubject(subject: Subject, notebooks: readonly Notebook[]): Promise<void> {
+    return this.db.writeAcross([
+      { store: 'subjects', values: [{ ...subject }] },
+      { store: 'notebooks', values: notebooks.map(NotebookRepository.toRecord) },
+    ]);
   }
 
   delete(id: string): Promise<void> {
@@ -42,6 +50,8 @@ export class NotebookRepository {
     if (nb.order !== undefined) record.order = nb.order;
     if (nb.zoomLock !== undefined) record.zoomLock = nb.zoomLock;
     if (nb.marks?.length) record.marks = nb.marks.map((mark) => ({ ...mark }));
+    if (nb.deletedAt !== undefined) record.deletedAt = nb.deletedAt;
+    if (nb.deletedWithSubject) record.deletedWithSubject = true;
     return record;
   }
 }

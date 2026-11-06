@@ -206,6 +206,7 @@ export class PreferencesStore {
       lastChangeAt: toClampedNumber(raw.lastChangeAt, 0, MAX_TIMESTAMP, d.lastChangeAt),
       exp: exportPrefs(section(raw, 'exp')),
       anchorMarkers: bool(raw.anchorMarkers, d.anchorMarkers),
+      keepOriginalPhotos: bool(raw.keepOriginalPhotos, d.keepOriginalPhotos),
       recentLinks: recentLinks(raw.recentLinks),
     };
     if (isLanguage(raw.lang)) prefs.lang = raw.lang;

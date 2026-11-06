@@ -32,6 +32,8 @@ export interface Subject {
   color: string;
   order: number;
   createdAt: number;
+  /** When it went to the Trash; absent means it is on the shelf. */
+  deletedAt?: number;
 }
 
 /** Where the notebook was last left open. */
@@ -68,6 +70,10 @@ export interface Notebook {
   zoomLock?: number;
   /** Its anchors, derived from its pages, so links can be checked without loading any page. */
   marks?: AnchorMark[];
+  /** When it went to the Trash; absent means it is on the shelf. */
+  deletedAt?: number;
+  /** It went to the Trash because its subject did, and comes back with it. */
+  deletedWithSubject?: true;
 }
 
 /**
@@ -347,6 +353,8 @@ export interface Preferences {
   anchorMarkers: boolean;
   /** Places recently linked to, newest first. */
   recentLinks: InternalLink[];
+  /** New photos keep their full size and a high quality; off, they are made smaller. */
+  keepOriginalPhotos: boolean;
   /** Pinned tool presets, at most twelve. */
   presets?: ToolPreset[];
   /** Toolbar order and hidden items; the default layout when absent. */

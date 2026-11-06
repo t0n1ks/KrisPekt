@@ -66,6 +66,8 @@ export function formatZoom(zoom: number): string {
 export function formatSize(bytes: number, i18n: I18n): string {
   const number = (value: number, digits: number): string =>
     value.toLocaleString(i18n.locale, { maximumFractionDigits: digits });
-  if (bytes < 1024 * 1024) return i18n.t('sizeKb', { n: number(Math.max(1, bytes / 1024), 0) });
+  // Anything at all reads as at least 1 KB; only nothing reads as 0.
+  const kilobytes = bytes > 0 ? Math.max(1, bytes / 1024) : 0;
+  if (bytes < 1024 * 1024) return i18n.t('sizeKb', { n: number(kilobytes, 0) });
   return i18n.t('sizeMb', { n: number(bytes / (1024 * 1024), 1) });
 }
