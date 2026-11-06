@@ -17,7 +17,14 @@ export interface ShortcutHandlers {
   setTool(kind: ToolKind): void;
 }
 
-const TOOL_KEYS: Record<string, ToolKind> = { p: 'pen', h: 'hl', e: 'eraser', l: 'lasso', t: 'text' };
+const TOOL_KEYS: Record<string, ToolKind> = {
+  p: 'pen',
+  h: 'hl',
+  e: 'eraser',
+  l: 'lasso',
+  t: 'text',
+  g: 'hand',
+};
 
 /** Editor keyboard shortcuts: Ctrl/⌘+Z, Ctrl/⌘+Y or Shift+Z, Delete, Escape, P/H/E/L/T. */
 export class KeyboardShortcuts {

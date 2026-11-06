@@ -169,6 +169,7 @@
   "hl": "Textmarker",
   "eraser": "Radierer",
   "lasso": "Lasso",
+  "hand": "Hand",
   "ruler": "Lineal",
   "penColor": "Stift, Farbe {c}",
   "thickness": "Strichstärke",
@@ -197,6 +198,9 @@
   "txtHeading": "Überschrift",
   "textHint": "Tippe auf die Seite, um zu schreiben. Tippe auf ein Textfeld, um es auszuwählen, und noch einmal, um es zu bearbeiten.",
   "lassoHint": "Umkreise Einträge, um sie auszuwählen. Zieh die Auswahl, um sie zu verschieben, oder den Kreis in der Ecke, um die Größe zu ändern.",
+  "handHint": "Blättere durch die Seite und öffne Links. Tippe auf Text oder ein Foto, um es auszuwählen, und zieh es, um es zu verschieben. Die Hand zeichnet und radiert nicht.",
+  "handToggleHint": "Nochmal tippen: Lasso ↔ Hand",
+  "handLinkTip": "Links öffnest du mit der Hand oder dem Finger",
   "rulerHint": "Lineal: mit einem Finger verschieben, mit zwei drehen. Fahr mit dem Stift an der Kante entlang.",
   "cm": "cm",
   "penColorNames": [

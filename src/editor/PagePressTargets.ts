@@ -49,14 +49,14 @@ export class PagePressTargets {
   constructor(private readonly deps: PagePressTargetsDeps) {}
 
   /**
-   * The card, marker or link under a stage point. The eraser reaches none: a dab must erase ink,
-   * never open a dialog. With the text tool a linked word is text to edit, so it does not count
-   * there. The area around a marker comes last, so that it never takes a press from what is there.
+   * The card, marker or link under a stage point; who may open them is for `ToolRules`. With the
+   * text tool a linked word is text to edit, so it does not count there. The area around a marker
+   * comes last, so that it never takes a press from what is there.
    */
   at(pt: Point): PressHit | null {
     const { camera, layout, texts } = this.deps;
     const tool = this.deps.tool();
-    if (tool === 'eraser' || this.deps.overSelection(pt)) return null;
+    if (this.deps.overSelection(pt)) return null;
     const world = camera.toWorld(pt.x, pt.y);
     const page = layout.pageAt(world.x, world.y);
     if (!page) return null;

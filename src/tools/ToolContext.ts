@@ -4,7 +4,7 @@ import type { PageLayout } from '../canvas/PageLayout';
 import type { StrokeGeometry } from '../canvas/StrokeGeometry';
 import type { StrokePainter } from '../canvas/StrokePainter';
 import type { TextLayout } from '../canvas/TextLayout';
-import type { Page, Preferences, Stroke, TextItem, ToolKind } from '../core/types';
+import type { Page, Point, Preferences, Stroke, TextItem, ToolKind } from '../core/types';
 import type { EditorSession } from '../editor/EditorSession';
 import type { I18n } from '../i18n/I18n';
 import type { Ruler } from './Ruler';
@@ -39,6 +39,13 @@ export interface ToolContext {
   editText(page: Page, item: TextItem | null, x: number, y: number): void;
   /** Switches tools. */
   setTool(kind: ToolKind): void;
+  /** Scrolls the page with a contact, for a tool that does that. */
+  pan: {
+    begin(id: number, pt: Point): void;
+    move(id: number, pt: Point): void;
+    release(id: number): void;
+    stop(): void;
+  };
   /** Rebuilds the tray after colour or favourite changes. */
   refreshTray(): void;
 }

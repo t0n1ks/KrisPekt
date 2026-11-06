@@ -177,6 +177,14 @@ export class TouchClassifier {
     return [this.assign(sample.id, contact, role, null)];
   }
 
+  /** A tool takes a finger that has not yet become anything; false if it already has. */
+  claim(id: number): boolean {
+    const contact = this.contacts.get(id);
+    if (contact?.role !== 'pending') return false;
+    contact.role = 'draw';
+    return true;
+  }
+
   /** A finger moved: re-checks its size and promotes a pending finger to a pan. */
   touchMove(sample: TouchSample): RoleChange[] {
     const contact = this.contacts.get(sample.id);

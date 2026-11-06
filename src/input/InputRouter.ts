@@ -1,7 +1,9 @@
 import type { Point } from '../core/types';
-import { LONG_PRESS_MS } from '../core/constants';
+import { HAND_HOLD_MS, LONG_PRESS_MS, TAP_MAX_MS, TAP_SLOP_PX } from '../core/constants';
 import { now } from '../core/utils/math';
 import type { Camera } from '../canvas/Camera';
+import { EraserModes } from '../domain/EraserModes';
+import { HandRules } from '../domain/HandRules';
 import type { RoleChange, TouchClassifier, TouchRole, TouchSample } from '../domain/TouchClassifier';
 import type { GestureController } from './GestureController';
 import { InputLog, type InputSample } from './InputLog';
@@ -23,6 +25,12 @@ export interface DrawingTarget {
   interrupt(): void;
   /** A short single-finger tap at a stage-local point (the text tool places a box). */
   tap(pt: Point): void;
+  /** The tool is for getting around, so the page may keep coasting while a stylus hovers. */
+  readonly navigates: boolean;
+  /** Whether a finger held here picks something up, instead of scrolling. */
+  holdableAt(pt: Point): boolean;
+  /** Shows what a held finger is about to pick up, or (null) stops showing it. */
+  showHold(pt: Point | null): void;
 }
 
 /**
@@ -37,6 +45,8 @@ export interface PressTarget {
   tap(pt: Point): void;
   /** A press held without moving. Returns false if it means nothing here. */
   longPress(pt: Point): boolean;
+  /** A tool made a mark with a short tap here, which reacted to nothing. */
+  drawnTap(pt: Point): void;
 }
 
 /** A press being watched to see what it turns out to be. */
@@ -49,6 +59,21 @@ interface HeldPress {
   timer: ReturnType<typeof setTimeout>;
   /** The long press fired; the rest of this press means nothing. */
   done: boolean;
+}
+
+/** A finger on something the tool can pick up: a hold takes it, and a quick move scrolls instead. */
+interface FingerGrab {
+  id: number;
+  start: Point;
+  time: number;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+/** A mark just begun, which may turn out to be a short tap. */
+interface BegunMark {
+  id: number;
+  start: Point;
+  time: number;
 }
 
 /** A press that moves further than this many px is a drag, not a tap. */
@@ -71,6 +96,8 @@ export interface InputRouterDeps {
   onTwoFingerTap: () => void;
   /** Every routed pointer event, for the diagnostics overlay. */
   onSample: (sample: InputSample) => void;
+  /** A mouse moved over the canvas without a button down. */
+  onHover: (pt: Point, e: PointerEvent) => void;
 }
 
 /**
@@ -88,6 +115,8 @@ export class InputRouter {
   private longPressedTouch: number | null = null;
   private touchTimer: ReturnType<typeof setTimeout> | undefined;
   private touchStart: Point | null = null;
+  private grab: FingerGrab | null = null;
+  private mark: BegunMark | null = null;
 
   constructor(private readonly deps: InputRouterDeps) {
     const { canvas, stage } = deps;
@@ -144,7 +173,10 @@ export class InputRouter {
     }
     if (this.deps.tools.activePointer !== null) return;
     this.capture(e.pointerId);
-    if (!this.holdPress(e, pt)) this.deps.tools.begin(e, pt);
+    if (!this.holdPress(e, pt)) {
+      this.deps.tools.begin(e, pt);
+      this.noteMark(e, pt);
+    }
   }
 
   /**
@@ -211,7 +243,7 @@ export class InputRouter {
       this.log(e, 'move');
       return;
     }
-    this.deps.gestures.stopInertia();
+    if (!this.deps.tools.navigates) this.deps.gestures.stopInertia();
     this.apply(result.changes, null);
     this.log(e, e.type === 'pointerover' ? 'over' : 'hover');
   }
@@ -224,7 +256,54 @@ export class InputRouter {
     this.capture(e.pointerId);
     this.apply(classifier.touchDown(this.sample(e, pt), wantsDraw), e);
     this.log(e, 'down');
+    if (wantsDraw) this.noteMark(e, pt);
     if (onTarget) this.watchTouchHold(e.pointerId, pt);
+    if (!wantsDraw && tools.holdableAt(pt)) this.watchGrab(e.pointerId, pt);
+  }
+
+  /** After the hold, the tool shows what it would pick up; the finger has yet to move for it to go. */
+  private watchGrab(id: number, start: Point): void {
+    this.dropGrab();
+    const timer = setTimeout(() => {
+      if (this.deps.classifier.roleOf(id) === 'pending') this.deps.tools.showHold(start);
+    }, HAND_HOLD_MS);
+    this.grab = { id, start, time: now(), timer };
+  }
+
+  private dropGrab(): void {
+    if (!this.grab) return;
+    clearTimeout(this.grab.timer);
+    this.grab = null;
+    this.deps.tools.showHold(null);
+  }
+
+  /** A held finger that moves takes the object with it; one that moved too soon only scrolls. */
+  private moveGrab(grab: FingerGrab, e: PointerEvent, pt: Point): void {
+    const { classifier, tools } = this.deps;
+    const moved = Math.hypot(pt.x - grab.start.x, pt.y - grab.start.y);
+    const drag = HandRules.fingerDrag(now() - grab.time, moved);
+    if (drag === 'wait' && classifier.roleOf(grab.id) === 'pending') return;
+    this.dropGrab();
+    if (drag !== 'move' || !classifier.claim(grab.id)) return;
+    clearTimeout(this.touchTimer);
+    tools.begin(e, grab.start);
+  }
+
+  /** Remembers a mark just begun, unless it was the eraser end of a stylus, which marks nothing. */
+  private noteMark(e: PointerEvent, pt: Point): void {
+    if (this.deps.tools.activePointer !== e.pointerId || EraserModes.isStylusEraser(e)) return;
+    this.mark = { id: e.pointerId, start: pt, time: now() };
+  }
+
+  /** Where a mark ending now was tapped, if it was only a tap. */
+  private tappedMark(e: PointerEvent, cancelled: boolean): Point | null {
+    const mark = this.mark;
+    if (mark?.id !== e.pointerId) return null;
+    this.mark = null;
+    if (cancelled || this.deps.tools.activePointer !== e.pointerId) return null;
+    const pt = this.deps.camera.toLocal(e.clientX, e.clientY);
+    const moved = Math.hypot(pt.x - mark.start.x, pt.y - mark.start.y);
+    return moved < TAP_SLOP_PX && now() - mark.time < TAP_MAX_MS ? mark.start : null;
   }
 
   private watchTouchHold(id: number, pt: Point): void {
@@ -233,7 +312,9 @@ export class InputRouter {
     this.touchTimer = setTimeout(() => {
       // Still one finger, still undecided: not a palm, a pan or a pinch.
       if (this.deps.classifier.roleOf(id) !== 'pending') return;
-      if (this.deps.press.longPress(pt)) this.longPressedTouch = id;
+      if (!this.deps.press.longPress(pt)) return;
+      this.longPressedTouch = id;
+      this.dropGrab();
     }, LONG_PRESS_MS);
   }
 
@@ -241,6 +322,7 @@ export class InputRouter {
     const { tools, gestures, camera, classifier } = this.deps;
     if (e.pointerType === 'pen' && !e.buttons && tools.activePointer !== e.pointerId) return;
     const pt = camera.toLocal(e.clientX, e.clientY);
+    if (e.pointerType === 'mouse' && !e.buttons) this.deps.onHover(pt, e);
     if (this.held?.id === e.pointerId) {
       this.moveHeld(this.held, e, pt);
       return;
@@ -249,6 +331,7 @@ export class InputRouter {
       if (this.touchStart && Math.hypot(pt.x - this.touchStart.x, pt.y - this.touchStart.y) > PRESS_SLOP) {
         clearTimeout(this.touchTimer);
       }
+      if (this.grab?.id === e.pointerId) this.moveGrab(this.grab, e, pt);
       this.apply(classifier.touchMove(this.sample(e, pt)), e);
       this.log(e, 'move');
     }
@@ -259,11 +342,13 @@ export class InputRouter {
   private up(e: PointerEvent, cancelled: boolean): void {
     const { tools, gestures, classifier } = this.deps;
     if (e.pointerType === 'pen') classifier.penEvent('up', now());
+    const tapped = this.tappedMark(e, cancelled);
     if (this.held?.id === e.pointerId) this.endHeld(this.held, cancelled);
     else if (tools.activePointer === e.pointerId) {
       if (cancelled) tools.cancel();
       else tools.end(e);
     }
+    if (tapped) this.deps.press.drawnTap(tapped);
     const quickPinch = gestures.hasTouch(e.pointerId) && gestures.release(e.pointerId);
     if (e.pointerType === 'touch') this.touchUp(e, cancelled, quickPinch);
     else this.log(e, cancelled ? 'cancel' : 'up');
@@ -272,6 +357,7 @@ export class InputRouter {
   private touchUp(e: PointerEvent, cancelled: boolean, quickPinch: boolean): void {
     const { classifier, tools } = this.deps;
     const time = now();
+    if (this.grab?.id === e.pointerId) this.dropGrab();
     const lifted = classifier.touchUp(e.pointerId, time, cancelled);
     this.log(e, cancelled ? 'cancel' : 'up', lifted.role);
     this.apply(lifted.changes, null);

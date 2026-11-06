@@ -17,7 +17,7 @@ import { StrokeGeometry } from '../canvas/StrokeGeometry';
 import { StrokePainter } from '../canvas/StrokePainter';
 import { TextLayout } from '../canvas/TextLayout';
 import { ThemeColors } from '../canvas/ThemeColors';
-import type { LinkTarget, Page, Preferences, Stroke, TextItem, ToolKind } from '../core/types';
+import type { LinkTarget, Page, Point, Preferences, Stroke, TextItem, ToolKind } from '../core/types';
 import { byId, context2d } from '../core/utils/dom';
 import { History } from '../domain/History';
 import { TouchClassifier } from '../domain/TouchClassifier';
@@ -29,6 +29,7 @@ import { TouchSizeProbe } from '../input/TouchSizeProbe';
 import type { BlobRepository } from '../storage/BlobRepository';
 import type { SaveQueue } from '../storage/SaveQueue';
 import { EraserTool } from '../tools/EraserTool';
+import { HandTool } from '../tools/HandTool';
 import { HighlighterTool } from '../tools/HighlighterTool';
 import { LassoTool } from '../tools/LassoTool';
 import { PenTool } from '../tools/PenTool';
@@ -196,7 +197,8 @@ export class EditorCanvas {
       tools: this.tools,
       press: hooks.press,
       classifier: new TouchClassifier({
-        twoFingerScroll: () => prefs.twoFingerScroll,
+        // The Hand is there to scroll: choosing it says that one finger may.
+        twoFingerScroll: () => prefs.twoFingerScroll && !this.tools.navigates,
         twoFingerUndo: () => prefs.twoFingerUndo,
       }),
       sizes: new TouchSizeProbe(this.stage),
@@ -204,6 +206,7 @@ export class EditorCanvas {
       onPenSeen: () => hooks.onPenSeen(),
       onTwoFingerTap: () => hooks.onTwoFingerTap(),
       onSample: (sample) => hooks.onInputSample(sample),
+      onHover: (pt, e) => this.hovered(pt, e),
     });
   }
 
@@ -249,6 +252,7 @@ export class EditorCanvas {
       new EraserTool(ctx),
       new LassoTool(ctx),
       new TextTool(ctx),
+      new HandTool(ctx),
     ];
     return new ToolManager(
       tools,
@@ -302,6 +306,12 @@ export class EditorCanvas {
       editText: (page, item, x, y) => hooks.editText(page, item, x, y),
       setTool: (kind) => hooks.setTool(kind),
       refreshTray: () => hooks.refreshTray(),
+      pan: {
+        begin: (id, pt) => this.gestures.beginPan(id, pt),
+        move: (id, pt) => this.gestures.move(id, pt),
+        release: (id) => void this.gestures.release(id),
+        stop: () => this.gestures.stop(),
+      },
     };
   }
 
@@ -353,9 +363,20 @@ export class EditorCanvas {
     this.ruler.fit(this.camera.width, this.camera.height);
   }
 
+  /** With the Hand, a mouse over something that opens shows that it does. */
+  private hovered(pt: Point, e: PointerEvent): void {
+    const opens = this.tools.navigates && this.deps.hooks.press.kindAt(pt, e) !== null;
+    this.mainCanvas.classList.toggle('stage__canvas--pointer', opens);
+  }
+
   /** Sets the canvas cursor for the active tool. */
   applyCursor(tool: Tool): void {
-    this.mainCanvas.classList.remove('stage__canvas--text', 'stage__canvas--crosshair');
+    this.mainCanvas.classList.remove(
+      'stage__canvas--text',
+      'stage__canvas--crosshair',
+      'stage__canvas--grab',
+      'stage__canvas--pointer',
+    );
     if (tool.cursorClass) this.mainCanvas.classList.add(tool.cursorClass);
   }
 }

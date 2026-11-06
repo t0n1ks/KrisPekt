@@ -2,6 +2,7 @@ import { HL_COLORS, PEN_COLORS } from '../../core/constants';
 import type { Preferences, ToolKind, ToolPreset, ToolSettings } from '../../core/types';
 import { el } from '../../core/utils/dom';
 import { ToolbarLayout } from '../../domain/ToolbarLayout';
+import { LassoHandToggle, type SharedTool } from '../../domain/LassoHandToggle';
 import { ToolPresets } from '../../domain/ToolPresets';
 import type { I18n } from '../../i18n/I18n';
 import { icon, type IconName } from '../icons';
@@ -17,6 +18,8 @@ export interface ToolbarState {
   prefs: Preferences;
   /** The base tools' own settings; a preset in use does not change these. */
   base: ToolSettings;
+  /** Which tool the button shared by the lasso and the Hand stands for now. */
+  sharedTool: SharedTool;
   presets: readonly ToolPreset[];
   rulerOn: boolean;
   canUndo: boolean;
@@ -28,6 +31,10 @@ export interface ToolbarItemHandlers {
   tool(kind: ToolKind, button: HTMLButtonElement): void;
   /** A base tool was long-pressed: open its options. */
   toolOptions(kind: ToolKind): void;
+  /** The button shared by the lasso and the Hand was tapped. */
+  sharedTool(): void;
+  /** The lasso's or the Hand's button was long-pressed: choose between them. */
+  sharedMenu(button: HTMLButtonElement): void;
   preset(id: string, button: HTMLButtonElement): void;
   presetMenu(id: string, button: HTMLButtonElement): void;
   /** A pinned pen colour was tapped. */
@@ -48,6 +55,7 @@ const TOOL_ICONS: Record<ToolKind, IconName> = {
   eraser: 'eraser',
   lasso: 'lasso',
   text: 'text',
+  hand: 'hand',
 };
 
 /** Builds the toolbar's items, the same ones on the bar, in the More grid and in customise mode. */
@@ -120,16 +128,22 @@ export class ToolbarItemFactory {
   }
 
   private toolButton(kind: ToolKind, state: ToolbarState): HTMLButtonElement {
-    const on = state.activeItem === kind;
-    const label = this.toolLabel(kind, state.base);
-    const button = this.button(kind, label, on, kind === 'pen' ? state.base.brush : TOOL_ICONS[kind]);
-    button.dataset.tool = kind;
+    const shared = kind === 'lasso';
+    const shown = shared ? state.sharedTool : kind;
+    const on = state.activeItem === kind || (shared && state.activeItem === 'hand');
+    const label = this.toolLabel(shown, state.base);
+    const button = this.button(kind, label, on, shown === 'pen' ? state.base.brush : TOOL_ICONS[shown]);
+    button.dataset.tool = shown;
     const dot =
       kind === 'pen' ? state.base.brushes[state.base.brush].c : kind === 'hl' ? state.base.hl.c : null;
     if (dot) button.append(el('span', { class: 'tool-tray__dot', style: { '--dot-color': dot } }));
     if (kind === 'eraser') button.append(ToolbarItemFactory.eraserBadge(state.base.er.mode));
-    button.addEventListener('click', () => this.handlers.tool(kind, button));
-    LongPress.attach(button, () => this.handlers.toolOptions(kind));
+    button.addEventListener('click', () =>
+      shared ? this.handlers.sharedTool() : this.handlers.tool(kind, button),
+    );
+    LongPress.attach(button, () =>
+      LassoHandToggle.isShared(kind) ? this.handlers.sharedMenu(button) : this.handlers.toolOptions(kind),
+    );
     return button;
   }
 
