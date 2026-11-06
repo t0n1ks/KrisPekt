@@ -210,7 +210,7 @@ test('automatic backup downloads when due, and the file restores', async ({ page
   await page.reload();
   await expect(page.locator('#libBackup')).toContainText('Последняя копия: 4 дня назад');
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^krispekt-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^krispekt-backup-\d{4}-\d{2}-\d{2}\.zip$/);
   await expect(page.locator('.toast')).toHaveText('Резервная копия сохранена в Загрузки');
   await expect(page.locator('.backup-banner')).toBeVisible();
   await expect(page.locator('#libBackup')).toContainText('Последняя копия: сегодня');
