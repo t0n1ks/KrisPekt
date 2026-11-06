@@ -277,6 +277,15 @@ describe('the button shared by the lasso and the Hand', () => {
     expect(LassoHandToggle.shown(null, undefined)).toBe('lasso');
   });
 
+  it('with the Hand on a button of its own, the shared button stays the lasso', () => {
+    expect(LassoHandToggle.shown('hand', 'hand', true)).toBe('lasso');
+    expect(LassoHandToggle.shown('pen', 'hand', true)).toBe('lasso');
+    expect(LassoHandToggle.shown('lasso', 'hand', true)).toBe('lasso');
+    expect(LassoHandToggle.afterTap('pen', 'hand', true)).toBe('lasso');
+    expect(LassoHandToggle.afterTap('hand', 'hand', true)).toBe('lasso');
+    expect(LassoHandToggle.afterTap('lasso', 'lasso', true)).toBe('hand');
+  });
+
   it('the lasso button stands in for a hidden Hand button, so the bar has no second Hand', () => {
     expect(LassoHandToggle.itemOnBar('hand', new Set(['hand']))).toBe('lasso');
     expect(LassoHandToggle.itemOnBar('hand', new Set(['lasso', 'hand']))).toBe('lasso');

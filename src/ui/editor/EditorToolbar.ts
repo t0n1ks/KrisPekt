@@ -49,7 +49,7 @@ export interface EditorToolbarDeps {
  *
  * The lasso's button is shared with the Hand: a tap on it while either is in use switches to the
  * other, and a long press offers both. The Hand's own button, if shown, also goes back to the lasso
- * when tapped in use.
+ * when tapped in use, and the shared button then always shows the lasso.
  */
 export class EditorToolbar {
   private readonly items: ToolbarItemFactory;
@@ -158,7 +158,7 @@ export class EditorToolbar {
       activeItem: active ? ToolbarLayout.presetItem(active.id) : tools().kind,
       prefs,
       base: presets.base,
-      sharedTool: LassoHandToggle.shown(active ? null : tools().kind, prefs.lassoSlot),
+      sharedTool: LassoHandToggle.shown(active ? null : tools().kind, prefs.lassoSlot, this.ownHandButton()),
       presets: presets.presets,
       rulerOn: rulerOn(),
       canUndo: this.canUndo,
@@ -168,6 +168,11 @@ export class EditorToolbar {
 
   private layout(): ToolbarPrefs {
     return ToolbarLayout.resolve(this.deps.prefs.toolbar, this.deps.presets.presets);
+  }
+
+  /** Whether the Hand was given a button of its own in customise mode. */
+  private ownHandButton(): boolean {
+    return !this.layout().hidden.includes('hand');
   }
 
   private setLayout(layout: ToolbarPrefs): void {
@@ -215,7 +220,7 @@ export class EditorToolbar {
     const { presets, prefs, tools } = this.deps;
     const active = presets.active ? null : tools().kind;
     if (presets.active) presets.leave();
-    this.deps.setTool(LassoHandToggle.afterTap(active, prefs.lassoSlot));
+    this.deps.setTool(LassoHandToggle.afterTap(active, prefs.lassoSlot, this.ownHandButton()));
     if (active && LassoHandToggle.isShared(active)) this.hintToggle();
   }
 

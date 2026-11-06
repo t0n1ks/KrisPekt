@@ -130,7 +130,7 @@ export class ToolbarItemFactory {
   private toolButton(kind: ToolKind, state: ToolbarState): HTMLButtonElement {
     const shared = kind === 'lasso';
     const shown = shared ? state.sharedTool : kind;
-    const on = state.activeItem === kind || (shared && state.activeItem === 'hand');
+    const on = state.activeItem === shown;
     const label = this.toolLabel(shown, state.base);
     const button = this.button(kind, label, on, shown === 'pen' ? state.base.brush : TOOL_ICONS[shown]);
     button.dataset.tool = shown;

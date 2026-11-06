@@ -10,8 +10,12 @@ export class LassoHandToggle {
     return tool === 'lasso' || tool === 'hand';
   }
 
-  /** Which of the two the button shows: the one in use, or else the one used last. */
-  static shown(active: ToolKind | null, last: SharedTool | undefined): SharedTool {
+  /**
+   * Which of the two the button shows: the one in use, or else the one used last. With the Hand on
+   * a button of its own, this one is always the lasso, so that the bar never shows two Hands.
+   */
+  static shown(active: ToolKind | null, last: SharedTool | undefined, ownHandButton = false): SharedTool {
+    if (ownHandButton) return 'lasso';
     if (active && LassoHandToggle.isShared(active)) return active;
     return last ?? 'lasso';
   }
@@ -26,9 +30,9 @@ export class LassoHandToggle {
   }
 
   /** The tool after a tap: one of the two in use gives way to the other. */
-  static afterTap(active: ToolKind | null, last: SharedTool | undefined): SharedTool {
+  static afterTap(active: ToolKind | null, last: SharedTool | undefined, ownHandButton = false): SharedTool {
     if (active === 'lasso') return 'hand';
     if (active === 'hand') return 'lasso';
-    return last ?? 'lasso';
+    return ownHandButton ? 'lasso' : (last ?? 'lasso');
   }
 }
