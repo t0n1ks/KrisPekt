@@ -48,7 +48,8 @@ export interface EditorToolbarDeps {
  * menu of a preset.
  *
  * The lasso's button is shared with the Hand: a tap on it while either is in use switches to the
- * other, and a long press offers both.
+ * other, and a long press offers both. The Hand's own button, if shown, also goes back to the lasso
+ * when tapped in use.
  */
 export class EditorToolbar {
   private readonly items: ToolbarItemFactory;
@@ -192,6 +193,10 @@ export class EditorToolbar {
     }
     if (tools().kind !== kind) {
       this.deps.setTool(kind);
+      return;
+    }
+    if (LassoHandToggle.isShared(kind)) {
+      this.onSharedTap();
       return;
     }
     if (tools().current.onActiveTap()) popover().close();

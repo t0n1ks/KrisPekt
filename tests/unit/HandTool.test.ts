@@ -220,10 +220,6 @@ describe('the Hand tool', () => {
     expect(tool.acceptsTouchAt({ x: 50, y: 50 })).toBe(false);
   });
 
-  it('tapping the Hand in use does nothing, as it has no settings', () => {
-    expect(setup().tool.onActiveTap()).toBe(true);
-  });
-
   it('fingers do not draw with it even when finger drawing is on', () => {
     const { tool } = setup();
     const prefs = { fingerDraw: true } as never;
@@ -279,6 +275,14 @@ describe('the button shared by the lasso and the Hand', () => {
     expect(LassoHandToggle.shown('lasso', 'hand')).toBe('lasso');
     expect(LassoHandToggle.shown('pen', 'hand')).toBe('hand');
     expect(LassoHandToggle.shown(null, undefined)).toBe('lasso');
+  });
+
+  it('the lasso button stands in for a hidden Hand button, so the bar has no second Hand', () => {
+    expect(LassoHandToggle.itemOnBar('hand', new Set(['hand']))).toBe('lasso');
+    expect(LassoHandToggle.itemOnBar('hand', new Set(['lasso', 'hand']))).toBe('lasso');
+    expect(LassoHandToggle.itemOnBar('hand', new Set(['lasso']))).toBe('hand');
+    expect(LassoHandToggle.itemOnBar('hand', new Set())).toBe('hand');
+    expect(LassoHandToggle.itemOnBar('pen', new Set(['pen', 'hand']))).toBe('pen');
   });
 
   it('in the toolbar the Hand starts hidden, and a layout from before it stays as it was', () => {

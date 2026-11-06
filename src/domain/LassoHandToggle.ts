@@ -16,6 +16,15 @@ export class LassoHandToggle {
     return last ?? 'lasso';
   }
 
+  /**
+   * The bar item that must stay on the bar for the item in use. The Hand, when its own button is
+   * hidden, is shown by the lasso's button. Bringing its own button back as well would add a dead
+   * twin, and the centred bar would shift so that the twin lands under the finger.
+   */
+  static itemOnBar(activeItem: string, hidden: ReadonlySet<string>): string {
+    return activeItem === 'hand' && hidden.has('hand') ? 'lasso' : activeItem;
+  }
+
   /** The tool after a tap: one of the two in use gives way to the other. */
   static afterTap(active: ToolKind | null, last: SharedTool | undefined): SharedTool {
     if (active === 'lasso') return 'hand';

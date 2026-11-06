@@ -113,11 +113,6 @@ export class HandTool extends Tool {
     if (found) this.select(found.page, found.object.id);
   }
 
-  /** There is nothing to set, so tapping the tool in use does nothing. */
-  override onActiveTap(): boolean {
-    return true;
-  }
-
   override renderOverlay(ctx: CanvasRenderingContext2D, live: LiveLayer): void {
     const held = this.held;
     if (!held) return;

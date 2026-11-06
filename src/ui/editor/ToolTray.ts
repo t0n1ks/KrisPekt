@@ -1,6 +1,7 @@
 import { TOOLBAR_CHROME_WIDTH, TOOLBAR_GAP, TOOLBAR_ITEM_WIDTH } from '../../core/constants';
 import type { ToolbarPrefs } from '../../core/types';
 import { byId, el, replaceChildren } from '../../core/utils/dom';
+import { LassoHandToggle } from '../../domain/LassoHandToggle';
 import { ToolbarLayout } from '../../domain/ToolbarLayout';
 import { ToolbarOverflow, type OverflowItem, type OverflowResult } from '../../domain/ToolbarOverflow';
 import type { I18n } from '../../i18n/I18n';
@@ -116,14 +117,15 @@ export class ToolTray {
 
   private overflowItems(state: ToolbarState, layout: ToolbarPrefs): OverflowItem[] {
     const hidden = new Set(layout.hidden);
+    const inUse = LassoHandToggle.itemOnBar(state.activeItem, hidden);
     return layout.order
-      .filter((id) => !hidden.has(id) || id === state.activeItem)
+      .filter((id) => !hidden.has(id) || id === inUse)
       .filter((id) => id !== 'colors' || state.prefs.favs.length > 0)
       .map((id) => ({
         id,
         width: id === 'colors' ? state.prefs.favs.length * TOOLBAR_ITEM_WIDTH : TOOLBAR_ITEM_WIDTH,
         priority: ToolbarLayout.priority(id),
-        always: id === 'undo' || id === 'redo' || id === state.activeItem,
+        always: id === 'undo' || id === 'redo' || id === inUse,
       }));
   }
 

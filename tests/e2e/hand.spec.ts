@@ -423,6 +423,8 @@ test.describe('the button shared by the lasso and the Hand', () => {
     await item.click();
     await expect(item).toHaveAttribute('aria-pressed', 'true');
     await item.click();
+    await expect(item).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('#tray [data-item="lasso"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.popover')).toHaveCount(0);
   });
 });
