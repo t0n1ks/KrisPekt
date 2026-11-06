@@ -45,7 +45,7 @@ describe('regressions found before attachments', () => {
   it('deleting a notebook still removes a blob nothing else uses', async () => {
     const { service, blobs, db } = library();
     await db.put('subjects', subject());
-    await db.put('blobs', { id: 'own', blob: new Blob(['x'], { type: 'image/png' }) });
+    await db.put('blobs', { id: 'own', blob: new Blob(['x'], { type: 'image/png' }) } as { id: string });
     await db.put('notebooks', notebook({ id: 'nba', pageIds: ['pa'] }));
     await db.put('pages', page({ id: 'pa', nbId: 'nba', images: [photo('own')] }));
     await service.load();

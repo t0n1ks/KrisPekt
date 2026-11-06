@@ -80,19 +80,8 @@ export class PdfImporter {
       notify(i18n.t('pdfModuleFail'), 4000);
       return null;
     }
-    const params = {
-      data: new Uint8Array(await file.arrayBuffer()),
-      // pdf.js ≥ 5 no longer has an eval code path (CVE-2024-4367); kept as defence in depth.
-      isEvalSupported: false,
-      enableXfa: false,
-      // Image decoders come as plain JS from our origin, so the CSP needs no 'wasm-unsafe-eval'.
-      useWasm: false,
-      wasmUrl: PdfLoader.wasmUrl,
-      standardFontDataUrl: PdfLoader.standardFontDataUrl,
-      stopAtErrors: false,
-    };
     try {
-      return await pdfjs.getDocument(params).promise;
+      return await pdfjs.getDocument(PdfLoader.documentOptions(new Uint8Array(await file.arrayBuffer()))).promise;
     } catch {
       notify(i18n.t('pdfOpenFail'), 3500);
       return null;
@@ -145,6 +134,7 @@ export class PdfImporter {
       strokes: [],
       texts: [],
       images: [],
+      cards: [],
       updatedAt: Date.now(),
     };
   }

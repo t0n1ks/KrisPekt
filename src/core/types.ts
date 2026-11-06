@@ -87,6 +87,12 @@ export interface StrokeLike {
 }
 
 /** Character styling. An absent field means the box's own size or colour, or "off". */
+/**
+ * Where a link leads. Only web addresses for now; further kinds (pages, notebooks) are added here,
+ * and everything that opens a link goes through this type.
+ */
+export type LinkTarget = { kind: 'url'; href: string };
+
 export interface TextStyle {
   /** Font size in world px. */
   fs?: number;
@@ -96,6 +102,8 @@ export interface TextStyle {
   i?: true;
   u?: true;
   s?: true;
+  /** Where the text leads; drawn in the link colour and underlined. */
+  link?: LinkTarget;
 }
 
 /** A stretch of text in one style. */
@@ -144,6 +152,42 @@ export interface ImageItem {
   blob: string;
 }
 
+export type CardKind = 'pdf' | 'link';
+
+/** What every attachment card has: its rectangle on the page, in world px. */
+interface CardBase {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** An attached PDF. It is shown on the card and in the viewer, and is never run or trusted. */
+export interface PdfCard extends CardBase {
+  kind: 'pdf';
+  /** Id of the file in the `blobs` store; files with the same content share one. */
+  blob: string;
+  /** Id of the first page's image in the `blobs` store. */
+  thumb: string | null;
+  /** The sanitised file name, with its extension. */
+  name: string;
+  /** 0 when unknown (a file that could not be opened). */
+  pages: number;
+  bytes: number;
+  /** Set when the file could not be opened; it can still be saved. */
+  problem?: 'locked' | 'broken';
+}
+
+/** A web link. No preview, title or icon is ever fetched for it. */
+export interface LinkCard extends CardBase {
+  kind: 'link';
+  link: LinkTarget;
+  title: string;
+}
+
+export type CardItem = PdfCard | LinkCard;
+
 export interface Page {
   id: string;
   nbId: string;
@@ -159,6 +203,8 @@ export interface Page {
   strokes: Stroke[];
   texts: TextItem[];
   images: ImageItem[];
+  /** Attachment cards; pages stored before they existed load with none. */
+  cards: CardItem[];
   updatedAt: number;
 }
 

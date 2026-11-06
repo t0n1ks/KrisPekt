@@ -117,6 +117,7 @@ export class SampleSeeder {
       strokes: [],
       texts: [],
       images: [],
+      cards: [],
       updatedAt: now,
     };
   }

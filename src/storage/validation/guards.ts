@@ -26,6 +26,7 @@ export const LIMITS = {
   lockedZoom: [ZOOM_MIN, ZOOM_MAX],
   timestamp: [0, 8.64e15],
   order: [-1e9, 1e9],
+  cardPages: [0, 1e6],
 } as const satisfies Record<string, readonly [number, number]>;
 
 export const MAX_LEN = {

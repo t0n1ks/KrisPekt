@@ -1,4 +1,4 @@
-import type { TextItem, TextParagraph, TextSpan, TextStyle } from '../core/types';
+import type { LinkTarget, TextItem, TextParagraph, TextSpan, TextStyle } from '../core/types';
 
 /** A style change: `false` turns a flag off. */
 export interface StylePatch {
@@ -8,6 +8,15 @@ export interface StylePatch {
   i?: boolean;
   u?: boolean;
   s?: boolean;
+  /** `null` removes the link. */
+  link?: LinkTarget | null;
+}
+
+/** A linked stretch of text, by character offsets. */
+export interface LinkRange {
+  start: number;
+  end: number;
+  link: LinkTarget;
 }
 
 /** A paragraph change; `null` restores the default. */
@@ -51,7 +60,12 @@ export class RichText {
 
   /** Whether two runs look the same. */
   static sameStyle(a: TextStyle, b: TextStyle): boolean {
-    return STYLE_KEYS.every((key) => a[key] === b[key]);
+    return STYLE_KEYS.every((key) => a[key] === b[key]) && RichText.sameLink(a.link, b.link);
+  }
+
+  /** Whether two links lead to the same place. */
+  static sameLink(a: LinkTarget | undefined, b: LinkTarget | undefined): boolean {
+    return a?.kind === b?.kind && a?.href === b?.href;
   }
 
   /** The style fields of a run, without its text. */
@@ -63,6 +77,7 @@ export class RichText {
     if (run.i) style.i = true;
     if (run.u) style.u = true;
     if (run.s) style.s = true;
+    if (run.link) style.link = run.link;
     return style;
   }
 
@@ -132,6 +147,7 @@ export class RichText {
     for (const run of runs) {
       const next: TextStyle = {};
       for (const key of STYLE_KEYS) if (common[key] === run[key]) Object.assign(next, { [key]: common[key] });
+      if (common.link && RichText.sameLink(common.link, run.link)) next.link = common.link;
       common = RichText.styleOf(next);
     }
     return common;
@@ -146,6 +162,22 @@ export class RichText {
       at += len + 1;
     }
     return paras[paras.length - 1];
+  }
+
+  /** The linked run at an offset; a caret at either end of it counts. */
+  static linkRangeAt(paras: readonly TextParagraph[], offset: number): LinkRange | null {
+    let at = 0;
+    for (const p of paras) {
+      for (const run of p.runs) {
+        const stop = at + run.t.length;
+        if (run.link && run.t && offset >= at && offset <= stop) {
+          return { start: at, end: stop, link: run.link };
+        }
+        at = stop;
+      }
+      at += 1;
+    }
+    return null;
   }
 
   /** Replaces [start, end) with plain text in the given style; "\n" starts a new paragraph. */
@@ -224,6 +256,8 @@ export class RichText {
     const out = { ...style };
     if (patch.fs !== undefined) out.fs = patch.fs;
     if (patch.c !== undefined) out.c = patch.c;
+    if (patch.link === null) out.link = undefined;
+    else if (patch.link) out.link = patch.link;
     for (const flag of ['b', 'i', 'u', 's'] as const) {
       if (patch[flag] === true) out[flag] = true;
       else if (patch[flag] === false) out[flag] = undefined;

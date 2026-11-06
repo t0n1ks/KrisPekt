@@ -41,6 +41,7 @@ export function page(overrides: Partial<Page> = {}): Page {
     ],
     texts: [{ id: 'tx1', x: 75, y: 58, w: 600, t: 'y = x²', fs: 20, c: '#1E40AF' }],
     images: [],
+    cards: [],
     updatedAt: 1700000000000,
     ...overrides,
   };

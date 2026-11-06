@@ -187,6 +187,7 @@ export class LibraryService {
       strokes: [],
       texts: [],
       images: [],
+      cards: [],
       updatedAt: Date.now(),
     };
   }

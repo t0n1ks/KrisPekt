@@ -1,4 +1,5 @@
 import type { Box } from '../core/types';
+import { CardRules } from './CardRules';
 import { ItemTransform, type PageItems } from './ItemTransform';
 
 /** Copied items and their bounding box in the page they came from. */
@@ -32,6 +33,7 @@ export class SelectionClipboard {
       strokes: moved.strokes.map(fresh),
       texts: moved.texts.map(fresh),
       images: moved.images.map(fresh),
+      cards: moved.cards.map(fresh),
     };
   }
 
@@ -40,8 +42,10 @@ export class SelectionClipboard {
     return this.content?.box ?? null;
   }
 
-  /** Ids of the images held here; these must stay stored. */
+  /** Ids of the blobs held here; these must stay stored. */
   blobIds(): string[] {
-    return this.content?.items.images.map((image) => image.blob) ?? [];
+    if (!this.content) return [];
+    const { images, cards } = this.content.items;
+    return [...images.map((image) => image.blob), ...cards.flatMap((card) => CardRules.blobIds(card))];
   }
 }

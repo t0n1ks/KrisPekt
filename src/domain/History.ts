@@ -1,5 +1,6 @@
 import { UNDO_LIMIT } from '../core/constants';
-import type { Background, ImageItem, Page, Stroke, TextItem } from '../core/types';
+import type { Background, CardItem, ImageItem, Page, Stroke, TextItem } from '../core/types';
+import { CardRules } from './CardRules';
 
 /**
  * State of one page before a change. Item arrays are copied shallowly: items are never
@@ -10,6 +11,7 @@ export interface PageSnapshot {
   strokes: Stroke[];
   texts: TextItem[];
   images: ImageItem[];
+  cards: CardItem[];
   w: number;
   h: number;
   locked: boolean;
@@ -41,6 +43,7 @@ export class History {
       strokes: page.strokes.slice(),
       texts: page.texts.slice(),
       images: page.images.slice(),
+      cards: page.cards.slice(),
       w: page.w,
       h: page.h,
       locked: page.locked,
@@ -54,6 +57,7 @@ export class History {
     page.strokes = snap.strokes;
     page.texts = snap.texts;
     page.images = snap.images;
+    page.cards = snap.cards;
     page.w = snap.w;
     page.h = snap.h;
     page.locked = snap.locked;
@@ -105,7 +109,10 @@ export class History {
   blobIds(): Set<string> {
     const ids = new Set<string>();
     for (const entry of [...this.undoStack, ...this.redoStack]) {
-      for (const snap of entry) for (const image of snap.images) ids.add(image.blob);
+      for (const snap of entry) {
+        for (const image of snap.images) ids.add(image.blob);
+        for (const card of snap.cards) for (const id of CardRules.blobIds(card)) ids.add(id);
+      }
     }
     return ids;
   }

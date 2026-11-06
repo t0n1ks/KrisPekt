@@ -1,15 +1,17 @@
-import { ALLOWED_IMAGE_TYPES, BACKUP_APP, MAX_BACKUP_BYTES } from '../core/constants';
+import { BACKUP_APP, MAX_BACKUP_BYTES } from '../core/constants';
 import type { BlobRecord, Page } from '../core/types';
 import { base64ToBlob, blobToBase64 } from '../core/utils/files';
+import { BackupSize } from '../domain/BackupSize';
 import type { BlobRepository } from './BlobRepository';
 import type { Database } from './Database';
 import type { NotebookRepository } from './NotebookRepository';
 import type { PageRepository } from './PageRepository';
 import type { SubjectRepository } from './SubjectRepository';
 import {
+  BACKUP_BLOB_TYPES,
   parseBackup,
-  type AllowedImageType,
   type BackupBlob,
+  type BackupBlobType,
   type BackupDocument,
 } from './validation/backup';
 
@@ -39,8 +41,8 @@ export interface BackupRepositories {
   blobs: BlobRepository;
 }
 
-function isAllowedType(type: string): type is AllowedImageType {
-  return (ALLOWED_IMAGE_TYPES as readonly string[]).includes(type);
+function isAllowedType(type: string): type is BackupBlobType {
+  return (BACKUP_BLOB_TYPES as readonly string[]).includes(type);
 }
 
 /** Strokes become plain arrays rounded to 2 decimals, which keeps backups compact. */
@@ -82,6 +84,15 @@ export class BackupService {
       blobs,
     });
     return new Blob([json], { type: 'application/json' });
+  }
+
+  /** About how large a backup would be now, without building it. */
+  async estimateBytes(): Promise<number> {
+    const [pages, blobs] = await Promise.all([this.repos.pages.all(), this.repos.blobs.all()]);
+    return BackupSize.estimate(
+      pages,
+      blobs.map((record) => record.blob.size),
+    );
   }
 
   private async encodeBlob(record: BlobRecord): Promise<BackupBlob | null> {

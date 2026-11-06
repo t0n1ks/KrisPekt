@@ -1,4 +1,4 @@
-import type { ImageItem, Stroke, TextItem } from '../core/types';
+import type { CardItem, ImageItem, Stroke, TextItem } from '../core/types';
 import { clamp } from '../core/utils/math';
 import { RichText } from './RichText';
 import { LIMITS } from '../storage/validation/guards';
@@ -8,6 +8,7 @@ export interface PageItems {
   strokes: Stroke[];
   texts: TextItem[];
   images: ImageItem[];
+  cards: CardItem[];
 }
 
 /** Uniform scale `k` around (`ox`, `oy`), then a move by (`dx`, `dy`); all in page px. */
@@ -17,6 +18,8 @@ export interface ItemMapping {
   k: number;
   dx: number;
   dy: number;
+  /** Vertical scale of cards when not `k`: dragging one card's handle sets only its width. */
+  cardKy?: number;
 }
 
 const clampCoord = (v: number): number => clamp(v, LIMITS.coord[0], LIMITS.coord[1]);
@@ -40,11 +43,13 @@ export class ItemTransform {
         strokes: items.strokes.filter(has),
         texts: items.texts.filter(has),
         images: items.images.filter(has),
+        cards: items.cards.filter(has),
       },
       rest: {
         strokes: items.strokes.filter(not),
         texts: items.texts.filter(not),
         images: items.images.filter(not),
+        cards: items.cards.filter(not),
       },
     };
   }
@@ -57,6 +62,13 @@ export class ItemTransform {
       strokes: items.strokes.map((st) => ItemTransform.mapStroke(st, m.k, tx, ty)),
       texts: items.texts.map((t) => ItemTransform.mapText(t, m.k, tx, ty)),
       images: items.images.map((im) => ({ ...im, x: tx(im.x), y: ty(im.y), w: im.w * m.k, h: im.h * m.k })),
+      cards: items.cards.map((card) => ({
+        ...card,
+        x: tx(card.x),
+        y: ty(card.y),
+        w: card.w * m.k,
+        h: card.h * (m.cardKy ?? m.k),
+      })),
     };
   }
 
@@ -67,6 +79,7 @@ export class ItemTransform {
       strokes: ItemTransform.swap(items.strokes, copies.strokes),
       texts: ItemTransform.swap(items.texts, copies.texts),
       images: ItemTransform.swap(items.images, copies.images),
+      cards: ItemTransform.swap(items.cards, copies.cards),
     };
   }
 

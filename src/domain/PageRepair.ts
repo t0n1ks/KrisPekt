@@ -1,5 +1,6 @@
 import { MM } from '../core/constants';
-import type { Box, ImageItem, Page, Stroke, TextItem } from '../core/types';
+import type { Box, CardItem, ImageItem, Page, Stroke, TextItem } from '../core/types';
+import { CardRules } from './CardRules';
 import { ItemTransform, type PageItems } from './ItemTransform';
 import { SelectionPlacement } from './SelectionPlacement';
 
@@ -42,6 +43,9 @@ export class PageRepair {
     page.images = page.images.map((im) =>
       fix(im, PageRepair.imageBox(im), PageRepair.ofImage, (v) => v.images[0]),
     );
+    page.cards = page.cards.map((card) =>
+      fix(card, CardRules.box(card), PageRepair.ofCard, (v) => v.cards[0]),
+    );
     return moved;
   }
 
@@ -50,14 +54,18 @@ export class PageRepair {
   }
 
   private static ofStroke(stroke: Stroke): PageItems {
-    return { strokes: [stroke], texts: [], images: [] };
+    return { strokes: [stroke], texts: [], images: [], cards: [] };
   }
 
   private static ofText(text: TextItem): PageItems {
-    return { strokes: [], texts: [text], images: [] };
+    return { strokes: [], texts: [text], images: [], cards: [] };
   }
 
   private static ofImage(image: ImageItem): PageItems {
-    return { strokes: [], texts: [], images: [image] };
+    return { strokes: [], texts: [], images: [image], cards: [] };
+  }
+
+  private static ofCard(card: CardItem): PageItems {
+    return { strokes: [], texts: [], images: [], cards: [card] };
   }
 }

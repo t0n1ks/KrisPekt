@@ -74,6 +74,7 @@ export class PageSizePolicy {
       strokes: [],
       texts: [],
       images: [],
+      cards: [],
       updatedAt: Date.now(),
     };
   }

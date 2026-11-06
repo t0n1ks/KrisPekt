@@ -63,6 +63,15 @@ export const PAPER = {
   imagePlaceholder: '#EEF1F5',
   eraserFill: 'rgba(255,255,255,.35)',
   eraserRing: 'rgba(30,40,60,.7)',
+  /** Linked words on the page. */
+  link: '#1D4ED8',
+  cardFill: '#F6F8FB',
+  cardEdge: '#C5CFDC',
+  cardTitle: '#1B2433',
+  cardMeta: '#566274',
+  cardProblem: '#B3261E',
+  cardBadge: '#C22A36',
+  cardBadgeText: '#FFFFFF',
 } as const;
 
 /** Fallbacks when theme variables cannot be read. */
@@ -379,6 +388,35 @@ export const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 export const MAX_BLOB_BYTES = 25 * 1024 * 1024;
 export const MAX_PDF_BYTES = 200 * 1024 * 1024;
 export const MAX_PDF_PAGES = 500;
+/** Largest PDF that can be attached to a page. */
+export const MAX_ATTACHMENT_PDF_BYTES = 50 * 1024 * 1024;
+/** Longest web address, after normalising. */
+export const MAX_URL_LENGTH = 2048;
+/** Longest attached file name shown or saved. */
+export const MAX_FILE_NAME = 120;
+/** Storage must have this many times the size of a new attachment free. */
+export const STORAGE_ROOM_FACTOR = 1.1;
+/** Card heights in world px; lasso scaling may change them. */
+export const CARD_HEIGHT = { pdf: 104, link: 68 } as const;
+/** Free space on each side of a new card, in world px (12 mm). */
+export const CARD_MARGIN = 45;
+export const CARD_MIN_WIDTH = 150;
+/** Width of the ⋮ zone at a card's right end, per unit of its height. */
+export const CARD_MENU_ZONE = 0.55;
+/** Thumbnails of attached PDFs: portrait 3:4, the first page fitted inside. */
+export const CARD_THUMB_WIDTH = 240;
+export const CARD_THUMB_HEIGHT = 320;
+export const CARD_THUMB_QUALITY = 0.8;
+/** How long the "tap the page" hint waits. */
+export const CARD_PLACE_HINT_MS = 30_000;
+/** Largest canvas one page of the built-in PDF viewer may take, in pixels. */
+export const VIEWER_MAX_PIXELS = 8e6;
+export const VIEWER_ZOOM_MIN = 1;
+export const VIEWER_ZOOM_MAX = 5;
+/** How far beyond the visible part of the viewer pages are rendered, in px. */
+export const VIEWER_RENDER_MARGIN = 900;
+/** Rendered pages kept in the viewer; the farthest are released first. */
+export const VIEWER_KEEP_PAGES = 6;
 export const IMAGE_MAX_EDGE = 2200;
 export const IMAGE_JPEG_QUALITY = 0.88;
 export const PDF_IMPORT_WIDTH = 1800;

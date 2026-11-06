@@ -16,14 +16,18 @@ function parseBlobRecord(raw: unknown): BlobRecord {
 function referencedBlobs(raw: unknown): string[] {
   if (!isRecord(raw)) return [];
   const ids = typeof raw.bgBlob === 'string' ? [raw.bgBlob] : [];
-  if (!Array.isArray(raw.images)) return ids;
-  for (const image of raw.images as unknown[]) {
-    if (isRecord(image) && typeof image.blob === 'string') ids.push(image.blob);
+  for (const list of [raw.images, raw.cards]) {
+    if (!Array.isArray(list)) continue;
+    for (const item of list as unknown[]) {
+      if (!isRecord(item)) continue;
+      if (typeof item.blob === 'string') ids.push(item.blob);
+      if (typeof item.thumb === 'string') ids.push(item.thumb);
+    }
   }
   return ids;
 }
 
-/** Stores binary images: inserted photos and rasterised PDF pages. */
+/** Stores binary files: photos, rasterised PDF pages, and attached PDFs with their thumbnails. */
 export class BlobRepository {
   /** Saved since the app started; a page may be about to reference them (a PDF still importing). */
   private readonly savedNow = new Set<string>();

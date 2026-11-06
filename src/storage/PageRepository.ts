@@ -1,4 +1,5 @@
 import type { Notebook, Page } from '../core/types';
+import { CardRules } from '../domain/CardRules';
 import type { Database } from './Database';
 import { NotebookRepository } from './NotebookRepository';
 import type { RecordReader } from './RecordReader';
@@ -66,16 +67,18 @@ export class PageRepository {
       strokes: p.strokes,
       texts: p.texts,
       images: p.images,
+      cards: p.cards,
       updatedAt: p.updatedAt || Date.now(),
     };
   }
 
-  /** Ids of every blob a set of pages references (backgrounds and images). */
+  /** Ids of every blob a set of pages references (backgrounds, images and attachments). */
   static blobIds(pages: readonly Page[]): Set<string> {
     const ids = new Set<string>();
     for (const p of pages) {
       if (p.bgBlob) ids.add(p.bgBlob);
       for (const image of p.images) ids.add(image.blob);
+      for (const card of p.cards) for (const id of CardRules.blobIds(card)) ids.add(id);
     }
     return ids;
   }

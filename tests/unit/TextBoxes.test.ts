@@ -439,7 +439,7 @@ describe('moving and scaling rich text', () => {
   it('scales the sizes that runs set themselves, and keeps the rest', () => {
     const item = rich([{ runs: [{ t: 'a', fs: 20 }, { t: 'b' }] }]);
     const out = ItemTransform.map(
-      { strokes: [], texts: [item], images: [] },
+      { strokes: [], texts: [item], images: [], cards: [] },
       { ox: 0, oy: 0, k: 2, dx: 0, dy: 0 },
     ).texts[0];
     expect(out?.fs).toBe(40);
@@ -450,7 +450,7 @@ describe('moving and scaling rich text', () => {
   it('keeps sizes within the limits', () => {
     const item = rich([{ runs: [{ t: 'a', fs: 150 }] }]);
     const out = ItemTransform.map(
-      { strokes: [], texts: [item], images: [] },
+      { strokes: [], texts: [item], images: [], cards: [] },
       { ox: 0, oy: 0, k: 3, dx: 0, dy: 0 },
     ).texts[0];
     expect(out?.paras?.[0]?.runs[0]?.fs).toBe(200);
@@ -459,7 +459,7 @@ describe('moving and scaling rich text', () => {
   it('a pure move shares the paragraphs, keeps the auto flag and changes no size', () => {
     const paras = plain('x');
     const out = ItemTransform.map(
-      { strokes: [], texts: [rich(paras, { auto: true })], images: [] },
+      { strokes: [], texts: [rich(paras, { auto: true })], images: [], cards: [] },
       ItemTransform.translation(5, 6),
     ).texts[0];
     expect(out).toMatchObject({ x: 15, y: 26, auto: true, fs: 20 });
@@ -472,6 +472,7 @@ describe('the selection clipboard', () => {
     strokes: [{ id: 's', k: 'pen' as const, c: '#000000', s: 2, p: new Float32Array([1, 2, 1]) }],
     texts: [rich(plain('x'))],
     images: [{ id: 'i', x: 1, y: 2, w: 3, h: 4, blob: 'photo' }],
+    cards: [],
   };
 
   it('starts empty', () => {

@@ -147,6 +147,7 @@ export class PageOperations {
       strokes: page.strokes.slice(),
       texts: page.texts.slice(),
       images: page.images.slice(),
+      cards: page.cards.slice(),
       updatedAt: Date.now(),
     };
     this.insert(page, [copy]);

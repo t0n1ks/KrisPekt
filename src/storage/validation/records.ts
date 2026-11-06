@@ -1,6 +1,8 @@
-import { BRUSH_KINDS } from '../../core/constants';
+import { BRUSH_KINDS, MAX_ATTACHMENT_PDF_BYTES, MAX_URL_LENGTH } from '../../core/constants';
 import type {
+  CardItem,
   ImageItem,
+  LinkTarget,
   Notebook,
   NotebookView,
   Page,
@@ -10,7 +12,9 @@ import type {
   TextParagraph,
   TextSpan,
 } from '../../core/types';
+import { FileNames } from '../../domain/FileNames';
 import { RichText } from '../../domain/RichText';
+import { SafeUrl } from '../../domain/SafeUrl';
 import {
   LIMITS,
   MAX_LEN,
@@ -118,6 +122,15 @@ function parseFlag(value: unknown, path: string): true {
   return true;
 }
 
+/** Only known kinds of link, and only addresses that may be opened; anything else rejects the record. */
+export function parseLink(raw: unknown, path: string): LinkTarget {
+  const o = asRecord(raw, path);
+  asOneOf(o.kind, ['url'] as const, `${path}.kind`);
+  const href = SafeUrl.strict(asString(o.href, `${path}.href`, MAX_URL_LENGTH));
+  if (!href) throw new ValidationError(`${path}.href`, 'address not allowed');
+  return { kind: 'url', href };
+}
+
 function parseRun(raw: unknown, path: string): TextSpan {
   const o = asRecord(raw, path);
   const t = asString(o.t, `${path}.t`, MAX_LEN.text);
@@ -128,6 +141,7 @@ function parseRun(raw: unknown, path: string): TextSpan {
   for (const key of ['b', 'i', 'u', 's'] as const) {
     if (o[key] !== undefined) run[key] = parseFlag(o[key], `${path}.${key}`);
   }
+  if (o.link !== undefined) run.link = parseLink(o.link, `${path}.link`);
   return run;
 }
 
@@ -180,6 +194,35 @@ export function parseImage(raw: unknown, path = 'image'): ImageItem {
   };
 }
 
+/** Names are cleaned rather than refused: a strange name is no reason to lose the file. */
+export function parseCard(raw: unknown, path = 'card'): CardItem {
+  const o = asRecord(raw, path);
+  const base = {
+    id: asId(o.id, `${path}.id`),
+    x: asNumber(o.x, `${path}.x`, LIMITS.coord),
+    y: asNumber(o.y, `${path}.y`, LIMITS.coord),
+    w: asNumber(o.w, `${path}.w`, LIMITS.extent),
+    h: asNumber(o.h, `${path}.h`, LIMITS.extent),
+  };
+  if (asOneOf(o.kind, ['pdf', 'link'] as const, `${path}.kind`) === 'link') {
+    const link = parseLink(o.link, `${path}.link`);
+    const title = FileNames.label(asString(o.title, `${path}.title`, MAX_LEN.name), MAX_LEN.name);
+    return { ...base, kind: 'link', link, title };
+  }
+  const card: CardItem = {
+    ...base,
+    kind: 'pdf',
+    blob: asId(o.blob, `${path}.blob`),
+    thumb: o.thumb == null ? null : asId(o.thumb, `${path}.thumb`),
+    name: FileNames.sanitize(asString(o.name, `${path}.name`, MAX_LEN.name), 'document.pdf'),
+    pages: asNumber(o.pages, `${path}.pages`, LIMITS.cardPages),
+    bytes: asNumber(o.bytes, `${path}.bytes`, [0, MAX_ATTACHMENT_PDF_BYTES]),
+  };
+  if (o.problem !== undefined)
+    card.problem = asOneOf(o.problem, ['locked', 'broken'] as const, `${path}.problem`);
+  return card;
+}
+
 export function parsePage(raw: unknown, path = 'page'): Page {
   const o = asRecord(raw, path);
   const list = <T>(key: string, parse: (v: unknown, p: string) => T): T[] =>
@@ -195,6 +238,7 @@ export function parsePage(raw: unknown, path = 'page'): Page {
     strokes: list('strokes', parseStroke),
     texts: list('texts', parseText),
     images: list('images', parseImage),
+    cards: list('cards', parseCard),
     updatedAt: o.updatedAt === undefined ? 0 : asNumber(o.updatedAt, `${path}.updatedAt`, LIMITS.timestamp),
   };
 }

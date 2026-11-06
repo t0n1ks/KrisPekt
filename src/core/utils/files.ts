@@ -71,3 +71,11 @@ export function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: n
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))), type, quality);
   });
 }
+
+/** The SHA-256 of some bytes in hex, or null where the browser offers none (outside HTTPS). */
+export async function sha256Hex(bytes: BufferSource): Promise<string | null> {
+  const subtle = globalThis.crypto?.subtle as SubtleCrypto | undefined;
+  if (!subtle) return null;
+  const digest = new Uint8Array(await subtle.digest('SHA-256', bytes));
+  return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
+}
