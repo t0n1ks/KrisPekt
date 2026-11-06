@@ -8,6 +8,8 @@ import type {
   PngScale,
   Preferences,
   RasterDpi,
+  ScratchLevel,
+  ScratchThresholds,
 } from './types';
 
 /* ---------- units and layout ---------- */
@@ -242,6 +244,7 @@ export const DEFAULT_PREFS: Preferences = {
   twoFingerUndo: true,
   twoFingerScroll: false,
   straighten: true,
+  scratch: { on: true, level: 'normal', hints: 0 },
   seeded: false,
   blobSweepDue: true,
   autoBackup: '3days',
@@ -250,6 +253,36 @@ export const DEFAULT_PREFS: Preferences = {
   lastChangeAt: 0,
   exp: { ...DEFAULT_EXPORT },
 };
+
+/* ---------- scratch out ---------- */
+
+export const SCRATCH_LEVEL_NAMES = ['low', 'normal', 'high'] as const;
+/**
+ * The limits of each sensitivity (see ScribbleDetector for what they measure). The pitch limits
+ * are the fine line. Normal keeps a narrow "www", at about 0.18, as writing, and so also a coarse
+ * zigzag of the same shape. High accepts both, because there has to be something to delete under
+ * them, while "ж", at about 0.21, and an ordinary "www", at about 0.25, stay writing at every level.
+ */
+export const SCRATCH_LEVELS: Record<ScratchLevel, ScratchThresholds> = {
+  low: { minReversals: 6, minDensity: 3.5, maxPitch: 0.11, maxWinding: 0.5, minCoverage: 0.75 },
+  normal: { minReversals: 4, minDensity: 2.8, maxPitch: 0.16, maxWinding: 0.6, minCoverage: 0.6 },
+  high: { minReversals: 3, minDensity: 2.2, maxPitch: 0.2, maxWinding: 0.7, minCoverage: 0.5 },
+};
+/** A reversal is a retreat over this share of a stroke's extent along its axis. */
+export const SCRATCH_MIN_SWING = 0.5;
+/** Fewer points than this are too few to go back and forth. */
+export const SCRATCH_MIN_POINTS = 12;
+/** A scribble is at least this big on the screen, in CSS px. */
+export const SCRATCH_MIN_EXTENT_PX = 10;
+/** The margin around a scribble's hull: this many ink widths, or this share of its shorter side. */
+export const SCRATCH_MARGIN_INK = 2;
+export const SCRATCH_MARGIN_SIDE = 0.25;
+/** A word with this share of its characters covered goes as a whole. */
+export const SCRATCH_WORD_SHARE = 0.6;
+export const SCRATCH_FADE_MS = 150;
+/** The hint shows this many times, and each time for this long. */
+export const SCRATCH_HINT_COUNT = 3;
+export const SCRATCH_HINT_MS = 4000;
 
 /* ---------- toolbar ---------- */
 

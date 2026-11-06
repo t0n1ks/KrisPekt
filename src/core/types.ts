@@ -249,12 +249,34 @@ export interface Preferences {
   lastChangeAt: number;
   /** The last export choices. */
   exp: ExportPrefs;
+  /** Scribbling over content deletes it. */
+  scratch: ScratchPrefs;
   /** Pinned tool presets, at most twelve. */
   presets?: ToolPreset[];
   /** Toolbar order and hidden items; the default layout when absent. */
   toolbar?: ToolbarPrefs;
   /** The base tools' settings while a preset is in use. Loading puts them back. */
   presetBase?: ToolSettings;
+}
+
+/** How readily a scribble counts as crossing out. */
+export type ScratchLevel = 'low' | 'normal' | 'high';
+
+/** The scratch-out settings; in storage the whole field is optional. */
+export interface ScratchPrefs {
+  on: boolean;
+  level: ScratchLevel;
+  /** How many times the hint has been shown. */
+  hints: number;
+}
+
+/** What a stroke must measure to be a scribble, and how much of a target it must cover. */
+export interface ScratchThresholds {
+  minReversals: number;
+  minDensity: number;
+  maxPitch: number;
+  maxWinding: number;
+  minCoverage: number;
 }
 
 /** The settings of all tools, as the tools read them. */

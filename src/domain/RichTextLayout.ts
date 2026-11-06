@@ -1,5 +1,5 @@
 import { TEXT_FONT, TEXT_LINE_HEIGHT } from '../core/constants';
-import type { TextParagraph, TextSpan } from '../core/types';
+import type { Box, TextParagraph, TextSpan } from '../core/types';
 import { RichText } from './RichText';
 
 /** Measures text; a canvas context in the app, a stub in tests. */
@@ -31,6 +31,8 @@ export interface LaidRun {
 }
 
 export interface LaidLine {
+  /** The offset of the line's first character in the whole text. */
+  start: number;
   /** From the box's top edge. */
   top: number;
   height: number;
@@ -47,11 +49,24 @@ export interface LaidText {
   height: number;
 }
 
+/** One character as drawn. Its box covers the ink rather than the whole height of the line. */
+export interface LaidGlyph extends Box {
+  /** Characters [start, end) of the whole text: one drawn character can take several. */
+  start: number;
+  end: number;
+  text: string;
+  baseline: number;
+  style: ResolvedStyle;
+}
+
 export interface BoxDefaults {
   fs: number;
   c: string;
 }
 
+/** The ink of a character above and below the baseline, per unit of font size. */
+const GLYPH_ABOVE = 0.72;
+const GLYPH_BELOW = 0.1;
 /** Hanging indent of list paragraphs, per unit of font size. */
 export const LIST_INDENT_EM = 1.5;
 /** Onest's ascent and descent, per unit of font size; when the measurer cannot tell. */
@@ -96,13 +111,58 @@ export class RichTextLayout {
     const numbers = RichText.listNumbers(paras);
     const lines: LaidLine[] = [];
     let top = 0;
+    let offset = 0;
     paras.forEach((para, i) => {
       for (const line of this.layoutParagraph(para, numbers[i] ?? 0, width, base, top)) {
-        lines.push(line);
+        lines.push({ ...line, start: line.start + offset });
         top += line.height;
       }
+      offset += para.runs.reduce((sum, run) => sum + run.t.length, 0) + 1;
     });
     return { lines, height: top };
+  }
+
+  /**
+   * The characters of laid-out text on the lines and runs that can touch a box, from the box's
+   * top left corner. They are measured only here, because a long text has many that never can.
+   */
+  glyphs(laid: LaidText, near: Box): LaidGlyph[] {
+    const out: LaidGlyph[] = [];
+    for (const line of laid.lines) {
+      let offset = line.start;
+      for (const run of line.runs) {
+        const runStart = offset;
+        offset += run.text.length;
+        if (line.top > near.y1 || line.top + line.height < near.y0) continue;
+        if (run.x > near.x1 || run.x + run.width < near.x0) continue;
+        out.push(...this.runGlyphs(run, runStart, line.baseline));
+      }
+    }
+    return out;
+  }
+
+  private runGlyphs(run: LaidRun, runStart: number, baseline: number): LaidGlyph[] {
+    const out: LaidGlyph[] = [];
+    let at = 0;
+    for (const text of RichTextLayout.graphemes(run.text)) {
+      const end = at + text.length;
+      // Up to the end of each character, so that the widths include kerning with what is before.
+      const left = this.widthOf(run.text.slice(0, at), run.style);
+      const right = this.widthOf(run.text.slice(0, end), run.style);
+      out.push({
+        start: runStart + at,
+        end: runStart + end,
+        text,
+        baseline,
+        style: run.style,
+        x0: run.x + left,
+        x1: run.x + right,
+        y0: baseline - run.style.fs * GLYPH_ABOVE,
+        y1: baseline + run.style.fs * GLYPH_BELOW,
+      });
+      at = end;
+    }
+    return out;
   }
 
   /** How wide a box must be for no paragraph to wrap; trailing spaces count, to fit the caret. */
@@ -248,6 +308,7 @@ export class RichTextLayout {
       return run;
     });
     return {
+      start: from,
       top,
       height: above + below,
       baseline: top + above,

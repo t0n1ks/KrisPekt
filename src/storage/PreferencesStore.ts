@@ -9,6 +9,8 @@ import {
   PNG_SCALES,
   PREFS_KEY,
   RASTER_DPIS,
+  SCRATCH_HINT_COUNT,
+  SCRATCH_LEVEL_NAMES,
 } from '../core/constants';
 import type {
   BrushKind,
@@ -19,6 +21,7 @@ import type {
   PenPrefs,
   Preferences,
   TextPrefs,
+  ScratchPrefs,
 } from '../core/types';
 import { toClampedNumber } from '../core/utils/math';
 import { ERASER_RANGE, HL_RANGE, TEXT_SIZE_RANGE } from '../domain/ToolPresets';
@@ -90,6 +93,16 @@ function exportPrefs(raw: UnknownRecord): ExportPrefs {
     scale: PNG_SCALES.find((v) => v === raw.scale) ?? d.scale,
     transparent: bool(raw.transparent, d.transparent),
     pages: scopes.find((v) => v === raw.pages) ?? d.pages,
+  };
+}
+
+/** The scratch-out settings; missing or wrong values fall back to the default. */
+function scratchPrefs(raw: UnknownRecord): ScratchPrefs {
+  const d = DEFAULT_PREFS.scratch;
+  return {
+    on: bool(raw.on, d.on),
+    level: SCRATCH_LEVEL_NAMES.find((level) => level === raw.level) ?? d.level,
+    hints: Math.floor(toClampedNumber(raw.hints, 0, SCRATCH_HINT_COUNT, d.hints)),
   };
 }
 
@@ -169,6 +182,7 @@ export class PreferencesStore {
       twoFingerUndo: bool(raw.twoFingerUndo, d.twoFingerUndo),
       twoFingerScroll: bool(raw.twoFingerScroll, d.twoFingerScroll),
       straighten: bool(raw.straighten, d.straighten),
+      scratch: scratchPrefs(section(raw, 'scratch')),
       seeded: bool(raw.seeded, d.seeded),
       blobSweepDue: bool(raw.blobSweepDue, d.blobSweepDue),
       autoBackup: AUTO_BACKUP_INTERVALS.find((v) => v === raw.autoBackup) ?? d.autoBackup,

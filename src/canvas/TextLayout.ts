@@ -1,7 +1,7 @@
 import { TEXT_LINE_HEIGHT } from '../core/constants';
 import type { Box, TextItem } from '../core/types';
 import { RichText } from '../domain/RichText';
-import { RichTextLayout, type LaidText, type TextMeasurer } from '../domain/RichTextLayout';
+import { RichTextLayout, type LaidGlyph, type LaidText, type TextMeasurer } from '../domain/RichTextLayout';
 import type { TextRun } from './draw/DrawSink';
 
 export type { TextMeasurer };
@@ -56,6 +56,24 @@ export class TextLayout {
     const laid = this.rich.layout(RichText.paragraphsOf(item), item.w, item);
     this.laidCache.set(item, laid);
     return laid;
+  }
+
+  /** The characters of a rich item that can touch a box, in page coordinates. */
+  glyphs(item: TextItem, near: Box): LaidGlyph[] {
+    const local = {
+      x0: near.x0 - item.x,
+      y0: near.y0 - item.y,
+      x1: near.x1 - item.x,
+      y1: near.y1 - item.y,
+    };
+    return this.rich.glyphs(this.laid(item), local).map((glyph) => ({
+      ...glyph,
+      x0: glyph.x0 + item.x,
+      x1: glyph.x1 + item.x,
+      y0: glyph.y0 + item.y,
+      y1: glyph.y1 + item.y,
+      baseline: glyph.baseline + item.y,
+    }));
   }
 
   /**
