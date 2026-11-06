@@ -14,9 +14,9 @@ async function canvasPng(page: Page): Promise<Buffer> {
  * images were taken before strokes, text and patterns were turned into shared drawing
  * commands; every later change is compared against them.
  */
-test('the editor draws the fixture page exactly as before', async ({ page }) => {
+test('the editor draws the fixture page exactly as before', async ({ page }, testInfo) => {
   test.skip(
-    process.platform !== 'win32',
+    process.platform !== 'win32' && testInfo.config.updateSnapshots !== 'all',
     'The baseline images are Windows renderings; other systems draw text differently.',
   );
   await page.setViewportSize({ width: 1000, height: 1300 });
