@@ -156,12 +156,14 @@ async function showPageBoundary(page: Page, stageTop: number): Promise<void> {
 /** A tap on the middle of a card at this height of the stage. */
 async function clickCard(page: Page, fy: number): Promise<void> {
   const spot = await at(page, 0.5, fy);
+  await page.keyboard.press('g');
   await page.mouse.click(spot.x, spot.y);
 }
 
 /** Opens a card's menu with its ⋮, at the right end of a card as wide as the page's content. */
 async function openCardMenu(page: Page, fy: number): Promise<void> {
   const spot = await at(page, 0.5, fy);
+  await page.keyboard.press('g');
   const box = await page.locator('#stage').boundingBox();
   if (!box) throw new Error('no stage');
   for (let x = box.x + box.width - 4; x > spot.x; x -= 12) {
@@ -286,6 +288,7 @@ test('a link card asks first, a dangerous address never gets in, and nothing is 
     };
     Object.assign(window, { openedForTest: opened });
   });
+  await page.keyboard.press('g');
   await page.mouse.click(spot.x, spot.y);
   const sheet = page.locator('.sheet');
   await expect(sheet).toContainText('Открыть ссылку на example.com?');
@@ -316,14 +319,16 @@ test('a word in a text box carries a link: coloured, asks before opening, and ca
   await page.click('.sheet__foot .btn--primary');
   await expect(page.locator('[data-href="https://example.org/"]')).toHaveText('hello');
 
-  await page.locator('#tray [data-tool="pen"]').click();
+  await page.keyboard.press('Escape');
   await expect
     .poll(async () => (await storedPages(page))[0]?.texts[0]?.paras?.[0]?.runs[0]?.link?.href)
     .toBe('https://example.org/');
+  await page.keyboard.press('g');
   await page.mouse.click(spot.x + 12, spot.y + 4);
   await expect(page.locator('.sheet')).toContainText('example.org');
   await page.locator('.sheet').getByRole('button', { name: 'Отмена' }).click();
-  // The pen still writes over a link: only a press that does not move is a tap.
+  // The pen only writes, over a link too.
+  await page.keyboard.press('p');
   await page.mouse.move(spot.x + 12, spot.y + 4);
   await page.mouse.down();
   await page.mouse.move(spot.x + 90, spot.y + 40, { steps: 6 });
@@ -412,6 +417,7 @@ test('the viewer fits a phone in both orientations and frees its canvases on clo
   const card = (await cardsOf(page))[0];
   if (!card) throw new Error('no card');
   // The view may have moved with the window, so the viewer is opened through the card's own spot.
+  await page.keyboard.press('g');
   for (let y = box.y + 4; y < box.y + box.height; y += 10) {
     await page.mouse.click(box.x + box.width / 2, y);
     if (await page.locator('.pdf-viewer').isVisible()) break;

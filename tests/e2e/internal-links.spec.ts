@@ -155,8 +155,9 @@ async function typedLink(
 const backChip = (page: Page): Locator => page.locator('#backChip');
 const highlight = (page: Page): Locator => page.locator('#jumpMark');
 
-/** Tap with whichever tool is selected, on a stage point. */
+/** A tap with the Hand, which opens what it lands on, on a stage point. */
 async function tap(page: Page, point: { x: number; y: number }): Promise<void> {
+  await page.keyboard.press('g');
   await page.mouse.click(point.x, point.y);
 }
 
@@ -391,7 +392,8 @@ test('Back returns to the very same place', async ({ page }) => {
   if (await page.locator('#panel').isVisible()) await page.click('#panelClose');
   await typedLink(page, 0.42, 0.45, 'Away', 'theo', 'Theorem');
   await expect.poll(async () => (await storedPages(page, 'Alpha'))[0]?.texts.length).toBe(1);
-  await page.keyboard.press('p');
+  // Before the picture: the toolbar in it shows the tool in use.
+  await page.keyboard.press('g');
   const middle = await at(page, 0.5, 0.5);
   await page.mouse.move(middle.x, middle.y);
   await page.mouse.wheel(0, 90);
@@ -438,7 +440,7 @@ test('a contents block lists the bookmarks, each line leads there, and it can be
   expect((await read())?.paras?.length).toBe(1);
 
   const lineAt = await firstLinkPixel(page);
-  await page.keyboard.press('p');
+  await page.keyboard.press('g');
   await page.mouse.move(lineAt.x, lineAt.y);
   await page.mouse.down();
   await expect(menuItem(page, 'Обновить оглавление')).toBeVisible({ timeout: 3000 });

@@ -242,9 +242,8 @@ describe('a press on a marker', () => {
     expect(targets(p).at({ x: 300, y: 300 })).toBeNull();
   });
 
-  it('works with the text tool, but never with the eraser or with markers off', () => {
+  it('works with the text tool, but not with markers off', () => {
     expect(targets(marked(), { tool: 'text' }).at({ x: 90, y: 205 })?.kind).toBe('anchor');
-    expect(targets(marked(), { tool: 'eraser' }).at({ x: 90, y: 205 })).toBeNull();
     expect(targets(marked(), { markers: false }).at({ x: 90, y: 205 })).toBeNull();
   });
 });

@@ -830,13 +830,13 @@ describe('a press', () => {
   }
   const linked = (): Page => page({ inkLinks: [inkLink()] });
 
-  it.each(['pen', 'highlighter', 'lasso'] as const)('with the %s on linked ink opens it', (tool) => {
-    const hit = targets(tool, linked()).at({ x: 20, y: 20 });
+  it('finds linked ink, with whichever tool; who may open it is not for it to say', () => {
+    const hit = targets('pen', linked()).at({ x: 20, y: 20 });
     expect(hit?.kind === 'link' && hit.ink?.id).toBe('ink1');
   });
 
-  it.each(['eraser', 'text'] as const)('with the %s never does', (tool) => {
-    expect(targets(tool, linked()).at({ x: 20, y: 20 })).toBeNull();
+  it('with the text tool a link is text to edit', () => {
+    expect(targets('text', linked()).at({ x: 20, y: 20 })).toBeNull();
   });
 
   it('near linked ink still counts, and away from it does not', () => {

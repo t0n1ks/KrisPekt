@@ -46,6 +46,7 @@ describe('tool presets', () => {
 
   it('the lasso cannot be pinned: it has no settings', () => {
     expect(ToolPresets.isPinnable('lasso')).toBe(false);
+    expect(ToolPresets.isPinnable('hand')).toBe(false);
     expect(ToolPresets.isPinnable('pen')).toBe(true);
   });
 
@@ -256,6 +257,7 @@ describe('toolbar layout', () => {
       'hl',
       'eraser',
       'lasso',
+      'hand',
       'text',
       'preset:a1',
       'colors',
@@ -274,7 +276,7 @@ describe('toolbar layout', () => {
     );
     expect(layout.order).not.toContain('evil');
     expect(layout.order.filter((id) => id === 'redo')).toHaveLength(1);
-    expect(layout.hidden).toEqual(['ruler']);
+    expect(layout.hidden).toEqual(['ruler', 'hand']);
   });
 
   it('keeps the user order, and brings back base items it does not know', () => {
@@ -283,7 +285,7 @@ describe('toolbar layout', () => {
     expect(order).toEqual(
       expect.arrayContaining(['hl', 'eraser', 'lasso', 'text', 'colors', 'ruler', 'image', 'attach', 'undo']),
     );
-    expect(order).toHaveLength(11);
+    expect(order).toHaveLength(12);
   });
 
   it('a new preset lands after the last tool or preset', () => {
@@ -323,14 +325,14 @@ describe('toolbar layout', () => {
 
   it('shows and hides', () => {
     const hidden = ToolbarLayout.withHidden(ToolbarLayout.defaults([]), 'ruler', true);
-    expect(hidden.hidden).toEqual(['ruler']);
-    expect(ToolbarLayout.withHidden(hidden, 'ruler', false).hidden).toEqual([]);
+    expect(hidden.hidden).toEqual(['hand', 'ruler']);
+    expect(ToolbarLayout.withHidden(hidden, 'ruler', false).hidden).toEqual(['hand']);
   });
 
-  it('reset gives the default order, shows everything and keeps the presets', () => {
+  it('reset gives the default order, shows all but the Hand and keeps the presets', () => {
     const presets = [fountain];
     const reset = ToolbarLayout.defaults(presets);
-    expect(reset.hidden).toEqual([]);
+    expect(reset.hidden).toEqual(['hand']);
     expect(reset.order).toContain('preset:a1');
   });
 });

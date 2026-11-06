@@ -273,7 +273,7 @@ test('customise mode: reorder by drag and by buttons, hide, reset; saved at once
 
   // Everything is saved before Done.
   const saved = (await storedPrefs(page)).toolbar as { hidden: string[]; order: string[] };
-  expect(saved.hidden).toEqual(['ruler']);
+  expect(saved.hidden).toEqual(['hand', 'ruler']);
   await customizer(page).getByRole('button', { name: 'Готово' }).click();
   await expect(customizer(page)).toBeHidden();
 

@@ -173,10 +173,12 @@ async function checkLibrary(page: Page, tag: string, t: Texts, all: string[]): P
 }
 
 async function checkTools(page: Page, tag: string, all: string[]): Promise<void> {
-  for (const kind of ['pen', 'hl', 'eraser', 'lasso', 'text']) {
+  for (const kind of ['pen', 'hl', 'eraser', 'text']) {
     await toolOptions(page, kind);
     await check(page, tag, 'options-' + kind, '.popover', all);
   }
+  await toolOptions(page, 'lasso');
+  await check(page, tag, 'lasso-or-hand', '.menu', all);
   await page.keyboard.press('p');
   await page.locator('.tool-tray__more').click();
   await check(page, tag, 'toolbar-more', '.menu', all);
@@ -247,6 +249,7 @@ async function checkViewer(page: Page, tag: string, t: Texts, all: string[]): Pr
   const y = box.y + box.height * 0.6;
   await page.mouse.click(x, y);
   await page.waitForTimeout(600);
+  await page.keyboard.press('g');
   await page.mouse.click(x, y);
   await check(page, tag, 'viewer', '.pdf-viewer', all);
 }
