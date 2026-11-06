@@ -1005,6 +1005,12 @@ export class EditorView {
       },
       this.scratchEntry(),
       {
+        label: i18n.t('photoQuality'),
+        icon: 'image',
+        check: prefs.keepOriginalPhotos,
+        onClick: () => this.toggleOriginalPhotos(),
+      },
+      {
         label: i18n.t('bookmarkMarkers'),
         icon: 'bookmark',
         check: prefs.anchorMarkers,
@@ -1040,6 +1046,12 @@ export class EditorView {
     this.settle();
     this.popover.close();
     this.anchorsPanel.open();
+  }
+
+  private toggleOriginalPhotos(): void {
+    const { prefs, savePrefs } = this.deps;
+    prefs.keepOriginalPhotos = !prefs.keepOriginalPhotos;
+    savePrefs();
   }
 
   private toggleMarkers(): void {

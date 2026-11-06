@@ -328,3 +328,150 @@
 .anchor-list__action {
   flex: none;
 }
+
+/* ---------- backup progress ---------- */
+
+.backup-progress {
+  display: block;
+  width: 100%;
+  height: 10px;
+  margin-top: 8px;
+  accent-color: var(--accent);
+}
+
+/* ---------- trash ---------- */
+
+.trash {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trash__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trash__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.trash__text {
+  display: flex;
+  flex: 1 1 180px;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.trash__title {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.trash__facts {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.trash__actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.trash__empty {
+  align-self: flex-end;
+}
+
+/* ---------- storage report ---------- */
+
+.storage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.storage__figures {
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) minmax(0, auto);
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.storage__label {
+  min-width: 0;
+  color: var(--muted);
+}
+
+.storage__value {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.storage__section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.storage__heading {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+}
+
+.storage__subject {
+  padding-bottom: 8px;
+}
+
+.storage__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.storage__row--strong {
+  font-weight: 600;
+}
+
+.storage__text {
+  display: flex;
+  flex: 1 1 160px;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.storage__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.storage__facts {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.storage__size {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.storage__open {
+  flex: none;
+  margin-left: auto;
+}

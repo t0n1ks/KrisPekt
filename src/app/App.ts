@@ -13,7 +13,9 @@ import { PdfImporter } from '../features/pdf/PdfImporter';
 import { PdfLoader } from '../features/pdf/PdfLoader';
 import { I18n } from '../i18n/I18n';
 import { AutoBackupScheduler } from '../services/AutoBackupScheduler';
+import type { StorageReport } from '../domain/StorageBreakdown';
 import { BlobSweeper } from '../services/BlobSweeper';
+import { TrashPurger } from '../services/TrashPurger';
 import { LibraryService } from '../services/LibraryService';
 import { TabPresence } from '../services/TabPresence';
 import { BackupService } from '../storage/BackupService';
@@ -31,6 +33,8 @@ import { ExportDialog } from '../ui/dialogs/ExportDialog';
 import { Menu } from '../ui/dialogs/Menu';
 import { NotebookDialog } from '../ui/dialogs/NotebookDialog';
 import { StorageInfoDialog } from '../ui/dialogs/StorageInfoDialog';
+import { StorageReportDialog } from '../ui/dialogs/StorageReportDialog';
+import { TrashDialog } from '../ui/dialogs/TrashDialog';
 import { SubjectDialog } from '../ui/dialogs/SubjectDialog';
 import { Toast } from '../ui/dialogs/Toast';
 import { EditorView } from '../ui/editor/EditorView';
@@ -64,7 +68,7 @@ export class App {
   private readonly repos: Repositories;
   private readonly library: LibraryService;
   private readonly saveQueue: SaveQueue;
-  private readonly imageEncoder = new ImageEncoder();
+  private readonly imageEncoder = new ImageEncoder(() => this.prefs.keepOriginalPhotos);
   private readonly pdfImporter: PdfImporter;
   private readonly pdfLoader: PdfLoader;
   private readonly attachments: PdfAttachments;
@@ -74,6 +78,7 @@ export class App {
   private readonly backupFlow: BackupFlow;
   private readonly autoBackup: AutoBackupScheduler;
   private readonly sweeper: BlobSweeper;
+  private readonly purger: TrashPurger;
   private readonly editor: EditorView;
   private readonly libraryView: LibraryView;
   private corruptToastPending = false;
@@ -135,9 +140,10 @@ export class App {
       prefs: this.prefs,
       savePrefs: () => this.prefsStore.save(this.prefs),
     });
+    const tabs = new TabPresence();
     this.sweeper = new BlobSweeper({
       blobs: this.repos.blobs,
-      tabs: new TabPresence(),
+      tabs,
       inUse: () => this.editor.blobsInUse(),
       flush: () => this.saveQueue.flush(),
       isDue: () => this.prefs.blobSweepDue,
@@ -145,6 +151,13 @@ export class App {
         this.prefs.blobSweepDue = due;
         this.prefsStore.save(this.prefs);
       },
+      onError: () => this.storageError(),
+    });
+    this.purger = new TrashPurger({
+      library: this.library,
+      tabs,
+      now: () => Date.now(),
+      onPurged: () => this.libraryView.render(),
       onError: () => this.storageError(),
     });
     this.editor = this.createEditor();
@@ -241,7 +254,10 @@ export class App {
   private createBackupFlow(): BackupFlow {
     return new BackupFlow({
       i18n: this.i18n,
-      backup: new BackupService(this.db, this.repos, (blob) => this.imageEncoder.reencode(blob)),
+      backup: new BackupService(this.db, this.repos, (blob) => this.imageEncoder.reencode(blob), {
+        onFilesWritten: () => this.sweeper.markDue(),
+        appVersion: __APP_VERSION__,
+      }),
       library: this.library,
       files: this.files,
       dialogs: this.dialogs,
@@ -258,6 +274,7 @@ export class App {
   private createLibraryView(): LibraryView {
     const rerender = (): void => this.libraryView.render();
     const backup = this.backupFlow;
+    const measure = (): Promise<StorageReport> => this.library.measureStorage();
     const actions = new ShelfActions({
       i18n: this.i18n,
       library: this.library,
@@ -266,6 +283,27 @@ export class App {
       subjectDialog: this.subjectDialog,
       notebookDialog: this.notebookDialog,
       storageInfo: new StorageInfoDialog(this.i18n, this.dialogs),
+      storageReport: new StorageReportDialog({
+        i18n: this.i18n,
+        dialogs: this.dialogs,
+        measure,
+        browserFigures: () => App.storageFigures(),
+        openNotebook: (nb) => void this.openNotebook(nb),
+      }),
+      trash: new TrashDialog({
+        i18n: this.i18n,
+        dialogs: this.dialogs,
+        library: this.library,
+        toast: this.toast,
+        now: () => Date.now(),
+        measure,
+        onChanged: rerender,
+        onError: () => this.storageError(),
+      }),
+      toggleOriginalPhotos: () => {
+        this.prefs.keepOriginalPhotos = !this.prefs.keepOriginalPhotos;
+        this.prefsStore.save(this.prefs);
+      },
       backup,
       persistent: () => this.db.persistent,
       openNotebook: (nb) => void this.openNotebook(nb),
@@ -282,6 +320,7 @@ export class App {
       actions,
       backupState: () => this.prefs,
       backupSize: () => backup.estimateBytes(),
+      originalPhotos: () => this.prefs.keepOriginalPhotos,
       now: () => Date.now(),
     });
   }
@@ -309,7 +348,10 @@ export class App {
     this.libraryView.show();
     this.watchLifecycle();
     this.autoBackup.appOpened();
-    setTimeout(() => void this.sweeper.run(), BLOB_SWEEP_DELAY_MS);
+    setTimeout(() => {
+      void this.sweeper.run();
+      this.purger.start();
+    }, BLOB_SWEEP_DELAY_MS);
   }
 
   /**

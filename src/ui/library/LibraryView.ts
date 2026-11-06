@@ -22,6 +22,8 @@ export interface LibraryViewDeps {
   backupState: () => BackupState;
   /** About how large a backup would be; null if that cannot be told. */
   backupSize: () => Promise<number | null>;
+  /** Whether new photos keep their full size and quality. */
+  originalPhotos: () => boolean;
   now: () => number;
 }
 
@@ -100,8 +102,21 @@ export class LibraryView {
       },
       ...this.backupSizeEntry(),
       '-',
+      { label: i18n.t('storageReport'), icon: 'apps', onClick: () => actions.showStorageReport() },
+      { label: this.trashLabel(), icon: 'trash', onClick: () => actions.showTrash() },
+      {
+        label: i18n.t('photoQuality'),
+        icon: 'image',
+        check: this.deps.originalPhotos(),
+        onClick: () => actions.toggleOriginalPhotos(),
+      },
       { label: i18n.t('whereStored'), icon: 'info', onClick: () => actions.showStorageInfo() },
     ];
+  }
+
+  private trashLabel(): string {
+    const count = this.deps.library.trashCount;
+    return this.deps.i18n.t('trash') + (count ? ' · ' + count : '');
   }
 
   /** The current size of a backup, right by the backup settings. It is information, not a choice. */
@@ -121,11 +136,16 @@ export class LibraryView {
   private intervalEntries(): MenuEntry[] {
     const { i18n, actions } = this.deps;
     const current = this.deps.backupState().autoBackup;
-    return AUTO_BACKUP_INTERVALS.map((v) => ({
-      label: i18n.t(INTERVAL_LABELS[v]),
-      check: v === current,
-      onClick: () => actions.setAutoBackup(v),
-    }));
+    return [
+      ...AUTO_BACKUP_INTERVALS.map((v) => ({
+        label: i18n.t(INTERVAL_LABELS[v]),
+        check: v === current,
+        onClick: () => actions.setAutoBackup(v),
+      })),
+      '-',
+      // The app cannot reach the Downloads folder, so only the user can tidy it up.
+      { label: i18n.t('autoBackupHint'), disabled: true, onClick: () => undefined },
+    ];
   }
 
   /** Shows the banner after an automatic backup (until dismissed, for this session). */

@@ -4,8 +4,10 @@ import type { LibraryService } from '../../services/LibraryService';
 import type { DialogFactory } from '../dialogs/DialogFactory';
 import type { NotebookDialog } from '../dialogs/NotebookDialog';
 import type { StorageInfoDialog } from '../dialogs/StorageInfoDialog';
+import type { StorageReportDialog } from '../dialogs/StorageReportDialog';
 import type { SubjectDialog } from '../dialogs/SubjectDialog';
 import type { Toast } from '../dialogs/Toast';
+import type { TrashDialog } from '../dialogs/TrashDialog';
 import type { BackupFlow } from './BackupFlow';
 import type { LibraryActions } from './LibraryActions';
 
@@ -17,6 +19,9 @@ export interface ShelfActionsDeps {
   subjectDialog: SubjectDialog;
   notebookDialog: NotebookDialog;
   storageInfo: StorageInfoDialog;
+  storageReport: StorageReportDialog;
+  trash: TrashDialog;
+  toggleOriginalPhotos: () => void;
   backup: BackupFlow;
   persistent: () => boolean;
   openNotebook: (nb: Notebook) => void;
@@ -56,7 +61,7 @@ export class ShelfActions implements LibraryActions {
   }
 
   async deleteSubject(subject: Subject): Promise<void> {
-    const { i18n, library } = this.deps;
+    const { i18n, library, toast } = this.deps;
     const count = library.notebooksOf(subject.id).length;
     const text = count
       ? i18n.t('delSubjText', { s: subject.name, n: i18n.plural(count, 'nb') })
@@ -64,6 +69,7 @@ export class ShelfActions implements LibraryActions {
     if (!(await this.deps.dialogs.confirm(i18n.t('delSubjQ'), text))) return;
     try {
       await library.deleteSubject(subject);
+      toast.show(i18n.t('subjDeleted'));
     } catch (error) {
       this.deps.onError(error);
     }
@@ -92,6 +98,18 @@ export class ShelfActions implements LibraryActions {
 
   showStorageInfo(): void {
     this.deps.storageInfo.open(this.deps.persistent());
+  }
+
+  showStorageReport(): void {
+    this.deps.storageReport.open();
+  }
+
+  showTrash(): void {
+    this.deps.trash.open();
+  }
+
+  toggleOriginalPhotos(): void {
+    this.deps.toggleOriginalPhotos();
   }
 
   setLanguage(language: Language): void {

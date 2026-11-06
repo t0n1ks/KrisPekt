@@ -13,6 +13,10 @@ export interface LibraryActions {
   saveBackup(): void;
   restoreBackup(): void;
   showStorageInfo(): void;
+  showStorageReport(): void;
+  showTrash(): void;
+  /** Turns "Keep original photo quality" on or off. */
+  toggleOriginalPhotos(): void;
   setLanguage(language: Language): void;
   /** Moves a subject one place up (-1) or down (+1). */
   moveSubject(subject: Subject, delta: -1 | 1): void;
