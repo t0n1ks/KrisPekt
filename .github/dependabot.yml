@@ -10,6 +10,10 @@ updates:
       # Remove this rule once typescript-eslint supports TS 7.
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
+      # The types follow the major version of Node we run on, so a newer major would let code
+      # use APIs that this Node does not have. Move this together with Node itself.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
