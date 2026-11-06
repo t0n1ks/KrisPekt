@@ -19,7 +19,7 @@ export interface ResolvedLink {
 /** A place in the notes, for showing in a list. */
 export interface LinkEntry {
   target: InternalLink;
-  /** The anchor's name or the notebook's title; empty for a page. */
+  /** The anchor's name, the page's title or the notebook's title; empty for a page without one. */
   name: string;
   notebook: string;
   subject: string;
@@ -62,15 +62,16 @@ export class LinkDirectory {
     const found = this.resolve(link);
     if (!found) return null;
     const mark = found.nb.marks?.find((m) => m.id === found.anchorId);
-    return this.entry(
-      link,
-      found.nb,
-      mark?.name ?? (link.kind === 'notebook' ? found.nb.title : ''),
-      found.pageId,
-    );
+    const own = link.kind === 'notebook' ? found.nb.title : this.pageTitle(found.nb, found.pageId ?? '');
+    return this.entry(link, found.nb, mark?.name ?? own, found.pageId);
   }
 
-  /** Anchors, then notebooks, whose name has the query in it. */
+  /** A page's title, empty if it has none. */
+  pageTitle(nb: Notebook, pageId: string): string {
+    return nb.pageTitles?.find((mark) => mark.pageId === pageId)?.title ?? '';
+  }
+
+  /** Anchors, then titled pages, then notebooks, whose name has the query in it. */
   search(query: string): LinkEntry[] {
     const needle = normalized(query.trim());
     if (!needle) return [];
@@ -80,10 +81,15 @@ export class LinkDirectory {
         .filter((mark) => normalized(mark.name).includes(needle))
         .map((mark) => this.entry({ kind: 'anchor', nb: nb.id, id: mark.id }, nb, mark.name, mark.pageId)),
     );
+    const pages = notebooks.flatMap((nb) =>
+      (nb.pageTitles ?? [])
+        .filter((mark) => nb.pageIds.includes(mark.pageId) && normalized(mark.title).includes(needle))
+        .map((mark) => this.entry({ kind: 'page', nb: nb.id, id: mark.pageId }, nb, mark.title, mark.pageId)),
+    );
     const titled = notebooks
       .filter((nb) => normalized(nb.title).includes(needle))
       .map((nb) => this.entry({ kind: 'notebook', nb: nb.id }, nb, nb.title, null));
-    return [...anchors, ...titled];
+    return [...anchors, ...pages, ...titled];
   }
 
   /** The subjects that have notebooks. */

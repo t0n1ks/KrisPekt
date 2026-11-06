@@ -88,9 +88,14 @@ export function assertUniqueIds(items: readonly { id: string }[], path: string):
 function withDerivedMarks(notebook: Notebook, pages: readonly Page[]): Notebook {
   const own = new Map(pages.filter((page) => page.nbId === notebook.id).map((page) => [page.id, page]));
   const ordered = notebook.pageIds.flatMap((id) => own.get(id) ?? []);
-  const { marks: _untrusted, ...rest } = notebook;
+  const { marks: _untrusted, pageTitles: _alsoUntrusted, ...rest } = notebook;
   const marks = AnchorMarks.of(ordered);
-  return marks.length ? { ...rest, marks } : rest;
+  const pageTitles = AnchorMarks.titles(ordered);
+  return {
+    ...rest,
+    ...(marks.length ? { marks } : {}),
+    ...(pageTitles.length ? { pageTitles } : {}),
+  };
 }
 
 /** Every notebook's list of anchors, as its pages have them. */

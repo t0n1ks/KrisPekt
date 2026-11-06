@@ -13,7 +13,7 @@ export interface PageCellHandlers {
   menu(page: Page, anchor: HTMLElement): void;
 }
 
-/** One page in the organizer: thumbnail, "+" before it, number, size and ⋮. */
+/** One page in the organizer: thumbnail, "+" before it, number, size, ⋮ and its title, if any. */
 export class PageCell {
   readonly node: HTMLDivElement;
   /** Holds the thumbnail canvas. */
@@ -22,6 +22,7 @@ export class PageCell {
   private readonly more: HTMLButtonElement;
   private readonly number = el('b', { class: 'page-item__name' });
   private readonly size = el('span', { class: 'page-item__size' });
+  private readonly title = el('span', { class: 'page-item__title' });
   private readonly check = el('span', { class: 'page-item__check' }, icon('check', 18));
 
   constructor(
@@ -67,6 +68,7 @@ export class PageCell {
       this.insert,
       el('div', { class: 'page-item__frame' }, this.thumb, this.check),
       el('div', { class: 'page-item__info' }, this.number, this.size, this.more),
+      this.title,
     );
   }
 
@@ -76,6 +78,8 @@ export class PageCell {
     const n = index + 1;
     const { page } = this;
     this.number.textContent = String(n);
+    this.title.textContent = page.title ?? '';
+    this.title.hidden = !page.title;
     replaceChildren(
       this.size,
       icon(page.locked ? 'lock' : 'unlock', 13),

@@ -11,6 +11,8 @@ export interface TopBarHandlers {
   zoom(anchor: HTMLElement): void;
   lock(): void;
   pages(): void;
+  /** The page's number or title was tapped. */
+  pageTitle(): void;
   more(anchor: HTMLElement): void;
 }
 
@@ -23,6 +25,7 @@ export class TopBar {
   private readonly zoom = byId<HTMLButtonElement>('btnZoom');
   private readonly lock = byId<HTMLButtonElement>('btnLock');
   private readonly pages = byId<HTMLButtonElement>('btnPages');
+  private readonly pageChip = byId<HTMLButtonElement>('pageChip');
   private readonly moreButton = byId<HTMLButtonElement>('btnEdMore');
   private lastKey = '';
   private readonly cleanup: (() => void)[] = [];
@@ -44,6 +47,7 @@ export class TopBar {
     bind(this.zoom, () => handlers.zoom(this.zoom));
     bind(this.lock, handlers.lock);
     bind(this.pages, handlers.pages);
+    bind(this.pageChip, handlers.pageTitle);
     bind(this.moreButton, () => handlers.more(this.moreButton));
   }
 
@@ -58,7 +62,9 @@ export class TopBar {
 
   /** Updates the lock pill, page counter and zoom; skipped when nothing visible changed. */
   update(page: Page, index: number, count: number, zoom: number, zoomLocked: boolean): void {
-    const key = [index, count, page.locked, page.w, page.h, formatZoom(zoom), zoomLocked].join('|');
+    const key = [index, count, page.locked, page.w, page.h, formatZoom(zoom), zoomLocked, page.title].join(
+      '|',
+    );
     if (key === this.lastKey) return;
     this.lastKey = key;
     const t = this.i18n;
@@ -71,6 +77,7 @@ export class TopBar {
     const state = page.locked ? t.t('stLocked') : t.t('stUnlocked');
     this.lock.setAttribute('aria-label', t.t('lockAria', { size: this.sizes.label(page.w, page.h), state }));
     replaceChildren(this.pages, icon('pages', 17), el('span', null, `${index + 1}/${count}`));
+    this.pageChip.textContent = page.title || t.t('linkPageN', { n: index + 1 });
     this.updateZoom(zoom, zoomLocked);
   }
 
@@ -92,6 +99,7 @@ export class TopBar {
       [this.back, t.t('toShelf')],
       [this.titleButton, t.t('nbSettings')],
       [this.pages, t.t('pages')],
+      [this.pageChip, t.t('pageRename')],
       [this.moreButton, t.t('more')],
     ];
     for (const [node, label] of labels) node.setAttribute('aria-label', label);

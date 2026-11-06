@@ -1,4 +1,4 @@
-import type { Anchor, AnchorMark, InternalLink, LinkTarget, Page } from '../core/types';
+import type { Anchor, AnchorMark, InternalLink, LinkTarget, Page, PageTitleMark } from '../core/types';
 import { LinkRules } from './LinkRules';
 
 /**
@@ -17,6 +17,11 @@ export class AnchorMarks {
     return pages.flatMap((page) =>
       AnchorMarks.ordered(page).map((anchor) => ({ id: anchor.id, pageId: page.id, name: anchor.name })),
     );
+  }
+
+  /** The titles of the pages that have one, in page order. */
+  static titles(pages: readonly Pick<Page, 'id' | 'title'>[]): PageTitleMark[] {
+    return pages.flatMap((page) => (page.title ? [{ pageId: page.id, title: page.title }] : []));
   }
 
   /**

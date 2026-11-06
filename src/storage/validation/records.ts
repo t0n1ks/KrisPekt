@@ -1,7 +1,14 @@
-import { BRUSH_KINDS, MAX_ANCHOR_NAME, MAX_ATTACHMENT_PDF_BYTES, MAX_URL_LENGTH } from '../../core/constants';
+import {
+  BRUSH_KINDS,
+  MAX_ANCHOR_NAME,
+  MAX_ATTACHMENT_PDF_BYTES,
+  MAX_PAGE_TITLE,
+  MAX_URL_LENGTH,
+} from '../../core/constants';
 import type {
   Anchor,
   AnchorMark,
+  PageTitleMark,
   CardItem,
   ImageItem,
   InkLink,
@@ -79,6 +86,14 @@ function parseMark(raw: unknown, path: string): AnchorMark {
   };
 }
 
+function parseTitleMark(raw: unknown, path: string): PageTitleMark {
+  const o = asRecord(raw, path);
+  return {
+    pageId: asId(o.pageId, `${path}.pageId`),
+    title: asString(o.title, `${path}.title`, MAX_PAGE_TITLE),
+  };
+}
+
 export function parseNotebook(raw: unknown, path = 'notebook'): Notebook {
   const o = asRecord(raw, path);
   const base = asRecord(o.base, `${path}.base`);
@@ -103,6 +118,10 @@ export function parseNotebook(raw: unknown, path = 'notebook'): Notebook {
     notebook.zoomLock = asNumber(o.zoomLock, `${path}.zoomLock`, LIMITS.lockedZoom);
   const marks = optionalArray(o.marks, `${path}.marks`);
   if (marks.length) notebook.marks = marks.map((v, i) => parseMark(v, `${path}.marks[${i}]`));
+  const titles = optionalArray(o.pageTitles, `${path}.pageTitles`);
+  if (titles.length) {
+    notebook.pageTitles = titles.map((v, i) => parseTitleMark(v, `${path}.pageTitles[${i}]`));
+  }
   if (o.deletedAt !== undefined) {
     notebook.deletedAt = asNumber(o.deletedAt, `${path}.deletedAt`, LIMITS.timestamp);
   }
@@ -315,9 +334,12 @@ export function parsePage(raw: unknown, path = 'page'): Page {
   const o = asRecord(raw, path);
   const list = <T>(key: string, parse: (v: unknown, p: string) => T): T[] =>
     optionalArray(o[key], `${path}.${key}`).map((v, i) => parse(v, `${path}.${key}[${i}]`));
+  // Optional: pages stored before titles existed have none, and an empty one is the same as none.
+  const title = o.title == null ? '' : asString(o.title, `${path}.title`, MAX_PAGE_TITLE);
   return {
     id: asId(o.id, `${path}.id`),
     nbId: asId(o.nbId, `${path}.nbId`),
+    ...(title.trim() ? { title } : {}),
     w: asNumber(o.w, `${path}.w`, LIMITS.pageMm),
     h: asNumber(o.h, `${path}.h`, LIMITS.pageMm),
     locked: o.locked === undefined ? false : asBoolean(o.locked, `${path}.locked`),

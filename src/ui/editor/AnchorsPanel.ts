@@ -10,6 +10,7 @@ import { icon, type IconName } from '../icons';
 export interface AnchorsPanelHandlers {
   jump(link: InternalLink): void;
   rename(anchorId: string): Promise<void>;
+  renamePage(pageId: string): Promise<void>;
   remove(anchorId: string): Promise<void>;
   copyLink(link: InternalLink): void;
   /** Bookmarks the current page. */
@@ -17,7 +18,7 @@ export interface AnchorsPanelHandlers {
   insertContents(): void;
 }
 
-/** The notebook's contents: its bookmarks in page order, to go to, rename, delete or link to. */
+/** The notebook's contents: its titled pages and bookmarks in page order, to go to, rename or link to. */
 export class AnchorsPanel {
   private readonly list = el('div', { class: 'anchor-list' });
   private sheet: Sheet | null = null;
@@ -68,6 +69,7 @@ export class AnchorsPanel {
     const { i18n, handlers } = this;
     const { target } = entry;
     const id = target.kind === 'anchor' ? target.id : '';
+    const pageId = target.kind === 'page' ? target.id : null;
     return el(
       'div',
       { class: 'anchor-list__row' },
@@ -86,15 +88,17 @@ export class AnchorsPanel {
         el('span', { class: 'anchor-list__name' }, entry.name),
         el('span', { class: 'anchor-list__page' }, i18n.t('contentsPage', { n: entry.page })),
       ),
-      this.action('edit', i18n.t('bookmarkRename'), async () => {
-        await handlers.rename(id);
+      this.action('edit', i18n.t(pageId ? 'pageRename' : 'bookmarkRename'), async () => {
+        await (pageId ? handlers.renamePage(pageId) : handlers.rename(id));
         this.render();
       }),
       this.action('copy', i18n.t('cardCopyLink'), () => handlers.copyLink(target)),
-      this.action('trash', i18n.t('bookmarkDelete'), async () => {
-        await handlers.remove(id);
-        this.render();
-      }),
+      pageId
+        ? null
+        : this.action('trash', i18n.t('bookmarkDelete'), async () => {
+            await handlers.remove(id);
+            this.render();
+          }),
     );
   }
 
