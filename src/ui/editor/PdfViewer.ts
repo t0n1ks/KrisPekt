@@ -109,7 +109,11 @@ export class PdfViewer {
     const button = (label: string, name: 'minus' | 'plus' | 'close', run: () => void): HTMLButtonElement =>
       el(
         'button',
-        { class: 'icon-btn', attrs: { type: 'button', 'aria-label': label, title: label }, on: { click: run } },
+        {
+          class: 'icon-btn',
+          attrs: { type: 'button', 'aria-label': label, title: label },
+          on: { click: run },
+        },
         icon(name, 22),
       );
     this.indicator = el('span', { class: 'pdf-viewer__indicator', attrs: { 'aria-live': 'polite' } });
@@ -271,9 +275,7 @@ export class PdfViewer {
 
   private nextToRender(): PageSlot | undefined {
     const width = this.targetWidth();
-    return [...this.near]
-      .sort((a, b) => a.index - b.index)
-      .find((slot) => slot.renderedWidth !== width);
+    return [...this.near].sort((a, b) => a.index - b.index).find((slot) => slot.renderedWidth !== width);
   }
 
   private targetWidth(): number {

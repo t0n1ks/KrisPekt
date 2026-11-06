@@ -322,7 +322,19 @@ test('a narrow window moves items into More and back, and the active tool stays'
   await page.setViewportSize({ width: 1200, height: 800 });
   await open(page);
   const wide = await barItems(page);
-  expect(wide).toEqual(['pen', 'hl', 'eraser', 'lasso', 'text', 'colors', 'ruler', 'image', 'attach', 'undo', 'redo']);
+  expect(wide).toEqual([
+    'pen',
+    'hl',
+    'eraser',
+    'lasso',
+    'text',
+    'colors',
+    'ruler',
+    'image',
+    'attach',
+    'undo',
+    'redo',
+  ]);
   await page.click('#btnTrayMore');
   await expect(page.locator('.toolbar-grid__cell')).toHaveCount(0);
   await page.mouse.click(5, 300);
