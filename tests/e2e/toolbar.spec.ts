@@ -385,8 +385,9 @@ test('a hidden tool in use shows on the bar until another one is chosen', async 
 });
 
 test('damaged toolbar settings give the default bar and keep other settings', async ({ page }) => {
-  await page.goto('./');
-  await page.evaluate((key) => {
+  // Written before the app starts, not after page.goto: the first boot saves its own settings when
+  // it seeds the sample, and that save could land after the damaged ones and replace them.
+  await page.addInitScript((key) => {
     localStorage.setItem(
       key,
       JSON.stringify({
@@ -397,11 +398,7 @@ test('damaged toolbar settings give the default bar and keep other settings', as
       }),
     );
   }, PREFS_KEY);
-  await page.reload();
-  await page.locator('.subject').first().locator('.shelf__add').click();
-  await page.fill('#nb-title', NOTEBOOK);
-  await page.click('.sheet__foot .btn--primary');
-  await expect(page.locator('#editor')).toBeVisible();
+  await open(page);
   await expect(presets(page)).toHaveCount(0);
   await expect(page.locator('#tray .tool-tray__swatch')).toHaveCount(1);
   expect((await barItems(page))[0]).toBe('pen');
