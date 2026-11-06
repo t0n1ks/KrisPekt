@@ -1,3 +1,4 @@
+import { PDF_WEBP_JPEG_QUALITY } from '../../core/constants';
 import type { Page } from '../../core/types';
 import type { BlobRepository } from '../../storage/BlobRepository';
 import type { PdfImage } from './PdfVectorBackend';
@@ -5,8 +6,8 @@ import type { PdfImage } from './PdfVectorBackend';
 /**
  * The stored images of a page as bytes for jsPDF: photos and PDF page backgrounds keep their
  * stored resolution and encoding (JPEG stays JPEG, PNG stays PNG). The type is taken from the
- * magic bytes, not the blob's declared type. Anything else (WebP from older versions) is
- * converted to PNG losslessly.
+ * magic bytes, not the blob's declared type. PDF cannot hold WebP, so a WebP is converted: to JPEG
+ * at high quality, as a photo in PNG would take many times the space, or to PNG if it has transparency.
  */
 export class PdfImages {
   private readonly cache = new Map<string, Promise<PdfImage | null>>();
@@ -50,19 +51,32 @@ export class PdfImages {
     const data = new Uint8Array(await blob.arrayBuffer());
     const format = PdfImages.sniff(data);
     if (format) return { data, format };
-    return { data: await PdfImages.toPng(blob), format: 'PNG' };
+    return PdfImages.convert(blob);
   }
 
-  private static async toPng(blob: Blob): Promise<Uint8Array> {
+  private static async convert(blob: Blob): Promise<PdfImage> {
     const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement('canvas');
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
-    canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('no canvas');
+    ctx.drawImage(bitmap, 0, 0);
     bitmap.close();
-    const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    const format = PdfImages.isOpaque(ctx, canvas) ? 'JPEG' : 'PNG';
+    const encoded = await new Promise<Blob | null>((resolve) =>
+      format === 'JPEG'
+        ? canvas.toBlob(resolve, 'image/jpeg', PDF_WEBP_JPEG_QUALITY)
+        : canvas.toBlob(resolve, 'image/png'),
+    );
     canvas.width = 0;
-    if (!png) throw new Error('PNG encoding failed');
-    return new Uint8Array(await png.arrayBuffer());
+    if (!encoded) throw new Error('image encoding failed');
+    return { data: new Uint8Array(await encoded.arrayBuffer()), format };
+  }
+
+  private static isOpaque(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): boolean {
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 3; i < data.length; i += 4) if ((data[i] ?? 255) < 255) return false;
+    return true;
   }
 }
