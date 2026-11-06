@@ -1,6 +1,8 @@
 import type { Camera } from '../canvas/Camera';
 import type { PageLayout } from '../canvas/PageLayout';
+import { MAX_PAGE_TITLE } from '../core/constants';
 import type { Background, Page } from '../core/types';
+import { FileNames } from '../domain/FileNames';
 import { ItemBindings } from '../domain/ItemBindings';
 import { PageSizePolicy } from '../domain/PageSizePolicy';
 import type { PageSizes } from '../domain/PageSizes';
@@ -134,6 +136,17 @@ export class PageOperations {
     const { session } = this.deps;
     for (const p of PageSizePolicy.applyBase(session.pages, session.nb.base)) session.touch(p);
     this.deps.viewport.relayout();
+    this.deps.onPagesChanged();
+  }
+
+  /** Gives a page a title, or takes it away if there is nothing left of it, as one undo step. */
+  setTitle(page: Page, title: string): void {
+    const clean = FileNames.label(title, MAX_PAGE_TITLE);
+    if (clean === (page.title ?? '')) return;
+    this.deps.undo.record(page);
+    if (clean) page.title = clean;
+    else delete page.title;
+    this.deps.session.touch(page);
     this.deps.onPagesChanged();
   }
 

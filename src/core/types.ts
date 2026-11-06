@@ -49,6 +49,12 @@ export interface AnchorMark {
   name: string;
 }
 
+/** A page's title as the notebook lists it; see `AnchorMarks`. */
+export interface PageTitleMark {
+  pageId: string;
+  title: string;
+}
+
 export interface Notebook {
   id: string;
   subjectId: string;
@@ -70,6 +76,8 @@ export interface Notebook {
   zoomLock?: number;
   /** Its anchors, derived from its pages, so links can be checked without loading any page. */
   marks?: AnchorMark[];
+  /** The titles of its pages, derived the same way, so places can be listed without loading pages. */
+  pageTitles?: PageTitleMark[];
   /** When it went to the Trash; absent means it is on the shelf. */
   deletedAt?: number;
   /** It went to the Trash because its subject did, and comes back with it. */
@@ -240,6 +248,8 @@ export interface InkLink {
 export interface Page {
   id: string;
   nbId: string;
+  /** Without one, the page goes by its number. */
+  title?: string;
   /** Width in mm. */
   w: number;
   /** Height in mm. */

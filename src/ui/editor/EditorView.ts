@@ -51,6 +51,7 @@ import type { PopoverManager } from '../dialogs/PopoverManager';
 import { PageSettingsDialog } from '../dialogs/PageSettingsDialog';
 import { Snackbar } from '../dialogs/Snackbar';
 import { AnchorDialog } from '../dialogs/AnchorDialog';
+import { PageTitleDialog } from '../dialogs/PageTitleDialog';
 import { LinkDialog } from '../dialogs/LinkDialog';
 import { LinkOpener } from '../dialogs/LinkOpener';
 import { LinkTargetPicker } from '../dialogs/LinkTargetPicker';
@@ -428,6 +429,7 @@ export class EditorView {
     return new AnchorsPanel(d.i18n, d.dialogs, c.session, {
       jump: (link) => void this.navigator.go(link),
       rename: (id) => this.anchors.rename(id),
+      renamePage: (id) => this.renamePage(c.session.pages.find((page) => page.id === id)),
       remove: (id) => this.anchors.remove(id),
       copyLink: (link) => this.anchors.copyLink(link),
       addToCurrentPage: () => {
@@ -436,6 +438,15 @@ export class EditorView {
       },
       insertContents: () => this.contents.insert(),
     });
+  }
+
+  private async renamePage(page: Page | undefined): Promise<void> {
+    if (!page) return;
+    const { i18n, dialogs } = this.deps;
+    const { session } = this.canvas;
+    const label = i18n.t('linkPageN', { n: session.indexOf(page) + 1 });
+    const title = await new PageTitleDialog(i18n, dialogs).ask(page.title ?? '', label);
+    if (title !== null && session.has(page)) this.pageOps.setTitle(page, title);
   }
 
   /** The items keep their selection until the bookmark exists, then show its marker. */
@@ -563,6 +574,7 @@ export class EditorView {
       title: () => this.deps.actions.editNotebook(c().session.nb),
       zoom: (anchor: HTMLElement) => this.deps.menu.show(anchor, this.zoom.entries()),
       lock: () => this.openPageSettings(c().session.currentPage()),
+      pageTitle: () => void this.renamePage(c().session.currentPage()),
       pages: () => {
         this.settle();
         this.popover.close();
@@ -629,6 +641,7 @@ export class EditorView {
         addAfter: (page) => this.pageOps.add(page),
         settings: (page) => this.openPageSettings(page),
         duplicate: (page) => this.pageOps.duplicate(page),
+        rename: (page) => void this.renamePage(page),
         bookmark: (page) => void this.anchors.addToPage(page),
         copyLink: (page) => this.anchors.copyLink(this.anchors.pageLink(page)),
         remove: (pages) => this.deletion.request(pages),

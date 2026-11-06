@@ -53,9 +53,14 @@ export class BindingKeeper {
     const nb = session.notebook;
     if (!nb) return;
     const marks = AnchorMarks.of(session.pages);
-    const changed = JSON.stringify(marks) !== JSON.stringify(nb.marks ?? []);
+    const titles = AnchorMarks.titles(session.pages);
+    const changed =
+      JSON.stringify(marks) !== JSON.stringify(nb.marks ?? []) ||
+      JSON.stringify(titles) !== JSON.stringify(nb.pageTitles ?? []);
     if (marks.length) nb.marks = marks;
     else delete nb.marks;
+    if (titles.length) nb.pageTitles = titles;
+    else delete nb.pageTitles;
     if (changed) this.deps.markNotebookDirty();
     const signature = AnchorMarks.signature(marks, nb.pageIds);
     if (signature === this.signature) return;

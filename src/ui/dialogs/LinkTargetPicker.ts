@@ -179,7 +179,7 @@ export class LinkTargetPicker {
       ...nb.pageIds.map((pageId, index) => {
         const count = directory.anchorsOn(nb, pageId).length;
         return this.row(
-          i18n.t('linkPageN', { n: index + 1 }),
+          this.pageName(nb, pageId, index + 1),
           count ? i18n.plural(count, 'mark') : '',
           () => this.go({ kind: 'page', nb, pageId, number: index + 1 }),
           true,
@@ -191,12 +191,16 @@ export class LinkTargetPicker {
   private page(nb: Notebook, pageId: string, number: number): Node[] {
     const { i18n, directory } = this.deps;
     return [
-      this.up(i18n.t('linkPageN', { n: number }), { kind: 'notebook', nb }),
+      this.up(this.pageName(nb, pageId, number), { kind: 'notebook', nb }),
       this.row(i18n.t('linkPickWholePage'), '', () =>
         this.deps.onPick({ kind: 'page', nb: nb.id, id: pageId }),
       ),
       ...directory.anchorsOn(nb, pageId).map((entry) => this.entryRow(entry)),
     ];
+  }
+
+  private pageName(nb: Notebook, pageId: string, number: number): string {
+    return this.deps.directory.pageTitle(nb, pageId) || this.deps.i18n.t('linkPageN', { n: number });
   }
 
   private go(view: View): void {
@@ -220,10 +224,9 @@ export class LinkTargetPicker {
   private entryRow(entry: LinkEntry): HTMLElement {
     const { i18n } = this.deps;
     const pages = entry.pageNumber === null ? '' : i18n.t('contentsPage', { n: entry.pageNumber });
-    const title =
-      entry.target.kind === 'page' ? i18n.t('linkPageN', { n: entry.pageNumber ?? 0 }) : entry.name;
+    const title = entry.name || i18n.t('linkPageN', { n: entry.pageNumber ?? 0 });
     const where = entry.target.kind === 'notebook' ? entry.subject : entry.notebook;
-    const sub = entry.target.kind === 'anchor' ? `${where} · ${pages}` : where;
+    const sub = entry.name && entry.target.kind !== 'notebook' ? `${where} · ${pages}` : where;
     return this.row(title, sub, () => this.deps.onPick(entry.target));
   }
 

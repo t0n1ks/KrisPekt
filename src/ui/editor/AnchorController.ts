@@ -44,7 +44,7 @@ export class AnchorController {
 
   /** Bookmarks a whole page. */
   async addToPage(page: Page): Promise<boolean> {
-    return this.add(page, [], undefined, null, this.deps.i18n.t('bookmarkAdd'));
+    return this.add(page, [], undefined, page.title ?? null, this.deps.i18n.t('bookmarkAdd'));
   }
 
   /** Bookmarks items selected with the lasso, named after the first text box among them. */

@@ -393,6 +393,8 @@ export const ZOOM_LOCK_HINT_MS = 5000;
 /* ---------- anchors and internal links ---------- */
 
 export const MAX_ANCHOR_NAME = 80;
+/** A page's optional title, in characters. */
+export const MAX_PAGE_TITLE = 120;
 /** How many jumps "Back" remembers. */
 export const NAV_HISTORY_LIMIT = 20;
 /** How long the place a link led to stays highlighted; the animation in editor.css matches. */

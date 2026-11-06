@@ -59,6 +59,7 @@ export class PageRepository {
     return {
       id: p.id,
       nbId: p.nbId,
+      ...(p.title ? { title: p.title } : {}),
       w: p.w,
       h: p.h,
       locked: !!p.locked,

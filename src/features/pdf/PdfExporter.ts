@@ -4,6 +4,7 @@ import { MM, PDF_FONT_NAME, PDF_PATTERN_SCALE, PT_PER_PX } from '../../core/cons
 import type { Page, RasterDpi } from '../../core/types';
 import { ExportSizing } from '../../domain/ExportSizing';
 import { PdfLinkMap } from '../../domain/PdfLinkMap';
+import { PdfOutline, type OutlineEntry } from '../../domain/PdfOutline';
 import type { I18n } from '../../i18n/I18n';
 import type { PageRasterizer } from '../export/PageRasterizer';
 import { PdfFont } from './PdfFont';
@@ -108,7 +109,20 @@ export class PdfExporter {
       // Yield so the progress toast can paint and the UI stays responsive.
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
+    if (doc) PdfExporter.addOutline(doc, pages);
     return doc ? { blob: doc.output('blob'), lowered } : null;
+  }
+
+  /** The reader's side panel: page titles with their bookmarks. */
+  private static addOutline(doc: JsPdfDocument, pages: readonly Page[]): void {
+    const outline = doc.outline as JsPdfDocument['outline'] & { makeString(title: string): string };
+    outline.makeString = (title) => PdfOutline.encodedTitle(title);
+    const add = (parent: unknown, entries: readonly OutlineEntry[]): void => {
+      for (const entry of entries) {
+        add(outline.add(parent, entry.title, { pageNumber: entry.pageNumber }), entry.children);
+      }
+    };
+    add(null, PdfOutline.entries(pages));
   }
 
   private async registerFont(doc: JsPdfDocument): Promise<boolean> {

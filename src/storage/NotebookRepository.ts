@@ -50,6 +50,7 @@ export class NotebookRepository {
     if (nb.order !== undefined) record.order = nb.order;
     if (nb.zoomLock !== undefined) record.zoomLock = nb.zoomLock;
     if (nb.marks?.length) record.marks = nb.marks.map((mark) => ({ ...mark }));
+    if (nb.pageTitles?.length) record.pageTitles = nb.pageTitles.map((mark) => ({ ...mark }));
     if (nb.deletedAt !== undefined) record.deletedAt = nb.deletedAt;
     if (nb.deletedWithSubject) record.deletedWithSubject = true;
     return record;

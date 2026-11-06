@@ -8,6 +8,7 @@ import { CardRules } from './CardRules';
  */
 export interface PageSnapshot {
   id: string;
+  title?: string | undefined;
   strokes: Stroke[];
   texts: TextItem[];
   images: ImageItem[];
@@ -57,6 +58,7 @@ export class History {
       texts: page.texts.slice(),
       images: page.images.slice(),
       cards: page.cards.slice(),
+      title: page.title,
       anchors: page.anchors.slice(),
       inkLinks: page.inkLinks.slice(),
       w: page.w,
@@ -69,6 +71,8 @@ export class History {
   /** Writes a snapshot back into a page. Returns true if the page size changed. */
   static apply(page: Page, snap: PageSnapshot): boolean {
     const resized = page.w !== snap.w || page.h !== snap.h;
+    if (snap.title) page.title = snap.title;
+    else delete page.title;
     page.strokes = snap.strokes;
     page.texts = snap.texts;
     page.images = snap.images;
