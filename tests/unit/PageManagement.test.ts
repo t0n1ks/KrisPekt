@@ -334,9 +334,11 @@ describe('duplicating pages', () => {
     const copy = r.session.pages[1] as Page;
     expect(ids(r.session.pages)).toEqual(['a', 'new1', 'b']);
     expect(copy).toMatchObject({ locked: false, ...A5, bg: 'lines', bgBlob: 'pdf' });
-    expect(copy.strokes).toEqual(original.strokes);
-    expect(copy.texts).toEqual(original.texts);
-    expect(copy.images).toEqual(original.images);
+    const content = <T extends { id: string }>(items: T[]): unknown[] =>
+      items.map(({ id: _id, ...rest }) => rest);
+    expect(content(copy.strokes)).toEqual(content(original.strokes));
+    expect(content(copy.texts)).toEqual(content(original.texts));
+    expect(content(copy.images)).toEqual(content(original.images));
     copy.strokes = [];
     expect(original.strokes).toHaveLength(1);
   });
@@ -631,7 +633,7 @@ describe('backups after page operations', () => {
     const pages = await restored.pages.loadOrdered(nb);
     expect(ids(pages)).toEqual(['free', 'new1', 'first']);
     expect(pages[0]).toMatchObject({ locked: false, ...A5 });
-    expect(pages[1]).toMatchObject({ locked: false, ...A5, images: [image('photo')] });
+    expect(pages[1]).toMatchObject({ locked: false, ...A5, images: [{ blob: 'photo' }] });
     expect(pages[2]).toMatchObject({ locked: true, ...A4 });
     expect((await restored.blobs.all()).map((b) => b.id)).toEqual(['photo']);
   });

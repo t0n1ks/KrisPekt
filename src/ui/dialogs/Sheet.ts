@@ -28,6 +28,7 @@ export interface SheetOptions {
 export class Sheet {
   private readonly scrim: HTMLDivElement;
   private closed = false;
+  private readonly fitToView = (): void => this.fit();
 
   constructor(
     i18n: I18n,
@@ -64,6 +65,9 @@ export class Sheet {
   open(): this {
     this.bus.emit('menu-opened', undefined);
     document.body.append(this.scrim);
+    this.fit();
+    window.visualViewport?.addEventListener('resize', this.fitToView);
+    window.visualViewport?.addEventListener('scroll', this.fitToView);
     if (this.options.focus) {
       setTimeout(() => this.scrim.querySelector<HTMLInputElement>('input[type=text]')?.focus(), 60);
     }
@@ -73,8 +77,18 @@ export class Sheet {
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    window.visualViewport?.removeEventListener('resize', this.fitToView);
+    window.visualViewport?.removeEventListener('scroll', this.fitToView);
     this.scrim.remove();
     this.options.onClose?.();
+  }
+
+  /** An on-screen keyboard covers the page without resizing it, so the sheet follows what it leaves. */
+  private fit(): void {
+    const view = window.visualViewport;
+    if (!view) return;
+    this.scrim.style.setProperty('--view-top', view.offsetTop + 'px');
+    this.scrim.style.setProperty('--view-height', view.height + 'px');
   }
 
   private footer(actions: readonly SheetAction[]): HTMLDivElement {

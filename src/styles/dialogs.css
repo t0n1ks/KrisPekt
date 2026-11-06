@@ -1,7 +1,8 @@
 /* Bottom sheets / dialogs, dropdown menus and the toast. */
 .scrim {
   position: fixed;
-  inset: 0;
+  inset: var(--view-top, 0) 0 auto;
+  height: var(--view-height, 100%);
   background: var(--scrim);
   z-index: 20;
   display: flex;

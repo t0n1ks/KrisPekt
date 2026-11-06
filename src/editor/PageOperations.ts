@@ -139,15 +139,17 @@ export class PageOperations {
   /** Inserts a copy of a page right after it. */
   duplicate(page: Page): void {
     this.deps.settle();
-    // Items are never changed in place and blobs are only removed once no page uses them,
-    // so the copy can share both with the original.
+    // Blobs are only removed once no page uses them, so the copy can share them with the original.
+    // Items get ids of their own: a selection moved onto the copy must not end up with two items
+    // of one id.
+    const fresh = <T extends { id: string }>(item: T): T => ({ ...item, id: this.deps.makeId() });
     const copy: Page = {
       ...PageRepository.toRecord(page),
       id: this.deps.makeId(),
-      strokes: page.strokes.slice(),
-      texts: page.texts.slice(),
-      images: page.images.slice(),
-      cards: page.cards.slice(),
+      strokes: page.strokes.map(fresh),
+      texts: page.texts.map(fresh),
+      images: page.images.map(fresh),
+      cards: page.cards.map(fresh),
       updatedAt: Date.now(),
     };
     this.insert(page, [copy]);
