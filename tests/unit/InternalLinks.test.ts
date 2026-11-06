@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
+import { Camera } from '../../src/canvas/Camera';
 import { LinkGeometry } from '../../src/canvas/LinkGeometry';
 import { LinkMarkPainter } from '../../src/canvas/LinkMarkPainter';
 import { PAPER } from '../../src/core/constants';
@@ -496,6 +497,18 @@ describe('going to a place', () => {
     viewport.reveal({} as Page, box(800, 850));
     expect(camera.y).toBe(840);
     expect(camera.setZoom).not.toHaveBeenCalled();
+  });
+
+  it('keeps a locked zoom, on the real camera, both going there and coming back', () => {
+    const camera = new Camera();
+    camera.resize({ left: 0, top: 0, width: 800, height: 600 }, 1);
+    camera.setZoomLock(1.5);
+    const layout = { pos: () => ({ x: 0, y: 100 }), width: 800, height: 5000 };
+    const viewport = new Viewport(camera, layout as never, {} as never, { request: vi.fn() } as never);
+    viewport.reveal({} as Page, box(800, 850));
+    expect(camera.z).toBe(1.5);
+    viewport.showAt({} as Page, { dy: 40, x: 0, z: 3 });
+    expect(camera.z).toBe(1.5);
   });
 
   it('goes back through setZoom, which a locked camera ignores', () => {

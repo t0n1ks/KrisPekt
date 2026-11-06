@@ -380,7 +380,7 @@ test('a stretch of text can be bookmarked, and a copied link pasted on handwriti
   await expect.poll(async () => (await storedPages(page, 'Parts'))[0]?.inkLinks[0]?.link.kind).toBe('anchor');
 });
 
-test('Back returns to the very same place, and a locked zoom stays locked', async ({ page }) => {
+test('Back returns to the very same place', async ({ page }) => {
   await notebookWithAnchor(page);
   await page.click('#btnPages');
   await page.locator('.page-item__thumb').first().click();
