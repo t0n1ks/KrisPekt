@@ -155,6 +155,13 @@ base-uri 'self'; form-action 'none'; manifest-src 'self'
   - check that **Secret scanning** and **Push protection** are on (Settings → Code security);
   - protect the `main` branch (no force-push, no deletion).
 
+### Origin policy for dependencies and assets
+The project must not contain libraries, fonts, assets, services or tools that originate from Russian companies or from organisations based in Russia.
+- **Before adding anything** (a dependency, a font, an icon set or other asset, a service, a CI action, a tool), check who makes it and where they are based, from a source that can be verified: the project's own site or repository, or the company's register entry. Put the finding in the commit message.
+- If the origin is unclear, say "unclear", do not guess, and ask the owner before adding it. If it violates this policy, do not add it; propose alternatives with their trade-offs.
+- Do not replace anything already in the project without the owner's decision.
+- This covers origin only. Russian as an interface language is not affected: it stays one of the four languages.
+
 ### 6. Defensive coding
 - Wrap all IndexedDB, file and PDF operations in error handling. Corrupted or unexpected stored data must not crash the app: skip the bad record and show a toast.
 - Validate data read **from IndexedDB** with the same type guards before rendering. The data could have been written by an older version or tampered with.
