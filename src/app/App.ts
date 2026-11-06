@@ -18,6 +18,7 @@ import { BlobRepository } from '../storage/BlobRepository';
 import { Database } from '../storage/Database';
 import { NotebookRepository } from '../storage/NotebookRepository';
 import { PageRepository } from '../storage/PageRepository';
+import { ToolPresetController } from '../editor/ToolPresetController';
 import { PreferencesStore } from '../storage/PreferencesStore';
 import { RecordReader } from '../storage/RecordReader';
 import { SaveQueue } from '../storage/SaveQueue';
@@ -173,11 +174,16 @@ export class App {
   }
 
   private createEditor(): EditorView {
+    const presets = new ToolPresetController(this.prefs, uid, this.bus);
     return new EditorView({
       i18n: this.i18n,
       bus: this.bus,
       prefs: this.prefs,
-      savePrefs: () => this.prefsStore.save(this.prefs),
+      savePrefs: () => {
+        presets.sync();
+        this.prefsStore.save(this.prefs);
+      },
+      presets,
       sizes: this.sizes,
       menu: this.menu,
       dialogs: this.dialogs,

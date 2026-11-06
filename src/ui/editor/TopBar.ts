@@ -11,12 +11,10 @@ export interface TopBarHandlers {
   zoom(anchor: HTMLElement): void;
   lock(): void;
   pages(): void;
-  undo(): void;
-  redo(): void;
   more(anchor: HTMLElement): void;
 }
 
-/** The editor's top bar: back, title, zoom, page-size lock, page counter, undo/redo, ⋯. */
+/** The editor's top bar: back, title, zoom, page-size lock, page counter, ⋯. Undo is on the toolbar. */
 export class TopBar {
   private readonly back = byId<HTMLButtonElement>('btnBack');
   private readonly titleButton = byId<HTMLButtonElement>('btnTitle');
@@ -25,8 +23,6 @@ export class TopBar {
   private readonly zoom = byId<HTMLButtonElement>('btnZoom');
   private readonly lock = byId<HTMLButtonElement>('btnLock');
   private readonly pages = byId<HTMLButtonElement>('btnPages');
-  private readonly undoButton = byId<HTMLButtonElement>('btnUndo');
-  private readonly redoButton = byId<HTMLButtonElement>('btnRedo');
   private readonly moreButton = byId<HTMLButtonElement>('btnEdMore');
   private lastKey = '';
   private readonly cleanup: (() => void)[] = [];
@@ -37,8 +33,6 @@ export class TopBar {
     handlers: TopBarHandlers,
   ) {
     this.back.append(icon('back'));
-    this.undoButton.append(icon('undo'));
-    this.redoButton.append(icon('redo'));
     this.moreButton.append(icon('more'));
     this.zoom.setAttribute('aria-haspopup', 'menu');
     const bind = (button: HTMLButtonElement, fn: () => void): void => {
@@ -50,8 +44,6 @@ export class TopBar {
     bind(this.zoom, () => handlers.zoom(this.zoom));
     bind(this.lock, handlers.lock);
     bind(this.pages, handlers.pages);
-    bind(this.undoButton, handlers.undo);
-    bind(this.redoButton, handlers.redo);
     bind(this.moreButton, () => handlers.more(this.moreButton));
   }
 
@@ -62,11 +54,6 @@ export class TopBar {
   setTitle(title: string, subject: string): void {
     this.title.textContent = title;
     this.subtitle.textContent = subject;
-  }
-
-  setUndoState(canUndo: boolean, canRedo: boolean): void {
-    this.undoButton.disabled = !canUndo;
-    this.redoButton.disabled = !canRedo;
   }
 
   /** Updates the lock pill, page counter and zoom; skipped when nothing visible changed. */
@@ -105,8 +92,6 @@ export class TopBar {
       [this.back, t.t('toShelf')],
       [this.titleButton, t.t('nbSettings')],
       [this.pages, t.t('pages')],
-      [this.undoButton, t.t('undo')],
-      [this.redoButton, t.t('redo')],
       [this.moreButton, t.t('more')],
     ];
     for (const [node, label] of labels) node.setAttribute('aria-label', label);

@@ -40,7 +40,8 @@ import { SelectionBar } from './SelectionBar';
 import { TextBoxEditor } from './TextBoxEditor';
 import { TextLayout } from '../../canvas/TextLayout';
 import { ToolOptionsPopover } from './ToolOptionsPopover';
-import { ToolTray } from './ToolTray';
+import type { ToolPresetController } from '../../editor/ToolPresetController';
+import { EditorToolbar } from './EditorToolbar';
 import { TopBar } from './TopBar';
 import { ZoomMenu } from './ZoomMenu';
 
@@ -58,6 +59,7 @@ export interface EditorViewDeps {
   bus: EventBus;
   prefs: Preferences;
   savePrefs: () => void;
+  presets: ToolPresetController;
   sizes: PageSizes;
   menu: Menu;
   dialogs: DialogFactory;
@@ -83,7 +85,7 @@ export class EditorView {
   private readonly fab = byId<HTMLButtonElement>('fab');
   private readonly canvas: EditorCanvas;
   private readonly topBar: TopBar;
-  private readonly tray: ToolTray;
+  private readonly toolbar: EditorToolbar;
   private readonly popover: ToolOptionsPopover;
   private readonly panel: PagesPanel;
   private readonly selectionBar: SelectionBar;
@@ -146,14 +148,31 @@ export class EditorView {
       toast: (message) => deps.toast.show(message),
     });
     this.topBar = new TopBar(i18n, sizes, this.topBarHandlers());
-    this.tray = new ToolTray(i18n, {
-      tool: (kind, button) => this.onToolButton(kind, button),
-      toolOptions: (kind) => this.openToolOptions(kind),
-      swatch: (color) => this.onSwatch(color),
-      swatchMenu: (index, button) => this.openSwatchMenu(index, button),
-      ruler: () => this.toggleRuler(),
+    this.toolbar = new EditorToolbar({
+      stage: c.stage,
+      i18n,
+      menu,
+      toast: deps.toast,
+      bus: deps.bus,
+      prefs: deps.prefs,
+      savePrefs: deps.savePrefs,
+      presets: deps.presets,
+      tools: () => c.tools,
+      popover: () => this.popover,
+      setTool: (kind) => this.setTool(kind),
+      rulerOn: () => c.ruler.on,
+      toggleRuler: () => this.toggleRuler(),
+      insertPhoto: () => void this.insertPhoto(),
+      undo: () => void c.undo.undo(),
+      redo: () => void c.undo.redo(),
     });
-    this.popover = new ToolOptionsPopover(c.stage, c.camera, () => this.tray.rect(), deps.bus);
+    this.popover = new ToolOptionsPopover(
+      c.stage,
+      c.camera,
+      () => this.toolbar.rect(),
+      deps.bus,
+      (tool) => this.toolbar.pinControl(tool),
+    );
     this.selectionBar = new SelectionBar(i18n, menu, {
       recolor: (color) => c.selection.recolor(color),
       duplicate: () => c.selection.duplicate(),
@@ -226,7 +245,7 @@ export class EditorView {
           this.positionOverlays();
         } else this.showPasteOrNothing();
       },
-      onUndoState: (u, r) => this.topBar.setUndoState(u, r),
+      onUndoState: (u, r) => this.toolbar.setUndoState(u, r),
       onRestored: (_pages, resized) => {
         if (resized) this.canvas.viewport.relayout();
         this.refreshPanel();
@@ -247,7 +266,7 @@ export class EditorView {
         else this.textEditor.startNew(page, x, y);
       },
       setTool: (kind) => this.setTool(kind),
-      refreshTray: () => this.renderTray(),
+      refreshTray: () => this.toolbar.render(),
       toast: (message, ms) => d.toast.show(message, ms),
       confirm: (title, text, ok) => {
         this.popover.close();
@@ -356,6 +375,7 @@ export class EditorView {
         return true;
       },
       escape: () => {
+        if (this.toolbar.closeCustomizer()) return;
         c.selection.clear();
         this.popover.close();
       },
@@ -452,7 +472,7 @@ export class EditorView {
     this.show();
     this.placeCamera(nb);
     this.topBar.setTitle(nb.title, this.deps.actions.subjectName(nb.subjectId));
-    this.renderTray();
+    this.toolbar.render();
     c.renderer.render();
     return true;
   }
@@ -625,68 +645,15 @@ export class EditorView {
 
   private onToolChange(tool: Tool): void {
     this.showPasteOrNothing();
-    this.renderTray();
+    this.toolbar.toolChanged(tool);
     this.canvas.applyCursor(tool);
-  }
-
-  private renderTray(): void {
-    this.tray.render(this.canvas.tools.kind, this.deps.prefs, this.canvas.ruler.on);
-  }
-
-  /** A tap on a tool: select it, or, if it is active, let it react (eraser) or toggle its options. */
-  private onToolButton(kind: ToolKind, button: HTMLButtonElement): void {
-    const tools = this.canvas.tools;
-    if (tools.kind !== kind) {
-      this.setTool(kind);
-      return;
-    }
-    if (tools.current.onActiveTap()) this.popover.close();
-    else this.popover.toggle(button, tools.current);
-  }
-
-  /** A long press on a tool: select it if needed and open its options. */
-  private openToolOptions(kind: ToolKind): void {
-    if (this.canvas.tools.kind !== kind) this.setTool(kind);
-    const button = this.tray.buttonFor(kind);
-    if (button) this.popover.open(button, this.canvas.tools.current);
-  }
-
-  private onSwatch(color: string): void {
-    const { prefs } = this.deps;
-    prefs.brushes[prefs.brush].c = color;
-    this.deps.savePrefs();
-    this.setTool('pen');
-  }
-
-  /** Long press on a pinned colour: replace it with the current pen colour, or remove it. */
-  private openSwatchMenu(index: number, button: HTMLButtonElement): void {
-    const { prefs, i18n, menu } = this.deps;
-    const current = prefs.brushes[prefs.brush].c;
-    const update = (favs: string[]): void => {
-      prefs.favs = favs;
-      this.deps.savePrefs();
-      this.renderTray();
-    };
-    menu.show(button, [
-      {
-        label: i18n.t('favReplace'),
-        swatch: current,
-        onClick: () => update(ColorLists.replace(prefs.favs, index, current)),
-      },
-      {
-        label: i18n.t('favRemove'),
-        icon: 'trash',
-        danger: true,
-        onClick: () => update(ColorLists.remove(prefs.favs, index)),
-      },
-    ]);
   }
 
   private toggleRuler(): void {
     const on = !this.canvas.ruler.on;
     this.rulerWidget.setVisible(on);
     if (on) this.deps.toast.show(this.deps.i18n.t('rulerHint'), 3200);
-    this.renderTray();
+    this.toolbar.render();
   }
 
   private beforePointerDown(): boolean {
@@ -720,6 +687,7 @@ export class EditorView {
         onClick: () => this.openPageSettings(this.canvas.session.currentPage()),
       },
       { label: i18n.t('insertPhoto'), icon: 'image', onClick: () => void this.insertPhoto() },
+      { label: i18n.t('customizeToolbar'), icon: 'sliders', onClick: () => this.toolbar.openCustomizer() },
       { label: i18n.t('addPdfPages'), icon: 'file', onClick: () => void this.importPdfHere() },
       { label: i18n.t('exportMenu'), icon: 'download', onClick: () => actions.exportNotebook(nb) },
       // The zoom pill is hidden on phones, so the lock has to be reachable from here too.
@@ -845,7 +813,7 @@ export class EditorView {
     this.panel.applyLanguage();
     if (!c.session.isOpen) return;
     this.popover.close();
-    this.renderTray();
+    this.toolbar.render();
     this.rulerWidget.invalidate();
     if (c.selection.current && this.selectionBar.visible) this.selectionBar.show();
     this.refreshPanel();

@@ -62,6 +62,16 @@ const PATHS = {
     '<rect x="4" y="4" width="11" height="11" rx="2"/><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M14.5 12v5M12 14.5h5"/>',
   paste: '<rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3.5h6V5M9 11h6M9 15h6"/>',
   minus: '<path d="M5 12h14"/>',
+  apps: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
+  sliders:
+    '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
+  eyeOff:
+    '<path d="M4 4l16 16M9.8 5.8A9.4 9.4 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-3 3.7M6.3 7.6A15.6 15.6 0 0 0 2.5 12S6 18.5 12 18.5c1.6 0 3-.4 4.3-1.1M10 10a2.8 2.8 0 0 0 4 4"/>',
+  pin: '<path d="M9 4h6l-1 6 3.5 3.5v1.5h-11v-1.5L10 10zM12 15v5.5"/>',
+  unpin: '<path d="M4 4l16 16M9.6 4H15l-.9 5.6M10 10l-3.5 3.5V15H15M12 15v5.5"/>',
+  left: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+  right: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   bold: '<path d="M7.5 5h5.5a3.5 3.5 0 0 1 0 7H7.5zM7.5 12H14a3.5 3.5 0 0 1 0 7H7.5z" stroke-width="2.4"/>',
   italic: '<path d="M10 5h7M7 19h7M14 5l-4 14"/>',
   underline: '<path d="M7 4v8a5 5 0 0 0 10 0V4M5 20.5h14"/>',

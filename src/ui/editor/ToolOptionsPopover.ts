@@ -17,6 +17,7 @@ export class ToolOptionsPopover {
     private readonly camera: Camera,
     private readonly trayRect: () => DOMRect,
     bus: EventBus,
+    private readonly footer: (tool: Tool) => HTMLElement | null,
   ) {
     bus.on('menu-opened', () => this.close());
   }
@@ -37,6 +38,7 @@ export class ToolOptionsPopover {
       'div',
       { class: 'popover', attrs: { 'data-tool': tool.kind } },
       tool.createOptionsPanel(),
+      this.footer(tool),
     );
     this.stage.append(node);
     this.node = node;

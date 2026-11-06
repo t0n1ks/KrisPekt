@@ -9,8 +9,16 @@ const MOVE_SLOP = 10;
  * swallowed so the tap action does not run as well.
  */
 export class LongPress {
-  /** Adds the listeners; they live as long as the node does. */
-  static attach(node: HTMLElement, onLong: () => void, ms = LONG_PRESS_MS): void {
+  /**
+   * Adds the listeners; they live as long as the node does.
+   * @param accepts leaves out some presses, such as those on a child with a long press of its own
+   */
+  static attach(
+    node: HTMLElement,
+    onLong: () => void,
+    ms = LONG_PRESS_MS,
+    accepts: (e: Event) => boolean = () => true,
+  ): void {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let fired = false;
     let pressing = false;
@@ -26,6 +34,7 @@ export class LongPress {
       clearTimeout(timer);
     };
     node.addEventListener('pointerdown', (e) => {
+      if (!accepts(e)) return;
       fired = false;
       pressing = true;
       start = { x: e.clientX, y: e.clientY };
@@ -38,6 +47,7 @@ export class LongPress {
     for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const)
       node.addEventListener(type, cancel);
     node.addEventListener('contextmenu', (e) => {
+      if (!accepts(e)) return;
       e.preventDefault();
       if (fired) return;
       // During a press (touch long-press, right click) the following click must be swallowed;
