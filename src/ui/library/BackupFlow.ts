@@ -1,4 +1,5 @@
 import { dateStamp } from '../../core/utils/format';
+import { BackupSize } from '../../domain/BackupSize';
 import { pickFile } from '../../core/utils/files';
 import type { FileSaver } from '../../features/files/FileSaver';
 import type { I18n } from '../../i18n/I18n';
@@ -34,6 +35,7 @@ export class BackupFlow {
     if (!blob) return;
     await this.deps.files.save(`krispekt-${dateStamp()}.json`, blob);
     this.deps.onSaved(blob.size, false);
+    this.warnIfTooLarge(blob);
   }
 
   /**
@@ -47,6 +49,21 @@ export class BackupFlow {
     await this.deps.files.save(`krispekt-backup-${dateStamp()}.json`, blob);
     this.deps.toast.show(this.deps.i18n.t('autoBackupDone'), 4000);
     this.deps.onSaved(blob.size, true);
+    this.warnIfTooLarge(blob);
+  }
+
+  /** About how many bytes a backup would take now; null if that cannot be told. */
+  async estimateBytes(): Promise<number | null> {
+    try {
+      return await this.deps.backup.estimateBytes();
+    } catch {
+      return null;
+    }
+  }
+
+  /** The file is still saved, since it holds the data, but it could not be restored by the app. */
+  private warnIfTooLarge(blob: Blob): void {
+    if (BackupSize.overLimit(blob.size)) this.deps.toast.show(this.deps.i18n.t('backupOverLimit'), 8000);
   }
 
   /** Writes pending edits, then collects the backup; null (with a toast) if that fails. */

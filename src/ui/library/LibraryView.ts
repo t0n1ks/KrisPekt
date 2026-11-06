@@ -1,7 +1,8 @@
 import { AUTO_BACKUP_INTERVALS } from '../../core/constants';
 import type { AutoBackupInterval } from '../../core/types';
 import { byId, el, replaceChildren } from '../../core/utils/dom';
-import { formatDate, formatRelativeDay } from '../../core/utils/format';
+import { formatDate, formatRelativeDay, formatSize } from '../../core/utils/format';
+import { BackupSize } from '../../domain/BackupSize';
 import { AutoBackupPolicy, type BackupState } from '../../domain/AutoBackupPolicy';
 import type { I18n, TextKey } from '../../i18n/I18n';
 import type { LibraryService } from '../../services/LibraryService';
@@ -19,6 +20,8 @@ export interface LibraryViewDeps {
   actions: LibraryActions;
   /** Backup preferences, for the status line and the "Auto backup" menu. */
   backupState: () => BackupState;
+  /** About how large a backup would be; null if that cannot be told. */
+  backupSize: () => Promise<number | null>;
   now: () => number;
 }
 
@@ -44,6 +47,7 @@ export class LibraryView {
   private readonly backupLine = byId('libBackup');
   private readonly banner = byId('libBanner');
   private notice: AutoBackupNotice | null = null;
+  private backupBytes: number | null = null;
   private readonly drag: SubjectDragController;
   private readonly search = byId<HTMLInputElement>('q');
   private readonly addSubject = byId<HTMLButtonElement>('btnAddSubject');
@@ -94,9 +98,23 @@ export class LibraryView {
         icon: 'folder',
         onClick: () => this.deps.menu.show(this.moreButton, this.intervalEntries()),
       },
+      ...this.backupSizeEntry(),
       '-',
       { label: i18n.t('whereStored'), icon: 'info', onClick: () => actions.showStorageInfo() },
     ];
+  }
+
+  /** The current size of a backup, right by the backup settings. It is information, not a choice. */
+  private backupSizeEntry(): MenuEntry[] {
+    if (this.backupBytes === null) return [];
+    const size = formatSize(this.backupBytes, this.deps.i18n);
+    return [{ label: this.deps.i18n.t('backupSize', { size }), disabled: true, onClick: () => undefined }];
+  }
+
+  /** Measures what a backup would take now, and shows it. */
+  async refreshBackupSize(): Promise<void> {
+    this.backupBytes = await this.deps.backupSize();
+    this.renderBackupStatus();
   }
 
   /** The "Auto backup" choices, with a check on the current one. */
@@ -173,16 +191,21 @@ export class LibraryView {
     const { i18n } = this.deps;
     const state = this.deps.backupState();
     const when = state.lastBackupAt ? formatRelativeDay(state.lastBackupAt, i18n) : i18n.t('backupNever');
-    this.backupLine.textContent = i18n.t('lastBackup', { when });
+    const bytes = this.backupBytes;
+    const over = bytes !== null && BackupSize.overLimit(bytes);
+    const size = bytes === null ? '' : ' · ' + i18n.t('backupSize', { size: formatSize(bytes, i18n) });
+    this.backupLine.textContent =
+      i18n.t('lastBackup', { when }) + size + (over ? ' · ' + i18n.t('backupOverLimit') : '');
     this.backupLine.classList.toggle(
       'library__backup--stale',
-      AutoBackupPolicy.isStale(state, this.deps.now()),
+      over || AutoBackupPolicy.isStale(state, this.deps.now()),
     );
   }
 
   show(): void {
     this.root.hidden = false;
     this.render();
+    void this.refreshBackupSize();
   }
 
   hide(): void {
@@ -213,6 +236,7 @@ export class LibraryView {
   /** Rebuilds the shelf for the current data and search query. */
   render(): void {
     const { i18n, library } = this.deps;
+    if (this.backupBytes === null) void this.refreshBackupSize();
     this.renderBackupStatus();
     this.renderBanner();
     if (this.drag.active) return;

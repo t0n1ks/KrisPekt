@@ -193,7 +193,7 @@ test('automatic backup downloads when due, and the file restores', async ({ page
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('./');
   await expect(page.locator('.notebook-card')).toHaveCount(2);
-  await expect(page.locator('#libBackup')).toHaveText('Последняя копия: ещё не было');
+  await expect(page.locator('#libBackup')).toContainText('Последняя копия: ещё не было');
 
   // Pretend the last backup is 4 days old and something changed since.
   await page.evaluate(() => {
@@ -208,12 +208,12 @@ test('automatic backup downloads when due, and the file restores', async ({ page
   await expect(page.locator('#libBackup')).toBeVisible();
   const downloadPromise = page.waitForEvent('download');
   await page.reload();
-  await expect(page.locator('#libBackup')).toHaveText('Последняя копия: 4 дня назад');
+  await expect(page.locator('#libBackup')).toContainText('Последняя копия: 4 дня назад');
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^krispekt-backup-\d{4}-\d{2}-\d{2}\.json$/);
   await expect(page.locator('.toast')).toHaveText('Резервная копия сохранена в Загрузки');
   await expect(page.locator('.backup-banner')).toBeVisible();
-  await expect(page.locator('#libBackup')).toHaveText('Последняя копия: сегодня');
+  await expect(page.locator('#libBackup')).toContainText('Последняя копия: сегодня');
   const file = await download.path();
 
   // The automatic file restores like a manual backup.
