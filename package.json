@@ -41,7 +41,7 @@
     "@fontsource/unbounded": "5.3.0",
     "fflate": "0.8.3",
     "jspdf": "4.2.1",
-    "pdfjs-dist": "6.4.299"
+    "pdfjs-dist": "6.5.438"
   },
   "overrides": {
     "rollup": "npm:@rollup/wasm-node@4.64.5"
