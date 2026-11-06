@@ -1,3 +1,5 @@
+import type { CardLabels } from '../../canvas/CardPainter';
+import { formatSize } from '../../core/utils/format';
 import { SCRATCH_HINT_MS } from '../../core/constants';
 import type { EventBus } from '../../app/EventBus';
 import type { Language, Notebook, Page, Preferences, Stroke, TextItem, ToolKind } from '../../core/types';
@@ -11,7 +13,9 @@ import { PageDeletion } from '../../editor/PageDeletion';
 import { PageOperations } from '../../editor/PageOperations';
 import { ImageInserter } from '../../features/images/ImageInserter';
 import { ImageRejectedError, type ImageEncoder } from '../../features/images/ImageEncoder';
+import type { PdfAttachments } from '../../features/attachments/PdfAttachments';
 import type { PdfImporter } from '../../features/pdf/PdfImporter';
+import type { PdfLoader } from '../../features/pdf/PdfLoader';
 import type { BlobSweeper } from '../../services/BlobSweeper';
 import { ExportController, type ExportRequest } from '../../features/export/ExportController';
 import { PageRasterizer } from '../../features/export/PageRasterizer';
@@ -24,6 +28,7 @@ import { PdfImages } from '../../features/pdf/PdfImages';
 import type { I18n } from '../../i18n/I18n';
 import { KeyboardShortcuts } from '../../input/KeyboardShortcuts';
 import type { BlobRepository } from '../../storage/BlobRepository';
+import { PagePressTargets } from '../../editor/PagePressTargets';
 import { PageRepository } from '../../storage/PageRepository';
 import type { SaveQueue } from '../../storage/SaveQueue';
 import type { Tool } from '../../tools/Tool';
@@ -31,6 +36,8 @@ import type { DialogFactory } from '../dialogs/DialogFactory';
 import type { Menu, MenuEntry } from '../dialogs/Menu';
 import { PageSettingsDialog } from '../dialogs/PageSettingsDialog';
 import { Snackbar } from '../dialogs/Snackbar';
+import { LinkDialog } from '../dialogs/LinkDialog';
+import { LinkOpener } from '../dialogs/LinkOpener';
 import type { Toast } from '../dialogs/Toast';
 import { icon } from '../icons';
 import { languageMenu, languageShort } from '../widgets/languageMenu';
@@ -39,6 +46,8 @@ import { ScratchOutMenu } from './ScratchOutMenu';
 import { PagesPanel } from './PagesPanel';
 import { RulerWidget } from './RulerWidget';
 import { SelectionBar } from './SelectionBar';
+import { CardController } from './CardController';
+import { PdfViewer } from './PdfViewer';
 import { TextBoxEditor } from './TextBoxEditor';
 import { TextLayout } from '../../canvas/TextLayout';
 import { ToolOptionsPopover } from './ToolOptionsPopover';
@@ -72,6 +81,8 @@ export interface EditorViewDeps {
   saveQueue: SaveQueue;
   imageEncoder: ImageEncoder;
   pdfImporter: PdfImporter;
+  pdfLoader: PdfLoader;
+  attachments: PdfAttachments;
   files: FileSaver;
   makeId: () => string;
   actions: EditorActions;
@@ -101,6 +112,9 @@ export class EditorView {
   private readonly exporter: ExportController;
   private readonly diagnostics: InputDiagnosticsOverlay;
   private readonly zoom: ZoomMenu;
+  private readonly linkDialog: LinkDialog;
+  private readonly pdfViewer: PdfViewer;
+  private readonly cards: CardController;
 
   constructor(private readonly deps: EditorViewDeps) {
     const { i18n, sizes, menu } = deps;
@@ -112,9 +126,12 @@ export class EditorView {
       blobs: deps.blobs,
       saveQueue: deps.saveQueue,
       makeId: deps.makeId,
+      cardLabels: this.cardLabels(),
       hooks: this.hooks(),
     });
     const c = this.canvas;
+    this.linkDialog = new LinkDialog(i18n, deps.dialogs);
+    this.pdfViewer = new PdfViewer(i18n, deps.pdfLoader, (message) => deps.toast.show(message, 4000));
     this.textEditor = new TextBoxEditor({
       camera: c.camera,
       layout: c.layout,
@@ -138,6 +155,7 @@ export class EditorView {
       canRedoPage: () => c.history.canRedo,
       isPalm: (e) => c.router.isPalmTouch(e),
       toast: (message) => deps.toast.show(message),
+      askLink: (options) => this.linkDialog.ask(options),
       redraw: () => c.renderer.request(),
     });
     this.zoom = new ZoomMenu({
@@ -165,6 +183,7 @@ export class EditorView {
       rulerOn: () => c.ruler.on,
       toggleRuler: () => this.toggleRuler(),
       insertPhoto: () => void this.insertPhoto(),
+      attach: () => this.openInsertMenu(),
       undo: () => void c.undo.undo(),
       redo: () => void c.undo.redo(),
     });
@@ -211,6 +230,7 @@ export class EditorView {
       makeId: deps.makeId,
     });
     this.exporter = this.createExporter();
+    this.cards = this.createCards();
     this.fab.append(icon('plus', 26));
     this.fab.addEventListener('click', () => this.pageOps.add());
     new KeyboardShortcuts(this.shortcutHandlers());
@@ -218,6 +238,64 @@ export class EditorView {
   }
 
   /* ---------- wiring ---------- */
+
+  /** The words on attachment cards, in the current language. */
+  private cardLabels(): CardLabels {
+    const { i18n } = this.deps;
+    return {
+      get pdfBadge() {
+        return i18n.t('pdfBadge');
+      },
+      pdfMeta: (card) => {
+        const size = formatSize(card.bytes, i18n);
+        return card.pages ? i18n.plural(card.pages, 'pg') + ' · ' + size : size;
+      },
+      pdfProblem: (card) => {
+        if (card.problem === 'locked') return i18n.t('pdfLocked');
+        return card.problem === 'broken' ? i18n.t('pdfBroken') : null;
+      },
+    };
+  }
+
+  private createCards(): CardController {
+    const d = this.deps;
+    const c = this.canvas;
+    return new CardController({
+      i18n: d.i18n,
+      menu: d.menu,
+      dialogs: d.dialogs,
+      files: d.files,
+      blobs: d.blobs,
+      attachments: d.attachments,
+      viewer: this.pdfViewer,
+      linkDialog: this.linkDialog,
+      links: new LinkOpener(d.i18n, d.dialogs, (message) => d.toast.show(message)),
+      targets: new PagePressTargets({
+        camera: c.camera,
+        layout: c.layout,
+        texts: c.texts,
+        tool: () => c.tools.kind,
+        overSelection: (pt) => c.selection.hit(pt) !== null,
+      }),
+      session: c.session,
+      undo: c.undo,
+      makeId: d.makeId,
+      stage: c.stage,
+      prompt: this.snackbar,
+      toast: (message, ms) => d.toast.show(message, ms),
+      dismissToast: () => d.toast.hide(),
+      settle: () => this.settle(),
+      selectCard: (page, card) => {
+        this.setTool('lasso');
+        c.selection.set(page, new Set([card.id]));
+      },
+      insertPages: (file) => this.insertPdfPages(file),
+    });
+  }
+
+  private openInsertMenu(): void {
+    this.deps.menu.show(this.topBarMoreAnchor(), this.cards.insertEntries());
+  }
 
   /** PDF (vector or raster) and PNG export, drawn with the editor's own painter. */
   private createExporter(): ExportController {
@@ -264,6 +342,11 @@ export class EditorView {
       onScratchReport: (report) => this.diagnostics.noteScratch(report),
       onScratchHint: () => this.showScratchHint(),
       settle: () => this.settle(),
+      press: {
+        kindAt: (pt, event) => this.cards.kindAt(pt, event),
+        tap: (pt) => this.cards.tap(pt),
+        longPress: (pt) => this.cards.longPress(pt),
+      },
       hiddenTextOn: (page) => this.textEditor.hiddenOn(page),
       editText: (page, item, x, y) => {
         if (item) this.textEditor.select(page, item);
@@ -542,6 +625,16 @@ export class EditorView {
     ]);
   }
 
+  /**
+   * Undo steps hold whatever was deleted or undone in this session. What only they still name is
+   * no longer needed once they are gone, and an attached PDF is too large to leave behind.
+   */
+  private markReleasedBlobs(): void {
+    const { session, history } = this.canvas;
+    const onPages = PageRepository.blobIds(session.pages);
+    if ([...history.blobIds()].some((id) => !onPages.has(id))) this.deps.sweeper.markDue();
+  }
+
   /** Saves and returns to the shelf. */
   async close(): Promise<void> {
     const c = this.canvas;
@@ -549,9 +642,12 @@ export class EditorView {
     this.popover.close();
     this.deps.menu.close();
     this.panel.hide();
+    this.cards.cancelPlacement();
+    this.pdfViewer.close();
     this.deletion.finish();
     this.rememberView();
     await this.deps.saveQueue.flush(true);
+    this.markReleasedBlobs();
     c.session.close();
     c.undo.clear();
     this.deps.saveQueue.setNotebook(null);
@@ -560,6 +656,7 @@ export class EditorView {
     this.root.hidden = true;
     document.body.classList.remove('is-editing');
     this.deps.actions.closed();
+    void this.deps.sweeper.run();
   }
 
   /** Applies notebook-dialog changes to the open notebook. */
@@ -691,6 +788,7 @@ export class EditorView {
         onClick: () => this.openPageSettings(this.canvas.session.currentPage()),
       },
       { label: i18n.t('insertPhoto'), icon: 'image', onClick: () => void this.insertPhoto() },
+      { label: i18n.t('insertMenu'), icon: 'paperclip', onClick: () => this.openInsertMenu() },
       { label: i18n.t('customizeToolbar'), icon: 'sliders', onClick: () => this.toolbar.openCustomizer() },
       { label: i18n.t('addPdfPages'), icon: 'file', onClick: () => void this.importPdfHere() },
       { label: i18n.t('exportMenu'), icon: 'download', onClick: () => actions.exportNotebook(nb) },
@@ -823,11 +921,22 @@ export class EditorView {
     const c = this.canvas;
     const ref = c.session.currentPage() ?? null;
     const imported = await this.deps.pdfImporter.pickAndImport();
-    if (!imported?.pages.length || !c.session.isOpen) return;
-    for (const p of imported.pages) p.nbId = c.session.nb.id;
-    this.pageOps.insert(ref, imported.pages);
+    if (imported) await this.addImportedPages(ref, imported.pages);
+  }
+
+  /** Makes notebook pages of an attached PDF, after the current page. */
+  private async insertPdfPages(file: Blob): Promise<void> {
+    const ref = this.canvas.session.currentPage() ?? null;
+    await this.addImportedPages(ref, await this.deps.pdfImporter.import(file));
+  }
+
+  private async addImportedPages(after: Page | null, pages: Page[]): Promise<void> {
+    const c = this.canvas;
+    if (!pages.length || !c.session.isOpen) return;
+    for (const p of pages) p.nbId = c.session.nb.id;
+    this.pageOps.insert(after, pages);
     await this.deps.saveQueue.flush(true);
-    const first = imported.pages[0];
+    const first = pages[0];
     if (first) c.viewport.scrollTo(first);
   }
 
@@ -848,6 +957,7 @@ export class EditorView {
     if (c.selection.current && this.selectionBar.visible) this.selectionBar.show();
     this.refreshPanel();
     c.texts.reset();
+    for (const page of c.session.pages) if (page.cards.length) c.session.bump(page);
     c.renderer.request();
   }
 }

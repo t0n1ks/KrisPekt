@@ -970,3 +970,11 @@
   pointer-events: none;
   z-index: 7;
 }
+
+/* The point a card's menu opens from. */
+.card-anchor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}

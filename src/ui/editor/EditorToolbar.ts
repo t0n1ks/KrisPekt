@@ -32,6 +32,7 @@ export interface EditorToolbarDeps {
   rulerOn: () => boolean;
   toggleRuler: () => void;
   insertPhoto: () => void;
+  attach: () => void;
   undo: () => void;
   redo: () => void;
 }
@@ -62,6 +63,7 @@ export class EditorToolbar {
       swatchMenu: (index, button) => this.openSwatchMenu(index, button),
       ruler: () => deps.toggleRuler(),
       image: () => deps.insertPhoto(),
+      attach: () => deps.attach(),
       undo: () => deps.undo(),
       redo: () => deps.redo(),
     });

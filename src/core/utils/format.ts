@@ -61,3 +61,11 @@ export function formatRelativeDay(ts: number, i18n: I18n, nowDate: Date = new Da
 export function formatZoom(zoom: number): string {
   return Math.round(zoom * 100) + '%';
 }
+
+/** A file size in the interface language: "340 KB", "1.4 MB". */
+export function formatSize(bytes: number, i18n: I18n): string {
+  const number = (value: number, digits: number): string =>
+    value.toLocaleString(i18n.locale, { maximumFractionDigits: digits });
+  if (bytes < 1024 * 1024) return i18n.t('sizeKb', { n: number(Math.max(1, bytes / 1024), 0) });
+  return i18n.t('sizeMb', { n: number(bytes / (1024 * 1024), 1) });
+}

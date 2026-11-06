@@ -16,6 +16,8 @@ export interface FormatState {
   size: number;
   align: 'left' | 'center' | 'right';
   list: 'bullet' | 'number' | null;
+  /** The selected text carries a link. */
+  link: boolean;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -25,6 +27,8 @@ export interface TextFormatHandlers {
   paragraph(patch: ParagraphPatch): void;
   /** Changes the font size by this many steps. */
   stepSize(delta: number): void;
+  /** Adds, changes or removes the link of the selected text. */
+  link(): void;
   undo(): void;
   redo(): void;
   remove(): void;
@@ -217,6 +221,7 @@ export class TextFormatBar {
         run: list('number'),
         pressed: (s) => s.list === 'number',
       },
+      { key: 'link', label: 'fmtLink', icon: 'link', run: () => h.link(), pressed: (s) => s.link },
       { key: 'remove', label: 'delete', icon: 'trash', run: () => h.remove(), danger: true },
     ];
   }

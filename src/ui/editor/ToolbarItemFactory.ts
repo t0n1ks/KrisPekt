@@ -36,6 +36,8 @@ export interface ToolbarItemHandlers {
   swatchMenu(index: number, button: HTMLButtonElement): void;
   ruler(): void;
   image(): void;
+  /** The attachment menu: a PDF file or a link. */
+  attach(): void;
   undo(): void;
   redo(): void;
 }
@@ -71,6 +73,8 @@ export class ToolbarItemFactory {
         return this.ruler(state.rulerOn);
       case 'image':
         return this.action(item, 'image', this.i18n.t('insertPhoto'), () => this.handlers.image());
+      case 'attach':
+        return this.action(item, 'paperclip', this.i18n.t('insertAttachment'), () => this.handlers.attach());
       case 'undo':
         return this.undoRedo(item, 'btnUndo', state.canUndo, () => this.handlers.undo());
       case 'redo':
@@ -90,6 +94,7 @@ export class ToolbarItemFactory {
       colors: 'palette',
       ruler: 'ruler',
       image: 'image',
+      attach: 'paperclip',
       undo: 'undo',
       redo: 'redo',
     };
@@ -105,6 +110,7 @@ export class ToolbarItemFactory {
     if (preset) return this.presetLabel(preset);
     if (item === 'colors') return t.t('toolbarColors');
     if (item === 'image') return t.t('insertPhoto');
+    if (item === 'attach') return t.t('insertAttachment');
     if (item === 'ruler' || item === 'undo' || item === 'redo') return t.t(item);
     return item;
   }

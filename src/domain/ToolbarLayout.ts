@@ -1,7 +1,7 @@
 import type { ToolKind, ToolPreset, ToolbarPrefs } from '../core/types';
 
 const TOOLS: readonly ToolKind[] = ['pen', 'hl', 'eraser', 'lasso', 'text'];
-const DEFAULT_ORDER: readonly string[] = [...TOOLS, 'colors', 'ruler', 'image', 'undo', 'redo'];
+const DEFAULT_ORDER: readonly string[] = [...TOOLS, 'colors', 'ruler', 'image', 'attach', 'undo', 'redo'];
 /** Always reachable, so they cannot be hidden. The More button is not a movable item at all. */
 const ESSENTIAL: ReadonlySet<string> = new Set(['undo', 'redo']);
 const PRESET_PREFIX = 'preset:';
@@ -18,6 +18,7 @@ const PRIORITY: Readonly<Record<string, number>> = {
   colors: 40,
   ruler: 30,
   image: 20,
+  attach: 15,
 };
 const PRESET_PRIORITY = 80;
 

@@ -1,0 +1,64 @@
+.pdf-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  background: var(--desk);
+  color: var(--fg);
+}
+.pdf-viewer__bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 4px 8px;
+  padding-top: calc(4px + env(safe-area-inset-top, 0px));
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.pdf-viewer__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 8px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pdf-viewer__indicator {
+  flex: none;
+  padding: 0 8px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.pdf-viewer__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* Two fingers are the viewer's own zoom; the browser must not zoom the whole app. */
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+}
+.pdf-viewer__pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  min-width: 100%;
+  padding: 8px 0;
+}
+.pdf-viewer__page {
+  position: relative;
+  flex: none;
+  width: var(--viewer-page-width, 100%);
+  aspect-ratio: var(--page-ratio, 0.707);
+  background: var(--paper);
+  box-shadow: 0 1px 4px var(--shadow);
+}
+.pdf-viewer__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

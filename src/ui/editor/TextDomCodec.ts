@@ -1,7 +1,9 @@
+import { PAPER } from '../../core/constants';
 import type { TextParagraph, TextSpan, TextStyle } from '../../core/types';
 import { el, replaceChildren } from '../../core/utils/dom';
 import { RichText } from '../../domain/RichText';
 import { LIST_INDENT_EM, type BoxDefaults } from '../../domain/RichTextLayout';
+import { SafeUrl } from '../../domain/SafeUrl';
 import { COLOR_PATTERN, LIMITS } from '../../storage/validation/guards';
 
 /** A character range; a paragraph break counts as one character. */
@@ -155,6 +157,11 @@ export class TextDomCodec {
       span.dataset[flag] = '1';
       span.classList.add('text-run--' + FLAG_CLASSES[flag]);
     }
+    if (run.link) {
+      span.dataset.href = run.link.href;
+      span.classList.add('text-run--underline');
+      span.style.setProperty('--run-color', PAPER.link);
+    }
     if (run.t) span.textContent = run.t;
     else span.append(el('br'));
     return span;
@@ -219,6 +226,8 @@ export class TextDomCodec {
     const color = node.dataset.c;
     if (color && COLOR_PATTERN.test(color)) style.c = color;
     for (const flag of FLAGS) if (node.dataset[flag] === '1') style[flag] = true;
+    const href = node.dataset.href ? SafeUrl.strict(node.dataset.href) : null;
+    if (href) style.link = { kind: 'url', href };
     return style;
   }
 

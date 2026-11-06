@@ -261,6 +261,7 @@ describe('toolbar layout', () => {
       'colors',
       'ruler',
       'image',
+      'attach',
       'undo',
       'redo',
     ]);
@@ -280,9 +281,9 @@ describe('toolbar layout', () => {
     const { order } = ToolbarLayout.resolve({ order: ['redo', 'pen'], hidden: [] }, []);
     expect(order.indexOf('redo')).toBeLessThan(order.indexOf('pen'));
     expect(order).toEqual(
-      expect.arrayContaining(['hl', 'eraser', 'lasso', 'text', 'colors', 'ruler', 'image', 'undo']),
+      expect.arrayContaining(['hl', 'eraser', 'lasso', 'text', 'colors', 'ruler', 'image', 'attach', 'undo']),
     );
-    expect(order).toHaveLength(10);
+    expect(order).toHaveLength(11);
   });
 
   it('a new preset lands after the last tool or preset', () => {
@@ -355,13 +356,14 @@ describe('priority overflow', () => {
   });
 
   it('as the bar narrows, the lowest priority goes first', () => {
-    expect(place(total + W - 1).overflow).toEqual(['image']);
-    expect(place(total + W - 1 - (W + G)).overflow).toEqual(['ruler', 'image']);
+    expect(place(total + W - 1).overflow).toEqual(['attach']);
+    expect(place(total + W - 1 - (W + G)).overflow).toEqual(['image', 'attach']);
+    expect(place(total + W - 1 - 2 * (W + G)).overflow).toEqual(['ruler', 'image', 'attach']);
   });
 
   it('a wide item that does not fit lets a narrower one take the room', () => {
-    // Without the image and the ruler, the room left is less than the colours' three buttons.
-    const { overflow, bar } = place(total + W - 2 * (W + G) - 1);
+    // Without the attachment, the image and the ruler, the room left is less than the colours' three buttons.
+    const { overflow, bar } = place(total + W - 3 * (W + G) - 1);
     expect(overflow).toContain('colors');
     expect(bar).toContain('ruler');
   });

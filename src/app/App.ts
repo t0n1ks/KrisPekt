@@ -6,6 +6,8 @@ import { PageSizes } from '../domain/PageSizes';
 import { SampleSeeder } from '../domain/SampleSeeder';
 import { FileSaver } from '../features/files/FileSaver';
 import { ImageEncoder } from '../features/images/ImageEncoder';
+import { PdfAttachments } from '../features/attachments/PdfAttachments';
+import { PdfInspector } from '../features/attachments/PdfInspector';
 import { PdfImporter } from '../features/pdf/PdfImporter';
 import { PdfLoader } from '../features/pdf/PdfLoader';
 import { I18n } from '../i18n/I18n';
@@ -63,6 +65,8 @@ export class App {
   private readonly saveQueue: SaveQueue;
   private readonly imageEncoder = new ImageEncoder();
   private readonly pdfImporter: PdfImporter;
+  private readonly pdfLoader: PdfLoader;
+  private readonly attachments: PdfAttachments;
   private readonly subjectDialog: SubjectDialog;
   private readonly notebookDialog: NotebookDialog;
   private readonly exportDialog: ExportDialog;
@@ -100,8 +104,16 @@ export class App {
       () => this.storageError(),
       () => this.contentChanged(),
     );
+    this.pdfLoader = new PdfLoader();
+    const inspector = new PdfInspector(this.pdfLoader);
+    this.attachments = new PdfAttachments({
+      blobs: this.repos.blobs,
+      inspect: (bytes) => inspector.inspect(bytes),
+      storage: () => App.storageFigures(),
+      makeId: uid,
+    });
     this.pdfImporter = new PdfImporter({
-      loader: new PdfLoader(),
+      loader: this.pdfLoader,
       blobs: this.repos.blobs,
       i18n: this.i18n,
       makeId: uid,
@@ -143,6 +155,15 @@ export class App {
     const app = new App(await Database.open());
     await app.boot();
     return app;
+  }
+
+  /** What the browser says about its storage; null where it says nothing. */
+  private static async storageFigures(): Promise<{ quota?: number; usage?: number } | null> {
+    try {
+      return (await navigator.storage?.estimate()) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /* ---------- construction ---------- */
@@ -200,6 +221,8 @@ export class App {
       saveQueue: this.saveQueue,
       imageEncoder: this.imageEncoder,
       pdfImporter: this.pdfImporter,
+      pdfLoader: this.pdfLoader,
+      attachments: this.attachments,
       files: this.files,
       makeId: uid,
       onStorageError: () => this.storageError(),
@@ -222,7 +245,10 @@ export class App {
       dialogs: this.dialogs,
       toast: this.toast,
       flush: () => this.saveQueue.flush(),
-      onRestored: () => this.libraryView.render(),
+      onRestored: () => {
+        this.libraryView.render();
+        void this.libraryView.refreshBackupSize();
+      },
       onSaved: (bytes, auto) => this.backupSaved(bytes, auto),
     });
   }
@@ -253,6 +279,7 @@ export class App {
       menu: this.menu,
       actions,
       backupState: () => this.prefs,
+      backupSize: () => backup.estimateBytes(),
       now: () => Date.now(),
     });
   }

@@ -2,12 +2,13 @@ import type { Camera } from '../../canvas/Camera';
 import type { PageLayout } from '../../canvas/PageLayout';
 import type { TextLayout } from '../../canvas/TextLayout';
 import { MM } from '../../core/constants';
-import type { Page, TextItem, TextParagraph, TextPrefs, TextStyle } from '../../core/types';
+import type { LinkTarget, Page, TextItem, TextParagraph, TextPrefs, TextStyle } from '../../core/types';
 import { byId } from '../../core/utils/dom';
 import { clamp } from '../../core/utils/math';
 import type { EditorSession } from '../../editor/EditorSession';
 import { PastedText } from '../../domain/PastedText';
 import { RichText, type ParagraphPatch, type StylePatch } from '../../domain/RichText';
+import type { LinkChoice, LinkDialogOptions } from '../dialogs/LinkDialog';
 import { TextBoxRules, type PageBounds } from '../../domain/TextBoxRules';
 import { TextEditHistory } from '../../domain/TextEditHistory';
 import type { I18n } from '../../i18n/I18n';
@@ -70,6 +71,8 @@ export interface TextBoxEditorDeps {
   canRedoPage: () => boolean;
   isPalm: (e: PointerEvent) => boolean;
   toast: (message: string) => void;
+  /** Asks for a link's address; resolves null if cancelled. */
+  askLink: (options: LinkDialogOptions) => Promise<LinkChoice | null>;
   /** Redraws after the camera moved to keep the caret in view. */
   redraw: () => void;
 }
@@ -91,6 +94,8 @@ export class TextBoxEditor {
   private readonly frame: TextBoxFrame;
   private readonly bar: TextFormatBar;
   private open: Session | null = null;
+  /** The link dialog has the focus; the box must stay open behind it. */
+  private askingLink = false;
   private readonly onSelectionChange = (): void => this.syncSelection();
   private readonly onViewportChange = (): void => this.viewportChanged();
   private readonly onHidden = (): void => {
@@ -110,6 +115,7 @@ export class TextBoxEditor {
       format: (patch) => this.format(patch),
       paragraph: (patch) => this.paragraph(patch),
       stepSize: (delta) => this.stepSize(delta),
+      link: () => void this.editLink(),
       undo: () => this.undo(),
       redo: () => this.redo(),
       remove: () => this.removeBox(),
@@ -244,6 +250,7 @@ export class TextBoxEditor {
     });
     root.addEventListener('compositionend', () => this.onCompositionEnd());
     root.addEventListener('focusout', (e) => {
+      if (this.askingLink) return;
       if (this.open?.editing && !this.bar.owns(e.relatedTarget)) this.commit();
     });
     document.addEventListener('selectionchange', this.onSelectionChange);
@@ -629,6 +636,55 @@ export class TextBoxEditor {
     this.format({ fs: size });
   }
 
+  /**
+   * What the link button works on, with the link already there if any: the whole box when it is
+   * only selected, the selection while editing, or the link the caret is in. Null: nothing to link.
+   */
+  private linkRange(s: Session): { start: number; end: number; link?: LinkTarget } | null {
+    const paras = s.draft.paras;
+    if (!s.editing) {
+      const end = RichText.length(paras);
+      return { start: 0, end, ...TextBoxEditor.commonLink(paras, 0, end) };
+    }
+    const { start, end } = s.selection;
+    if (start === end) return RichText.linkRangeAt(paras, start);
+    return { start, end, ...TextBoxEditor.commonLink(paras, start, end) };
+  }
+
+  private static commonLink(
+    paras: readonly TextParagraph[],
+    start: number,
+    end: number,
+  ): { link?: LinkTarget } {
+    const { link } = RichText.commonStyle(paras, start, end);
+    return link ? { link } : {};
+  }
+
+  /** The dialog takes the focus (and on a tablet closes the keyboard), so the box waits behind it. */
+  private async editLink(): Promise<void> {
+    const s = this.open;
+    if (!s) return;
+    this.deps.menu.close();
+    if (s.editing) s.selection = TextDomCodec.selection(this.root) ?? s.selection;
+    const range = this.linkRange(s);
+    if (!range) {
+      this.deps.toast(this.deps.i18n.t('linkSelectText'));
+      return;
+    }
+    this.askingLink = true;
+    const choice = await this.deps
+      .askLink({ href: range.link?.href, canRemove: range.link !== undefined })
+      .finally(() => (this.askingLink = false));
+    if (this.open !== s) return;
+    if (s.editing) this.focusEditor(s);
+    if (!choice) return;
+    if (s.editing) s.history.record(this.editState(s), 'other', performance.now());
+    const link: LinkTarget | null = choice.kind === 'remove' ? null : { kind: 'url', href: choice.href };
+    const paras = RichText.applyStyle(s.draft.paras, range.start, range.end, { link });
+    s.draft = { ...s.draft, paras };
+    this.afterFormat(s);
+  }
+
   /** After a format: the DOM, the box and, for a selected box, the page. */
   private afterFormat(s: Session): void {
     TextDomCodec.render(this.root, s.draft.paras, s.draft);
@@ -656,7 +712,7 @@ export class TextBoxEditor {
   private barState(): FormatState {
     const s = this.open;
     if (!s) {
-      return { style: {}, size: 0, align: 'left', list: null, canUndo: false, canRedo: false };
+      return { style: {}, size: 0, align: 'left', list: null, link: false, canUndo: false, canRedo: false };
     }
     const d = s.draft;
     const range = s.editing ? s.selection : { start: 0, end: RichText.length(d.paras) };
@@ -673,6 +729,7 @@ export class TextBoxEditor {
       size: style.fs ?? (mixedSize ? (first?.fs ?? d.fs) : d.fs),
       align: para?.align ?? 'left',
       list: para?.list ?? null,
+      link: this.linkRange(s)?.link !== undefined,
       canUndo: s.editing ? s.history.canUndo : this.deps.canUndoPage(),
       canRedo: s.editing ? s.history.canRedo : this.deps.canRedoPage(),
     };
