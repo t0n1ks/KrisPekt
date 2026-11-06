@@ -200,6 +200,7 @@ test('automatic backup downloads when due, and the file restores', async ({ page
     const key = 'konspektnik.prefs.v1';
     const prefs = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
     const day = 24 * 60 * 60 * 1000;
+    prefs.autoBackup = '3days';
     prefs.lastBackupAt = Date.now() - 4 * day;
     prefs.lastChangeAt = Date.now() - 60 * 60 * 1000;
     localStorage.setItem(key, JSON.stringify(prefs));

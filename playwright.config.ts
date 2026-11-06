@@ -7,6 +7,17 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173/KrisPekt/',
     locale: 'ru-RU',
+    // Automatic backups download a file on their own schedule, which a test waiting for its own
+    // download could take for it. A test about them turns them on.
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: 'http://localhost:4173',
+          localStorage: [{ name: 'konspektnik.prefs.v1', value: '{"autoBackup":"off"}' }],
+        },
+      ],
+    },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {

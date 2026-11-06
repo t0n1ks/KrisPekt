@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { exportDownload } from './downloads';
 import { pdfTextItems, servePdfJs, type PdfTextItem } from './pdf-view';
 
 const NOTEBOOK = 'Text boxes';
@@ -768,7 +769,7 @@ test.describe('text boxes', () => {
     await page.getByText('Экспорт…').click();
     const sheet = page.locator('.sheet');
     await sheet.locator('.choice-list__item', { hasText: 'PDF' }).first().click();
-    const download = page.waitForEvent('download');
+    const download = exportDownload(page);
     await sheet.getByRole('button', { name: 'Экспортировать' }).click();
     const data = await readFile(await (await download).path());
     const items = await pdfTextItems(page, data);
@@ -798,7 +799,7 @@ test.describe('text boxes', () => {
     await sheet.locator('.choice-list__item', { hasText: 'PNG' }).first().click();
     const radio = sheet.getByRole('radio', { name: /^Текущая/ });
     await sheet.getByRole('button', { name: 'Текущая', exact: true }).or(radio).first().click();
-    const pngDownload = page.waitForEvent('download');
+    const pngDownload = exportDownload(page);
     await sheet.getByRole('button', { name: 'Экспортировать' }).click();
     const png = await readFile(await (await pngDownload).path());
     const ink = await inkLines(page, png);

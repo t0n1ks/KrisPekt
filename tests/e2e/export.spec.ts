@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { unzipSync } from 'fflate';
 import { FIXTURE_TEXTS, openNotebook, seedFixtureNotebook, TINY_CELL_MM } from './fixture-page';
+import { exportDownload } from './downloads';
 import { cropSharpness, pdfInfo, servePdfJs } from './pdf-view';
 
 const SAMPLE = 'Лекции';
@@ -24,7 +25,7 @@ async function runExport(page: Page, choice: ExportChoice): Promise<{ name: stri
     const radio = sheet.getByRole('radio', { name: new RegExp('^' + label) });
     await sheet.getByRole('button', { name: label, exact: true }).or(radio).first().click();
   }
-  const download = page.waitForEvent('download');
+  const download = exportDownload(page);
   await sheet.getByRole('button', { name: 'Экспортировать' }).click();
   const file = await download;
   const path = await file.path();
@@ -117,4 +118,33 @@ test('PNG: the current page at 4×, and every page as a ZIP', async ({ page }) =
   const files = unzipSync(new Uint8Array(zip.data));
   expect(Object.keys(files).sort()).toEqual([`${SAMPLE}-p1.png`, `${SAMPLE}-p2.png`]);
   for (const png of Object.values(files)) expect(pngSize(png)).toEqual({ w: 1587, h: 2245 });
+});
+
+test('an automatic backup during an export does not pass for the exported file', async ({ page }) => {
+  await page.addInitScript(() => {
+    const key = 'konspektnik.prefs.v1';
+    const prefs = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
+    localStorage.setItem(key, JSON.stringify({ ...prefs, autoBackup: '3days' }));
+  });
+  const seen: string[] = [];
+  page.on('download', (d) => seen.push(d.suggestedFilename()));
+  await page.goto('./');
+  await seedFixtureNotebook(page, 'Parity');
+  // Opening a notebook counts as a change, so a backup is due. The check 2 s after the start
+  // finds the sheet open and tries again after 3 s more: this is how the test once went wrong.
+  await openNotebook(page, 'Parity');
+  await page.click('#btnEdMore');
+  await page.getByText('Экспорт…').click();
+  await expect(page.locator('.sheet')).toBeVisible();
+  await page.waitForTimeout(2500);
+  await page.locator('.sheet__foot .btn:not(.btn--primary)').click();
+  await expect(page.locator('.sheet')).toBeHidden();
+  const exported = exportDownload(page);
+  await expect.poll(() => seen.length, { timeout: 10_000 }).toBe(1);
+  expect(seen[0]).toMatch(/^krispekt-backup-/);
+  await page.click('#btnEdMore');
+  await page.getByText('Экспорт…').click();
+  await page.locator('.sheet').locator('.choice-list__item', { hasText: 'PNG' }).first().click();
+  await page.locator('.sheet').getByRole('button', { name: 'Экспортировать' }).click();
+  expect((await exported).suggestedFilename()).toMatch(/.png$/);
 });
