@@ -224,3 +224,107 @@
 .sheet__body {
   overflow-wrap: anywhere;
 }
+
+/* ---------- places in the notes ---------- */
+
+.link-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-pick[hidden] {
+  display: none;
+}
+
+.link-pick__list,
+.anchor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(46dvh, 420px);
+  overflow-y: auto;
+}
+
+.link-pick__heading {
+  margin: 8px 0 2px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.link-pick__row,
+.link-pick__up,
+.anchor-list__jump {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link-pick__row:hover,
+.link-pick__up:hover,
+.anchor-list__jump:hover {
+  background: var(--surface-2);
+}
+
+.link-pick__up {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.link-pick__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.link-pick__title,
+.link-pick__sub,
+.anchor-list__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-pick__sub,
+.anchor-list__page {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.link-pick__more {
+  display: flex;
+  flex: none;
+  color: var(--muted);
+}
+
+.anchor-list__row {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.anchor-list__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.anchor-list__page {
+  flex: none;
+}
+
+.anchor-list__action {
+  flex: none;
+}

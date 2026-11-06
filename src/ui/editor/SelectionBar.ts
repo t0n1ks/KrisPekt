@@ -14,6 +14,8 @@ export interface SelectionBarHandlers {
   canPaste(): boolean;
   remove(): void;
   deselect(): void;
+  /** Links and bookmarks for the selected items. */
+  linkMenu(anchor: HTMLElement): void;
 }
 
 /** Floating actions above (or below) the selection: colour, duplicate, copy, paste, delete, deselect. */
@@ -34,9 +36,11 @@ export class SelectionBar {
   show(): void {
     const t = this.i18n;
     const colorButton = this.button('palette', t.t('color'), () => this.openColors(colorButton));
+    const linkButton = this.button('link', t.t('linkMenu'), () => this.handlers.linkMenu(linkButton));
     replaceChildren(
       this.node,
       colorButton,
+      linkButton,
       this.button('duplicate', t.t('duplicate'), () => this.handlers.duplicate()),
       this.button('copy', t.t('copySel'), () => this.handlers.copy()),
       ...(this.handlers.canPaste() ? [this.pasteButton()] : []),

@@ -16,6 +16,10 @@ export interface PagesPanelHandlers {
   addAfter(page: Page): void;
   settings(page: Page): void;
   duplicate(page: Page): void;
+  /** Bookmarks a whole page. */
+  bookmark(page: Page): void;
+  /** Copies a link to a page, inside the app. */
+  copyLink(page: Page): void;
   /** Deletes pages after confirmation; resolves to whether they were deleted. */
   remove(pages: readonly Page[]): Promise<boolean>;
   moveTo(page: Page, index: number): void;
@@ -219,6 +223,8 @@ export class PagesPanel {
       { label: t.t('insertAfter'), icon: 'plus', onClick: () => h.addAfter(page) },
       { label: t.t('duplicate'), icon: 'copy', onClick: () => h.duplicate(page) },
       { label: t.t('sizeBg'), icon: 'page', onClick: () => h.settings(page) },
+      { label: t.t('bookmarkAdd'), icon: 'bookmark', onClick: () => h.bookmark(page) },
+      { label: t.t('pageCopyLink'), icon: 'link', onClick: () => h.copyLink(page) },
       '-',
       {
         label: t.t('moveEarlier'),

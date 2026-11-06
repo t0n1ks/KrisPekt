@@ -4,6 +4,10 @@
  */
 const PATHS = {
   back: '<path d="M15 5l-7 7 7 7"/>',
+  forward: '<path d="M9 5l7 7-7 7"/>',
+  bookmark: '<path d="M6.5 3.5h11v17L12 16.5 6.5 20.5z"/>',
+  refresh:
+    '<path d="M20 11a8 8 0 0 0-14.3-4.5L3.5 9"/><path d="M3.5 4v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.5l2.2-2.5"/><path d="M20.5 20v-5h-5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   more: '<circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"/>',
   undo: '<path d="M9 5L4 10l5 5"/><path d="M4 10h10.5a5.5 5.5 0 0 1 0 11H11"/>',

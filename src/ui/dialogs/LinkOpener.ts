@@ -1,9 +1,9 @@
-import type { LinkTarget } from '../../core/types';
+import type { UrlLink } from '../../core/types';
 import { SafeUrl } from '../../domain/SafeUrl';
 import type { I18n } from '../../i18n/I18n';
 import type { DialogFactory } from './DialogFactory';
 
-/** Opens links, always after showing where they lead. The one place the app leaves itself. */
+/** Opens web links, always after showing where they lead. The one place the app leaves itself. */
 export class LinkOpener {
   constructor(
     private readonly i18n: I18n,
@@ -12,7 +12,7 @@ export class LinkOpener {
   ) {}
 
   /** Asks, then opens in a new tab that cannot reach back into the app or learn where it came from. */
-  async open(target: LinkTarget): Promise<void> {
+  async open(target: UrlLink): Promise<void> {
     // Checked again at the last moment, whatever put the link where it was found.
     const href = SafeUrl.strict(target.href);
     if (!href) {

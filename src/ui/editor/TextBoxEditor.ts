@@ -28,6 +28,8 @@ interface Draft {
   fs: number;
   c: string;
   paras: TextParagraph[];
+  /** A table of contents; see `ContentsBlock`. */
+  toc?: true;
 }
 
 interface Session {
@@ -71,8 +73,12 @@ export interface TextBoxEditorDeps {
   canRedoPage: () => boolean;
   isPalm: (e: PointerEvent) => boolean;
   toast: (message: string) => void;
-  /** Asks for a link's address; resolves null if cancelled. */
+  /** Asks where a link leads; resolves null if cancelled. */
   askLink: (options: LinkDialogOptions) => Promise<LinkChoice | null>;
+  /** Bookmarks a saved box, or a stretch of it. */
+  addBookmark: (page: Page, item: TextItem, range: [number, number] | null) => Promise<unknown>;
+  /** Writes a table of contents again. */
+  updateContents: (page: Page, item: TextItem) => void;
   /** Redraws after the camera moved to keep the caret in view. */
   redraw: () => void;
 }
@@ -116,6 +122,8 @@ export class TextBoxEditor {
       paragraph: (patch) => this.paragraph(patch),
       stepSize: (delta) => this.stepSize(delta),
       link: () => void this.editLink(),
+      bookmark: () => void this.bookmark(),
+      updateContents: () => this.updateContents(),
       undo: () => this.undo(),
       redo: () => this.redo(),
       remove: () => this.removeBox(),
@@ -166,6 +174,7 @@ export class TextBoxEditor {
       fs: rich.fs,
       c: rich.c,
       paras: RichText.paragraphsOf(rich),
+      ...(rich.toc ? { toc: true as const } : {}),
     });
   }
 
@@ -347,6 +356,7 @@ export class TextBoxEditor {
       c: d.c,
       paras,
     };
+    if (d.toc) item.toc = true;
     if (!d.auto) return item;
     item.auto = true;
     const bounds = TextBoxEditor.bounds(s.page);
@@ -673,16 +683,50 @@ export class TextBoxEditor {
     }
     this.askingLink = true;
     const choice = await this.deps
-      .askLink({ href: range.link?.href, canRemove: range.link !== undefined })
+      .askLink({ link: range.link, canRemove: range.link !== undefined, notes: true })
       .finally(() => (this.askingLink = false));
     if (this.open !== s) return;
     if (s.editing) this.focusEditor(s);
     if (!choice) return;
     if (s.editing) s.history.record(this.editState(s), 'other', performance.now());
-    const link: LinkTarget | null = choice.kind === 'remove' ? null : { kind: 'url', href: choice.href };
+    const link = TextBoxEditor.chosenLink(choice);
     const paras = RichText.applyStyle(s.draft.paras, range.start, range.end, { link });
     s.draft = { ...s.draft, paras };
     this.afterFormat(s);
+  }
+
+  private static chosenLink(choice: LinkChoice): LinkTarget | null {
+    if (choice.kind === 'remove') return null;
+    return choice.kind === 'internal' ? choice.link : { kind: 'url', href: choice.href };
+  }
+
+  /** The box must be on the page to be bookmarked, so what is open is saved first. */
+  private async bookmark(): Promise<void> {
+    const s = this.open;
+    if (!s) return;
+    this.deps.menu.close();
+    if (s.editing) s.selection = TextDomCodec.selection(this.root) ?? s.selection;
+    this.save(s, false);
+    const item = s.page.texts.find((t) => t.id === s.draft.id);
+    if (!item) {
+      this.deps.toast(this.deps.i18n.t('linkSelectText'));
+      return;
+    }
+    const { start, end } = s.selection;
+    const range: [number, number] | null =
+      s.editing && start !== end ? [start, Math.min(end, item.t.length)] : null;
+    this.askingLink = true;
+    await this.deps.addBookmark(s.page, item, range).finally(() => (this.askingLink = false));
+    if (this.open === s && s.editing) this.focusEditor(s);
+  }
+
+  /** Closes the box first: writing it again replaces what the editor holds. */
+  private updateContents(): void {
+    const s = this.open;
+    if (!s) return;
+    this.commit();
+    const item = s.page.texts.find((t) => t.id === s.draft.id);
+    if (item) this.deps.updateContents(s.page, item);
   }
 
   /** After a format: the DOM, the box and, for a selected box, the page. */
@@ -712,7 +756,16 @@ export class TextBoxEditor {
   private barState(): FormatState {
     const s = this.open;
     if (!s) {
-      return { style: {}, size: 0, align: 'left', list: null, link: false, canUndo: false, canRedo: false };
+      return {
+        style: {},
+        size: 0,
+        align: 'left',
+        list: null,
+        link: false,
+        toc: false,
+        canUndo: false,
+        canRedo: false,
+      };
     }
     const d = s.draft;
     const range = s.editing ? s.selection : { start: 0, end: RichText.length(d.paras) };
@@ -730,6 +783,7 @@ export class TextBoxEditor {
       align: para?.align ?? 'left',
       list: para?.list ?? null,
       link: this.linkRange(s)?.link !== undefined,
+      toc: d.toc === true,
       canUndo: s.editing ? s.history.canUndo : this.deps.canUndoPage(),
       canRedo: s.editing ? s.history.canRedo : this.deps.canRedoPage(),
     };

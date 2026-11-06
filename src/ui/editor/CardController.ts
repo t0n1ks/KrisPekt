@@ -1,11 +1,11 @@
 import { CARD_PLACE_HINT_MS, MM } from '../../core/constants';
-import type { CardItem, CardKind, LinkCard, LinkTarget, Page, PdfCard, Point } from '../../core/types';
+import type { CardItem, CardKind, LinkCard, Page, PdfCard, Point, UrlLink } from '../../core/types';
 import { el } from '../../core/utils/dom';
 import { pickFile } from '../../core/utils/files';
 import { CardRules } from '../../domain/CardRules';
 import { FileNames } from '../../domain/FileNames';
 import type { EditorSession } from '../../editor/EditorSession';
-import type { PagePressTargets } from '../../editor/PagePressTargets';
+import type { LinkHit, PagePressTargets } from '../../editor/PagePressTargets';
 import type { UndoController } from '../../editor/UndoController';
 import type { PdfAttachments, PreparedPdf } from '../../features/attachments/PdfAttachments';
 import { PdfRejectedError } from '../../features/attachments/PdfRejectedError';
@@ -31,6 +31,10 @@ export interface CardControllerDeps {
   viewer: PdfViewer;
   linkDialog: LinkDialog;
   links: LinkOpener;
+  /** Follows a link that was tapped. */
+  openLink: (hit: LinkHit) => Promise<void>;
+  /** What a long press on a link offers. */
+  linkEntries: (hit: LinkHit) => MenuEntry[];
   targets: PagePressTargets;
   session: EditorSession;
   undo: Pick<UndoController, 'record'>;
@@ -58,7 +62,7 @@ export interface CardControllerDeps {
 }
 
 /** A new card waiting for the user to tap where it goes. */
-type Pending = { kind: 'pdf'; prepared: PreparedPdf } | { kind: 'link'; link: LinkTarget; title: string };
+type Pending = { kind: 'pdf'; prepared: PreparedPdf } | { kind: 'link'; link: UrlLink; title: string };
 
 const REJECTION_TEXT: Record<PdfRejectedError['reason'], TextKey> = {
   'too-large': 'attachTooBig',
@@ -109,15 +113,22 @@ export class CardController implements PressTarget {
       return;
     }
     const hit = this.deps.targets.at(pt);
-    if (hit?.kind === 'link') void this.deps.links.open(hit.link);
+    if (hit?.kind === 'link') void this.deps.openLink(hit);
     else if (hit?.onMenu) this.showMenu(pt, hit.page, hit.card);
     else if (hit) void this.openCard(hit.card);
   }
 
   longPress(pt: Point): boolean {
     const hit = this.deps.targets.at(pt);
-    if (hit?.kind !== 'card') return false;
-    this.showMenu(pt, hit.page, hit.card);
+    if (!hit) return false;
+    if (hit.kind === 'card') {
+      this.showMenu(pt, hit.page, hit.card);
+      return true;
+    }
+    const entries = this.deps.linkEntries(hit);
+    if (!entries.length) return false;
+    this.placeAnchor(pt);
+    this.deps.menu.show(this.anchor, entries);
     return true;
   }
 
@@ -234,9 +245,13 @@ export class CardController implements PressTarget {
 
   /* ---------- the menu ---------- */
 
-  private showMenu(pt: Point, page: Page, card: CardItem): void {
+  private placeAnchor(pt: Point): void {
     this.anchor.style.left = pt.x + 'px';
     this.anchor.style.top = pt.y + 'px';
+  }
+
+  private showMenu(pt: Point, page: Page, card: CardItem): void {
+    this.placeAnchor(pt);
     const entries = card.kind === 'pdf' ? this.pdfEntries(page, card) : this.linkEntries(page, card);
     this.deps.menu.show(this.anchor, entries);
   }
@@ -293,7 +308,7 @@ export class CardController implements PressTarget {
 
   private async editLink(page: Page, card: LinkCard): Promise<void> {
     const choice = await this.deps.linkDialog.ask({
-      href: card.link.href,
+      link: card.link,
       title: card.title,
       withTitle: true,
     });
@@ -314,8 +329,7 @@ export class CardController implements PressTarget {
         {
           label: i18n.t('save'),
           primary: true,
-          onClick: () =>
-            this.replace(page, { ...card, name: FileNames.sanitize(input.value, card.name) }),
+          onClick: () => this.replace(page, { ...card, name: FileNames.sanitize(input.value, card.name) }),
         },
       ],
       focus: true,

@@ -2,9 +2,21 @@ import type { CardLabels } from '../../canvas/CardPainter';
 import { formatSize } from '../../core/utils/format';
 import { SCRATCH_HINT_MS } from '../../core/constants';
 import type { EventBus } from '../../app/EventBus';
-import type { Language, Notebook, Page, Preferences, Stroke, TextItem, ToolKind } from '../../core/types';
+import type {
+  InternalLink,
+  Language,
+  Notebook,
+  Page,
+  Preferences,
+  Stroke,
+  TextItem,
+  ToolKind,
+} from '../../core/types';
 import { byId } from '../../core/utils/dom';
 import { ColorLists } from '../../domain/ColorLists';
+import { LinkClipboard } from '../../domain/LinkClipboard';
+import type { LinkDirectory } from '../../domain/LinkDirectory';
+import { LinkRules } from '../../domain/LinkRules';
 import { PageRepair } from '../../domain/PageRepair';
 import { PageSizePolicy } from '../../domain/PageSizePolicy';
 import type { PageSizes } from '../../domain/PageSizes';
@@ -36,12 +48,19 @@ import type { DialogFactory } from '../dialogs/DialogFactory';
 import type { Menu, MenuEntry } from '../dialogs/Menu';
 import { PageSettingsDialog } from '../dialogs/PageSettingsDialog';
 import { Snackbar } from '../dialogs/Snackbar';
+import { AnchorDialog } from '../dialogs/AnchorDialog';
 import { LinkDialog } from '../dialogs/LinkDialog';
 import { LinkOpener } from '../dialogs/LinkOpener';
+import { LinkTargetPicker } from '../dialogs/LinkTargetPicker';
 import type { Toast } from '../dialogs/Toast';
 import { icon } from '../icons';
 import { languageMenu, languageShort } from '../widgets/languageMenu';
+import { AnchorController } from './AnchorController';
+import { AnchorsPanel } from './AnchorsPanel';
+import { ContentsBlock } from './ContentsBlock';
+import { InkLinkController } from './InkLinkController';
 import { InputDiagnosticsOverlay } from './InputDiagnosticsOverlay';
+import { LinkNavigator } from './LinkNavigator';
 import { ScratchOutMenu } from './ScratchOutMenu';
 import { PagesPanel } from './PagesPanel';
 import { RulerWidget } from './RulerWidget';
@@ -84,6 +103,8 @@ export interface EditorViewDeps {
   pdfLoader: PdfLoader;
   attachments: PdfAttachments;
   files: FileSaver;
+  /** The places internal links lead to, on the whole shelf. */
+  directory: LinkDirectory;
   makeId: () => string;
   actions: EditorActions;
   onStorageError: (error: unknown) => void;
@@ -115,6 +136,12 @@ export class EditorView {
   private readonly linkDialog: LinkDialog;
   private readonly pdfViewer: PdfViewer;
   private readonly cards: CardController;
+  private readonly linkClipboard = new LinkClipboard();
+  private readonly navigator: LinkNavigator;
+  private readonly anchors: AnchorController;
+  private readonly inkLinks: InkLinkController;
+  private readonly contents: ContentsBlock;
+  private readonly anchorsPanel: AnchorsPanel;
 
   constructor(private readonly deps: EditorViewDeps) {
     const { i18n, sizes, menu } = deps;
@@ -127,10 +154,13 @@ export class EditorView {
       saveQueue: deps.saveQueue,
       makeId: deps.makeId,
       cardLabels: this.cardLabels(),
+      isLinkBroken: (link) => deps.directory.isBroken(link),
       hooks: this.hooks(),
     });
     const c = this.canvas;
-    this.linkDialog = new LinkDialog(i18n, deps.dialogs);
+    this.linkDialog = new LinkDialog(i18n, deps.dialogs, (onPick, current) =>
+      this.linkPicker(onPick, current),
+    );
     this.pdfViewer = new PdfViewer(i18n, deps.pdfLoader, (message) => deps.toast.show(message, 4000));
     this.textEditor = new TextBoxEditor({
       camera: c.camera,
@@ -156,6 +186,8 @@ export class EditorView {
       isPalm: (e) => c.router.isPalmTouch(e),
       toast: (message) => deps.toast.show(message),
       askLink: (options) => this.linkDialog.ask(options),
+      addBookmark: (page, item, range) => this.anchors.addToText(page, item, range),
+      updateContents: (page, item) => this.contents.update(page, item),
       redraw: () => c.renderer.request(),
     });
     this.zoom = new ZoomMenu({
@@ -202,6 +234,7 @@ export class EditorView {
       canPaste: () => c.selection.canPaste,
       remove: () => c.selection.remove(),
       deselect: () => c.selection.clear(),
+      linkMenu: (anchor) => menu.show(anchor, this.inkLinks.selectionEntries()),
     });
     this.rulerWidget = new RulerWidget(
       c.ruler,
@@ -230,6 +263,11 @@ export class EditorView {
       makeId: deps.makeId,
     });
     this.exporter = this.createExporter();
+    this.navigator = this.createNavigator();
+    this.anchors = this.createAnchors();
+    this.contents = this.createContents();
+    this.inkLinks = this.createInkLinks();
+    this.anchorsPanel = this.createAnchorsPanel();
     this.cards = this.createCards();
     this.fab.append(icon('plus', 26));
     this.fab.addEventListener('click', () => this.pageOps.add());
@@ -257,6 +295,124 @@ export class EditorView {
     };
   }
 
+  private linkPicker(onPick: (link: InternalLink) => void, current: InternalLink | null): LinkTargetPicker {
+    const { i18n, directory, prefs } = this.deps;
+    return new LinkTargetPicker({
+      i18n,
+      directory,
+      recent: () => prefs.recentLinks,
+      copied: () => this.linkClipboard.current,
+      current,
+      onPick: (link) => {
+        this.rememberLink(link);
+        onPick(link);
+      },
+    });
+  }
+
+  private rememberLink(link: InternalLink): void {
+    const { prefs, savePrefs } = this.deps;
+    prefs.recentLinks = LinkRules.pushRecent(prefs.recentLinks, link);
+    savePrefs();
+  }
+
+  private createNavigator(): LinkNavigator {
+    const d = this.deps;
+    const c = this.canvas;
+    return new LinkNavigator({
+      session: c.session,
+      camera: c.camera,
+      layout: c.layout,
+      viewport: c.viewport,
+      geometry: c.linkGeometry,
+      directory: d.directory,
+      i18n: d.i18n,
+      switchTo: (nb) => this.switchTo(nb),
+      settle: () => this.settle(),
+      blocked: () => d.dialogs.hasOpenSheet,
+      toast: (message) => d.toast.show(message),
+      history: window.history,
+      events: window,
+    });
+  }
+
+  private createAnchors(): AnchorController {
+    const d = this.deps;
+    const c = this.canvas;
+    return new AnchorController({
+      i18n: d.i18n,
+      dialog: new AnchorDialog(d.i18n, d.dialogs),
+      session: c.session,
+      undo: c.undo,
+      geometry: c.linkGeometry,
+      clipboard: this.linkClipboard,
+      makeId: d.makeId,
+      toast: (message) => d.toast.show(message),
+      remember: (link) => this.rememberLink(link),
+    });
+  }
+
+  private createContents(): ContentsBlock {
+    const d = this.deps;
+    const c = this.canvas;
+    return new ContentsBlock({
+      i18n: d.i18n,
+      session: c.session,
+      camera: c.camera,
+      layout: c.layout,
+      texts: c.texts,
+      undo: c.undo,
+      makeId: d.makeId,
+      textColor: () => d.prefs.txt.c,
+      toast: (message) => d.toast.show(message),
+    });
+  }
+
+  private createInkLinks(): InkLinkController {
+    const d = this.deps;
+    const c = this.canvas;
+    return new InkLinkController({
+      i18n: d.i18n,
+      dialogs: d.dialogs,
+      linkDialog: this.linkDialog,
+      web: new LinkOpener(d.i18n, d.dialogs, (message) => d.toast.show(message)),
+      navigator: this.navigator,
+      directory: d.directory,
+      session: c.session,
+      selection: c.selection,
+      undo: c.undo,
+      geometry: c.linkGeometry,
+      clipboard: this.linkClipboard,
+      makeId: d.makeId,
+      toast: (message) => d.toast.show(message),
+      bookmarkSelection: () => void this.bookmarkSelection(),
+      updateContents: (page, item) => this.contents.update(page, item),
+    });
+  }
+
+  private createAnchorsPanel(): AnchorsPanel {
+    const d = this.deps;
+    const c = this.canvas;
+    return new AnchorsPanel(d.i18n, d.dialogs, c.session, {
+      jump: (link) => void this.navigator.go(link),
+      rename: (id) => this.anchors.rename(id),
+      remove: (id) => this.anchors.remove(id),
+      copyLink: (link) => this.anchors.copyLink(link),
+      addToCurrentPage: () => {
+        const page = c.session.currentPage();
+        return page ? this.anchors.addToPage(page) : Promise.resolve(false);
+      },
+      insertContents: () => this.contents.insert(),
+    });
+  }
+
+  /** The items keep their selection until the bookmark exists, then show its marker. */
+  private async bookmarkSelection(): Promise<void> {
+    const selected = this.canvas.selection.current;
+    if (!selected) return;
+    if (await this.anchors.addToItems(selected.page, selected.ids)) this.canvas.selection.clear();
+  }
+
   private createCards(): CardController {
     const d = this.deps;
     const c = this.canvas;
@@ -270,10 +426,13 @@ export class EditorView {
       viewer: this.pdfViewer,
       linkDialog: this.linkDialog,
       links: new LinkOpener(d.i18n, d.dialogs, (message) => d.toast.show(message)),
+      openLink: (hit) => this.inkLinks.open(hit),
+      linkEntries: (hit) => this.inkLinks.hitEntries(hit),
       targets: new PagePressTargets({
         camera: c.camera,
         layout: c.layout,
         texts: c.texts,
+        geometry: c.linkGeometry,
         tool: () => c.tools.kind,
         overSelection: (pt) => c.selection.hit(pt) !== null,
       }),
@@ -435,6 +594,8 @@ export class EditorView {
         addAfter: (page) => this.pageOps.add(page),
         settings: (page) => this.openPageSettings(page),
         duplicate: (page) => this.pageOps.duplicate(page),
+        bookmark: (page) => void this.anchors.addToPage(page),
+        copyLink: (page) => this.anchors.copyLink(this.anchors.pageLink(page)),
         remove: (pages) => this.deletion.request(pages),
         moveTo: (page, index) => this.pageOps.moveTo(page, index),
       },
@@ -536,24 +697,44 @@ export class EditorView {
 
   /** Opens a notebook in the editor. Returns false if its pages could not be loaded. */
   async open(nb: Notebook): Promise<boolean> {
-    const c = this.canvas;
     this.deps.menu.close();
-    let pages: Page[];
+    const pages = await this.loadPages(nb);
+    if (!pages) return false;
+    this.mount(nb, pages);
+    return true;
+  }
+
+  private async loadPages(nb: Notebook): Promise<Page[] | null> {
     try {
-      pages = await this.deps.pages.loadOrdered(nb);
+      return await this.deps.pages.loadOrdered(nb);
     } catch (error) {
       this.deps.onStorageError(error);
-      return false;
+      return null;
     }
+  }
+
+  /** Follows a link into another notebook: this one is saved first, and its undo steps wait for it. */
+  private async switchTo(nb: Notebook): Promise<boolean> {
+    const pages = await this.loadPages(nb);
+    if (!pages) return false;
+    await this.leave();
+    this.mount(nb, pages);
+    return true;
+  }
+
+  private mount(nb: Notebook, loaded: Page[]): void {
+    const c = this.canvas;
+    let pages = loaded;
     const created = !pages.length;
     if (created) pages = [PageSizePolicy.newPageAfter(nb, null, this.deps.makeId)];
     for (const p of pages) PageSizePolicy.enforceLock(p, nb.base);
     const repaired = this.repairLostItems(pages);
     nb.pageIds = pages.map((p) => p.id);
     c.cache.clear();
-    c.undo.clear();
+    c.undo.use(nb.id);
     c.session.open(nb, pages);
     this.deps.saveQueue.setNotebook(nb);
+    c.bindings.opened();
     if (created) pages.forEach((p) => this.deps.saveQueue.markPageDirty(p));
     repaired.forEach((p) => this.deps.saveQueue.markPageDirty(p));
     this.show();
@@ -561,7 +742,6 @@ export class EditorView {
     this.topBar.setTitle(nb.title, this.deps.actions.subjectName(nb.subjectId));
     this.toolbar.render();
     c.renderer.render();
-    return true;
   }
 
   /**
@@ -638,6 +818,19 @@ export class EditorView {
   /** Saves and returns to the shelf. */
   async close(): Promise<void> {
     const c = this.canvas;
+    this.navigator.reset();
+    await this.leave();
+    c.undo.clear();
+    c.renderer.setEnabled(false);
+    this.root.hidden = true;
+    document.body.classList.remove('is-editing');
+    this.deps.actions.closed();
+    void this.deps.sweeper.run();
+  }
+
+  /** Finishes everything in progress, saves, and closes the notebook. */
+  private async leave(): Promise<void> {
+    const c = this.canvas;
     this.settle();
     this.popover.close();
     this.deps.menu.close();
@@ -649,14 +842,8 @@ export class EditorView {
     await this.deps.saveQueue.flush(true);
     this.markReleasedBlobs();
     c.session.close();
-    c.undo.clear();
     this.deps.saveQueue.setNotebook(null);
     c.cache.clear();
-    c.renderer.setEnabled(false);
-    this.root.hidden = true;
-    document.body.classList.remove('is-editing');
-    this.deps.actions.closed();
-    void this.deps.sweeper.run();
   }
 
   /** Applies notebook-dialog changes to the open notebook. */
@@ -672,6 +859,7 @@ export class EditorView {
     const c = this.canvas;
     c.live.render();
     this.positionOverlays();
+    this.navigator.position();
     const page = c.session.currentPage();
     if (page) {
       const { z, zoomLocked } = c.camera;
@@ -789,6 +977,7 @@ export class EditorView {
       },
       { label: i18n.t('insertPhoto'), icon: 'image', onClick: () => void this.insertPhoto() },
       { label: i18n.t('insertMenu'), icon: 'paperclip', onClick: () => this.openInsertMenu() },
+      { label: i18n.t('bookmarks'), icon: 'bookmark', onClick: () => this.openAnchorsPanel() },
       { label: i18n.t('customizeToolbar'), icon: 'sliders', onClick: () => this.toolbar.openCustomizer() },
       { label: i18n.t('addPdfPages'), icon: 'file', onClick: () => void this.importPdfHere() },
       { label: i18n.t('exportMenu'), icon: 'download', onClick: () => actions.exportNotebook(nb) },
@@ -815,6 +1004,12 @@ export class EditorView {
         onClick: () => this.toggleTwoFingerScroll(),
       },
       this.scratchEntry(),
+      {
+        label: i18n.t('bookmarkMarkers'),
+        icon: 'bookmark',
+        check: prefs.anchorMarkers,
+        onClick: () => this.toggleMarkers(),
+      },
       { label: i18n.t('nbSettings'), icon: 'edit', onClick: () => actions.editNotebook(nb) },
       {
         label: i18n.t('language') + ' · ' + languageShort(i18n.language),
@@ -839,6 +1034,19 @@ export class EditorView {
       icon: 'scribble',
       onClick: () => this.deps.menu.show(this.topBarMoreAnchor(), menu.entries()),
     };
+  }
+
+  private openAnchorsPanel(): void {
+    this.settle();
+    this.popover.close();
+    this.anchorsPanel.open();
+  }
+
+  private toggleMarkers(): void {
+    const { prefs, savePrefs } = this.deps;
+    prefs.anchorMarkers = !prefs.anchorMarkers;
+    savePrefs();
+    for (const page of this.canvas.session.pages) if (page.anchors.length) this.canvas.session.bump(page);
   }
 
   /** The first few times, says what happened to the content and offers to bring it back. */
@@ -950,6 +1158,7 @@ export class EditorView {
     this.textEditor.applyLanguage();
     this.topBar.applyLanguage();
     this.panel.applyLanguage();
+    this.navigator.applyLanguage();
     if (!c.session.isOpen) return;
     this.popover.close();
     this.toolbar.render();

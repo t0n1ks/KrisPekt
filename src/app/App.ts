@@ -1,6 +1,7 @@
 import { BLOB_SWEEP_DELAY_MS } from '../core/constants';
 import type { AutoBackupInterval, ExportPrefs, Language, Notebook, Preferences } from '../core/types';
 import { uid } from '../core/utils/id';
+import { LinkDirectory } from '../domain/LinkDirectory';
 import { PageSizePolicy } from '../domain/PageSizePolicy';
 import { PageSizes } from '../domain/PageSizes';
 import { SampleSeeder } from '../domain/SampleSeeder';
@@ -224,6 +225,7 @@ export class App {
       pdfLoader: this.pdfLoader,
       attachments: this.attachments,
       files: this.files,
+      directory: new LinkDirectory(this.library),
       makeId: uid,
       onStorageError: () => this.storageError(),
       actions: {

@@ -18,6 +18,8 @@ export interface FormatState {
   list: 'bullet' | 'number' | null;
   /** The selected text carries a link. */
   link: boolean;
+  /** The box is a table of contents. */
+  toc: boolean;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -29,6 +31,10 @@ export interface TextFormatHandlers {
   stepSize(delta: number): void;
   /** Adds, changes or removes the link of the selected text. */
   link(): void;
+  /** Bookmarks the box, or the selected text. */
+  bookmark(): void;
+  /** Writes a table of contents again. */
+  updateContents(): void;
   undo(): void;
   redo(): void;
   remove(): void;
@@ -45,6 +51,8 @@ interface BarButton {
   icon: IconName;
   run: () => void;
   pressed?: (state: FormatState) => boolean;
+  /** Only makes sense in some boxes. */
+  shownIf?: (state: FormatState) => boolean;
   danger?: boolean;
   /** Stays on the bar when it is narrow; everything else goes into the overflow menu. */
   core?: boolean;
@@ -222,6 +230,14 @@ export class TextFormatBar {
         pressed: (s) => s.list === 'number',
       },
       { key: 'link', label: 'fmtLink', icon: 'link', run: () => h.link(), pressed: (s) => s.link },
+      { key: 'bookmark', label: 'bookmarkAdd', icon: 'bookmark', run: () => h.bookmark() },
+      {
+        key: 'contents',
+        label: 'contentsUpdate',
+        icon: 'refresh',
+        run: () => h.updateContents(),
+        shownIf: (s) => s.toc,
+      },
       { key: 'remove', label: 'delete', icon: 'trash', run: () => h.remove(), danger: true },
     ];
   }
@@ -263,6 +279,7 @@ export class TextFormatBar {
     for (const { button, spec } of this.buttons.values()) {
       if (spec.pressed) button.setAttribute('aria-pressed', String(spec.pressed(state)));
       button.disabled = spec.disabled?.(state) ?? false;
+      button.hidden = !(spec.shownIf?.(state) ?? true);
     }
   }
 
@@ -294,7 +311,7 @@ export class TextFormatBar {
   private overflowEntries(): MenuEntry[] {
     const state = this.state;
     return this.specs
-      .filter((spec) => !spec.core)
+      .filter((spec) => !spec.core && (!state || (spec.shownIf?.(state) ?? true)))
       .map((spec) => ({
         label: this.i18n.t(spec.label),
         icon: spec.icon,

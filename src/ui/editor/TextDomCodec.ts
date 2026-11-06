@@ -1,6 +1,7 @@
 import { PAPER } from '../../core/constants';
-import type { TextParagraph, TextSpan, TextStyle } from '../../core/types';
+import type { LinkTarget, TextParagraph, TextSpan, TextStyle } from '../../core/types';
 import { el, replaceChildren } from '../../core/utils/dom';
+import { ID_PATTERN } from '../../core/utils/id';
 import { RichText } from '../../domain/RichText';
 import { LIST_INDENT_EM, type BoxDefaults } from '../../domain/RichTextLayout';
 import { SafeUrl } from '../../domain/SafeUrl';
@@ -158,7 +159,7 @@ export class TextDomCodec {
       span.classList.add('text-run--' + FLAG_CLASSES[flag]);
     }
     if (run.link) {
-      span.dataset.href = run.link.href;
+      TextDomCodec.writeLink(span, run.link);
       span.classList.add('text-run--underline');
       span.style.setProperty('--run-color', PAPER.link);
     }
@@ -226,9 +227,31 @@ export class TextDomCodec {
     const color = node.dataset.c;
     if (color && COLOR_PATTERN.test(color)) style.c = color;
     for (const flag of FLAGS) if (node.dataset[flag] === '1') style[flag] = true;
-    const href = node.dataset.href ? SafeUrl.strict(node.dataset.href) : null;
-    if (href) style.link = { kind: 'url', href };
+    const link = TextDomCodec.readLink(node);
+    if (link) style.link = link;
     return style;
+  }
+
+  private static writeLink(span: HTMLElement, link: LinkTarget): void {
+    if (link.kind === 'url') {
+      span.dataset.href = link.href;
+      return;
+    }
+    span.dataset.linkKind = link.kind;
+    span.dataset.linkNb = link.nb;
+    if (link.kind !== 'notebook') span.dataset.linkId = link.id;
+  }
+
+  /** A link from a run's data attributes, only if it checks out. */
+  private static readLink(node: HTMLElement): LinkTarget | null {
+    const { href, linkKind: kind, linkNb: nb, linkId: id } = node.dataset;
+    if (href) {
+      const safe = SafeUrl.strict(href);
+      return safe ? { kind: 'url', href: safe } : null;
+    }
+    if (!nb || !ID_PATTERN.test(nb)) return null;
+    if (kind === 'notebook') return { kind, nb };
+    return (kind === 'anchor' || kind === 'page') && id && ID_PATTERN.test(id) ? { kind, nb, id } : null;
   }
 
   private static isCanonicalBlock(block: Node): boolean {
