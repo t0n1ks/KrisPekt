@@ -63,6 +63,8 @@ export interface LaidGlyph extends Box {
 export interface BoxDefaults {
   fs: number;
   c: string;
+  /** A table of contents: every line is a link, so a colour given to one has to show. */
+  toc?: boolean | undefined;
 }
 
 /** The ink of a character above and below the baseline, per unit of font size. */
@@ -383,6 +385,12 @@ export class RichTextLayout {
     return styled[0]?.list ? styled[0].style.fs * LIST_INDENT_EM : 0;
   }
 
+  /** A link looks like one, whatever colour the text around it has; only in contents can it differ. */
+  static runColor(run: Pick<TextSpan, 'c' | 'link'>, base: BoxDefaults): string {
+    if (run.link && !(base.toc && run.c)) return PAPER.link;
+    return run.c ?? base.c;
+  }
+
   private static styled(para: TextParagraph, base: BoxDefaults): StyledRun[] {
     const runs: readonly TextSpan[] = para.runs.length ? para.runs : [{ t: '' }];
     return runs.map((run) => ({
@@ -390,8 +398,7 @@ export class RichTextLayout {
       list: para.list !== undefined,
       style: {
         fs: run.fs ?? base.fs,
-        // A link always looks like one, whatever colour the text around it has.
-        c: run.link ? PAPER.link : (run.c ?? base.c),
+        c: RichTextLayout.runColor(run, base),
         b: run.b === true,
         i: run.i === true,
         u: run.u === true || run.link !== undefined,
