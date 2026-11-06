@@ -13,11 +13,18 @@ async function canvasPng(page: Page): Promise<Buffer> {
  * Screen rendering must stay pixel-identical when the drawing code changes. The baseline
  * images were taken before strokes, text and patterns were turned into shared drawing
  * commands; every later change is compared against them.
+ *
+ * Text is drawn differently on each system, so each has its own images: Windows for local runs,
+ * Linux for CI. To draw the Linux ones again, in the environment CI tests in, run the "Render
+ * baselines" workflow, then `gh run download <run> -n render-baselines -D
+ * tests/e2e/render-parity.spec.ts-snapshots`, and commit them. To draw the Windows ones, run
+ * `npx playwright test render-parity --update-snapshots=all` on Windows.
  */
 test('the editor draws the fixture page exactly as before', async ({ page }, testInfo) => {
+  const hasBaselines = process.platform === 'win32' || (process.platform === 'linux' && !!process.env.CI);
   test.skip(
-    process.platform !== 'win32' && testInfo.config.updateSnapshots !== 'all',
-    'The baseline images are Windows renderings; other systems draw text differently.',
+    !hasBaselines && testInfo.config.updateSnapshots !== 'all',
+    'The baseline images are for Windows and for Linux in CI; other setups draw text differently.',
   );
   await page.setViewportSize({ width: 1000, height: 1300 });
   await page.goto('./');
