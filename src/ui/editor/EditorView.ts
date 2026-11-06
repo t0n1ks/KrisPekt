@@ -46,6 +46,7 @@ import type { SaveQueue } from '../../storage/SaveQueue';
 import type { Tool } from '../../tools/Tool';
 import type { DialogFactory } from '../dialogs/DialogFactory';
 import type { Menu, MenuEntry } from '../dialogs/Menu';
+import type { PopoverManager } from '../dialogs/PopoverManager';
 import { PageSettingsDialog } from '../dialogs/PageSettingsDialog';
 import { Snackbar } from '../dialogs/Snackbar';
 import { AnchorDialog } from '../dialogs/AnchorDialog';
@@ -92,6 +93,7 @@ export interface EditorViewDeps {
   presets: ToolPresetController;
   sizes: PageSizes;
   menu: Menu;
+  popovers: PopoverManager;
   dialogs: DialogFactory;
   toast: Toast;
   pages: PageRepository;
@@ -223,7 +225,7 @@ export class EditorView {
       c.stage,
       c.camera,
       () => this.toolbar.rect(),
-      deps.bus,
+      deps.popovers,
       (tool) => this.toolbar.pinControl(tool),
     );
     this.selectionBar = new SelectionBar(i18n, menu, {

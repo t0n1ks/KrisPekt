@@ -1,8 +1,8 @@
-import type { EventBus } from '../../app/EventBus';
 import { el } from '../../core/utils/dom';
-import { clamp } from '../../core/utils/math';
+import { PopoverPlacement, type ViewBox } from '../../domain/PopoverPlacement';
 import { icon, type IconName } from '../icons';
 import { LongPress } from '../widgets/LongPress';
+import type { PopoverHandle, PopoverManager } from './PopoverManager';
 
 export interface MenuItem {
   label: string;
@@ -22,22 +22,35 @@ export interface MenuItem {
 /** `'-'` draws a separator. */
 export type MenuEntry = MenuItem | '-';
 
+/** What is left of the screen; an on-screen keyboard covers the page without resizing it. */
+function visibleArea(): ViewBox {
+  const view = window.visualViewport;
+  return {
+    left: view?.offsetLeft ?? 0,
+    top: view?.offsetTop ?? 0,
+    width: view?.width ?? innerWidth,
+    height: view?.height ?? innerHeight,
+  };
+}
+
 /**
- * Dropdown menus anchored to a button. Only one is open at a time; a pointer-down outside
- * closes it.
+ * Dropdown menus anchored to a button. Pressing that button again closes the menu; see
+ * {@link PopoverManager} for the rest of what closes it. All of a menu stays on the screen: it
+ * flips and shifts, scrolls when it is long, and on a narrow screen a large one is a bottom sheet.
  */
 export class Menu {
   private node: HTMLDivElement | null = null;
-  private readonly outside = (e: PointerEvent): void => {
-    if (this.node && !this.node.contains(e.target as Node)) this.close();
+  private anchor: Element | null = null;
+  private readonly handle: PopoverHandle = {
+    contains: (target) => this.node?.contains(target) ?? false,
+    isTrigger: (target) => this.anchor?.contains(target) ?? false,
+    close: () => this.close(),
   };
+  private readonly reposition = (): void => this.place();
 
-  constructor(private readonly bus: EventBus) {
-    // Any other menu or sheet opening closes this one.
-    bus.on('menu-opened', () => this.close());
-  }
+  constructor(private readonly popovers: PopoverManager) {}
 
-  /** Opens a menu below (or above, if there is no room) `anchor`, right-aligned with it. */
+  /** Opens a menu at `anchor`, or closes it if that is where the open one came from. */
   show(anchor: Element, entries: readonly MenuEntry[]): void {
     const menu = el('div', { class: 'menu', attrs: { role: 'menu' } });
     for (const entry of entries)
@@ -54,31 +67,46 @@ export class Menu {
   }
 
   private open(anchor: Element, menu: HTMLDivElement): void {
+    if (this.node && this.anchor === anchor) {
+      this.close();
+      return;
+    }
     this.close();
-    this.bus.emit('menu-opened', undefined);
     document.body.append(menu);
     // Pressing a menu does not take the focus away from a text box, or the keyboard would close.
     menu.addEventListener('mousedown', (e) => {
       if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
     });
     this.ignoreStrayTaps(menu);
-    const r = anchor.getBoundingClientRect();
-    const mw = menu.offsetWidth;
-    const mh = menu.offsetHeight;
-    // The visual viewport is what an on-screen keyboard leaves of the screen.
-    const view = window.visualViewport;
-    const left = view?.offsetLeft ?? 0;
-    const top = view?.offsetTop ?? 0;
-    const width = view?.width ?? innerWidth;
-    const bottom = top + (view?.height ?? innerHeight);
-    const x = clamp(r.right - mw, left + 8, Math.max(left + 8, left + width - mw - 8));
-    let y = r.bottom + 6;
-    if (y + mh > bottom - 8) y = Math.max(top + 8, r.top - mh - 6);
-    menu.style.left = x + 'px';
-    menu.style.top = y + 'px';
     this.node = menu;
-    // Defer so the click that opened the menu does not close it.
-    setTimeout(() => document.addEventListener('pointerdown', this.outside, true), 0);
+    this.anchor = anchor;
+    this.place();
+    this.popovers.opened(this.handle);
+    window.visualViewport?.addEventListener('resize', this.reposition);
+    window.visualViewport?.addEventListener('scroll', this.reposition);
+    window.addEventListener('resize', this.reposition);
+  }
+
+  /** Measures with the room the menu may have, then puts it where all of it can be seen. */
+  private place(): void {
+    const { node: menu, anchor } = this;
+    if (!menu || !anchor) return;
+    const view = visibleArea();
+    menu.classList.remove('menu--sheet');
+    menu.style.width = '';
+    menu.style.maxHeight = PopoverPlacement.maxHeight(view) + 'px';
+    const content = menu.classList.contains('menu--content');
+    const sheet = PopoverPlacement.isSheet(menu.offsetHeight, view, content);
+    if (sheet) {
+      menu.classList.add('menu--sheet');
+      menu.style.width = view.width + 'px';
+    }
+    const size = { w: menu.offsetWidth, h: menu.offsetHeight };
+    const at = sheet
+      ? PopoverPlacement.sheet(size.h, view)
+      : PopoverPlacement.anchored(anchor.getBoundingClientRect(), size, view);
+    menu.style.left = at.x + 'px';
+    menu.style.top = at.y + 'px';
   }
 
   /**
@@ -109,7 +137,11 @@ export class Menu {
     if (!this.node) return;
     this.node.remove();
     this.node = null;
-    document.removeEventListener('pointerdown', this.outside, true);
+    this.anchor = null;
+    this.popovers.closed(this.handle);
+    window.visualViewport?.removeEventListener('resize', this.reposition);
+    window.visualViewport?.removeEventListener('scroll', this.reposition);
+    window.removeEventListener('resize', this.reposition);
   }
 
   private item(entry: MenuItem): HTMLButtonElement {

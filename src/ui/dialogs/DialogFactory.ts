@@ -5,7 +5,14 @@ import { Sheet, type SheetOptions } from './Sheet';
 
 /** Opens sheets and confirmation dialogs; shared by every view. */
 export class DialogFactory {
-  private openSheets = 0;
+  private readonly open: Sheet[] = [];
+  private readonly onKey = (e: KeyboardEvent): void => {
+    const top = this.open.at(-1);
+    if (e.key !== 'Escape' || !top) return;
+    // One Escape closes one thing: the page behind the sheet must not react as well.
+    e.stopPropagation();
+    if (!top.locked) top.close();
+  };
 
   constructor(
     private readonly i18n: I18n,
@@ -14,19 +21,22 @@ export class DialogFactory {
 
   /** Whether any sheet is open (the automatic backup waits until none is). */
   get hasOpenSheet(): boolean {
-    return this.openSheets > 0;
+    return this.open.length > 0;
   }
 
   /** Opens a sheet. */
   sheet(options: SheetOptions): Sheet {
-    this.openSheets++;
-    return new Sheet(this.i18n, this.bus, {
+    if (!this.open.length) document.addEventListener('keydown', this.onKey);
+    const sheet: Sheet = new Sheet(this.i18n, this.bus, {
       ...options,
       onClose: () => {
-        this.openSheets--;
+        this.open.splice(this.open.indexOf(sheet), 1);
+        if (!this.open.length) document.removeEventListener('keydown', this.onKey);
         options.onClose?.();
       },
-    }).open();
+    });
+    this.open.push(sheet);
+    return sheet.open();
   }
 
   /**

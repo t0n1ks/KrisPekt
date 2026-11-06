@@ -65,6 +65,11 @@ export class Sheet {
     });
   }
 
+  /** Whether only code can close it. */
+  get locked(): boolean {
+    return this.options.locked === true;
+  }
+
   /** Shows the sheet. */
   open(): this {
     this.bus.emit('menu-opened', undefined);
@@ -93,6 +98,10 @@ export class Sheet {
     if (!view) return;
     this.scrim.style.setProperty('--view-top', view.offsetTop + 'px');
     this.scrim.style.setProperty('--view-height', view.height + 'px');
+    // Where the keyboard came up over the field being typed in, the field comes back into view.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && this.scrim.contains(active))
+      active.scrollIntoView({ block: 'nearest' });
   }
 
   private footer(actions: readonly SheetAction[]): HTMLDivElement {
