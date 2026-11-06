@@ -300,11 +300,23 @@ export class EditorView {
   }
 
   private linkPicker(onPick: (link: InternalLink) => void, current: InternalLink | null): LinkTargetPicker {
-    const { i18n, directory, prefs } = this.deps;
+    const { i18n, directory, prefs, savePrefs, dialogs } = this.deps;
     return new LinkTargetPicker({
       i18n,
       directory,
       recent: () => prefs.recentLinks,
+      forgetRecent: (link) => {
+        prefs.recentLinks = LinkRules.withoutRecent(prefs.recentLinks, link);
+        savePrefs();
+      },
+      clearRecents: async () => {
+        const text = i18n.t('linkRecentClearText');
+        const yes = await dialogs.confirm(i18n.t('linkRecentClearTitle'), text, i18n.t('linkRecentClear'));
+        if (!yes) return false;
+        prefs.recentLinks = [];
+        savePrefs();
+        return true;
+      },
       copied: () => this.linkClipboard.current,
       current,
       onPick: (link) => {

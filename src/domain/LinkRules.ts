@@ -20,6 +20,11 @@ export class LinkRules {
     return LinkRules.key(a) === LinkRules.key(b);
   }
 
+  /** The recently used targets without this one. */
+  static withoutRecent(list: readonly InternalLink[], link: InternalLink): InternalLink[] {
+    return list.filter((other) => !LinkRules.same(other, link));
+  }
+
   /** The recently used targets with this one first. */
   static pushRecent(list: readonly InternalLink[], link: InternalLink): InternalLink[] {
     return [link, ...list.filter((other) => !LinkRules.same(other, link))].slice(0, MAX_RECENT_LINKS);
