@@ -1,5 +1,5 @@
-import { TEXT_FONT, TEXT_LINE_HEIGHT } from '../core/constants';
-import type { Box, TextParagraph, TextSpan } from '../core/types';
+import { PAPER, TEXT_FONT, TEXT_LINE_HEIGHT } from '../core/constants';
+import type { Box, LinkTarget, TextParagraph, TextSpan } from '../core/types';
 import { RichText } from './RichText';
 
 /** Measures text; a canvas context in the app, a stub in tests. */
@@ -20,6 +20,7 @@ export interface ResolvedStyle {
   i: boolean;
   u: boolean;
   s: boolean;
+  link?: LinkTarget;
 }
 
 export interface LaidRun {
@@ -389,11 +390,13 @@ export class RichTextLayout {
       list: para.list !== undefined,
       style: {
         fs: run.fs ?? base.fs,
-        c: run.c ?? base.c,
+        // A link always looks like one, whatever colour the text around it has.
+        c: run.link ? PAPER.link : (run.c ?? base.c),
         b: run.b === true,
         i: run.i === true,
-        u: run.u === true,
+        u: run.u === true || run.link !== undefined,
         s: run.s === true,
+        ...(run.link ? { link: run.link } : {}),
       },
     }));
   }

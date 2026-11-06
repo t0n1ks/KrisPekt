@@ -74,6 +74,7 @@ export class BitmapCache {
   /** Loads every bitmap a page needs and returns them by id (used for PDF export). */
   async loadForPage(page: Page): Promise<Map<string, ImageBitmap | null>> {
     const ids = [...(page.bgBlob ? [page.bgBlob] : []), ...page.images.map((im) => im.blob)];
+    for (const card of page.cards) if (card.kind === 'pdf' && card.thumb) ids.push(card.thumb);
     const out = new Map<string, ImageBitmap | null>();
     for (const id of ids) out.set(id, (await this.load(id)) || null);
     return out;

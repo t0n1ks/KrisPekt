@@ -1,4 +1,4 @@
-import type { Stroke } from '../../core/types';
+import type { LinkTarget, Stroke } from '../../core/types';
 import type { PathSink, ShapePart } from '../brushes/PathSink';
 
 /** How a filled shape is painted. */
@@ -62,6 +62,8 @@ export interface DrawSink<P extends PathSink> {
   fillRect(x: number, y: number, w: number, h: number, color: string): void;
   text(run: TextRun): void;
   image(run: ImageRun): void;
+  /** Marks a rectangle as leading somewhere. Only a vector PDF has a use for that. */
+  link?(x: number, y: number, w: number, h: number, target: LinkTarget): void;
   /**
    * Shapes of stored strokes, kept between draws. Strokes are immutable, so a cached shape
    * never goes stale. Absent when the backend's paths are not reusable.

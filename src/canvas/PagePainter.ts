@@ -1,6 +1,7 @@
 import { MM, PAPER } from '../core/constants';
 import type { Page, Stroke } from '../core/types';
 import type { BitmapCache } from './BitmapCache';
+import type { CardPainter } from './CardPainter';
 import type { PathSink } from './brushes/PathSink';
 import type { DrawSink } from './draw/DrawSink';
 import type { PatternPainter } from './PatternPainter';
@@ -23,6 +24,8 @@ export interface SceneOptions {
    * them first keeps ink on top of them, as the multiply blend does on screen.
    */
   highlightersFirst?: boolean;
+  /** The ⋮ button on cards; only on screen. */
+  cardChrome?: boolean;
 }
 
 /** Canvas-only extras for {@link PagePainter.paint}. */
@@ -34,7 +37,7 @@ export interface PaintOptions {
 
 /**
  * Emits a page's content in page-local world px: white paper, the background pattern or PDF
- * page, images, strokes, then text. The same commands drive the screen and every export.
+ * page, images, attachment cards, strokes, then text. The same commands drive the screen and every export.
  */
 export class PagePainter {
   constructor(
@@ -42,6 +45,7 @@ export class PagePainter {
     private readonly strokes: StrokePainter,
     private readonly texts: TextLayout,
     private readonly bitmaps: BitmapCache,
+    private readonly cards: CardPainter,
   ) {}
 
   /** Emits a page into any drawing backend. */
@@ -57,6 +61,9 @@ export class PagePainter {
     for (const im of page.images) {
       if (skip?.has(im.id)) continue;
       sink.image({ blob: im.blob, x: im.x, y: im.y, w: im.w, h: im.h, placeholder: PAPER.imagePlaceholder });
+    }
+    for (const card of page.cards) {
+      if (!skip?.has(card.id)) this.cards.emit(sink, card, options.cardChrome ?? false);
     }
     for (const st of PagePainter.strokeOrder(page.strokes, options.highlightersFirst ?? false)) {
       if (!skip?.has(st.id)) this.strokes.emit(sink, st);
@@ -75,7 +82,12 @@ export class PagePainter {
     const source = options.source;
     const bitmap = (id: string): ImageBitmap | null =>
       source ? (source.get(id) ?? null) : this.bitmaps.get(id);
-    this.emit(this.strokes.canvasBackend(ctx, bitmap), page, { scale, skip, paper: options.paper });
+    this.emit(this.strokes.canvasBackend(ctx, bitmap), page, {
+      scale,
+      skip,
+      paper: options.paper,
+      cardChrome: !source,
+    });
   }
 
   /** Strokes in drawing order: as stored, or highlighters first (keeping their own order). */

@@ -3,7 +3,7 @@ import type { ShapePart } from '../../canvas/brushes/PathSink';
 import { CurveMath } from '../../canvas/draw/CurveMath';
 import type { DrawSink, FillStyle, ImageRun, LineStyle, TextRun } from '../../canvas/draw/DrawSink';
 import { PathRecorder, type PathCommand } from '../../canvas/draw/PathRecorder';
-import type { Point, Stroke } from '../../core/types';
+import type { LinkTarget, Point, Stroke } from '../../core/types';
 
 type JsPdfModule = typeof import('jspdf');
 type JsPdfDocument = InstanceType<JsPdfModule['jsPDF']>;
@@ -143,6 +143,14 @@ export class PdfVectorBackend implements DrawSink<PathRecorder> {
     const k = this.options.k;
     this.setAlpha(1);
     this.doc.addImage(image.data, image.format, run.x * k, run.y * k, run.w * k, run.h * k, run.blob, 'NONE');
+  }
+
+  /** A clickable link annotation. The address was validated when it entered the app. */
+  link(x: number, y: number, w: number, h: number, target: LinkTarget): void {
+    const k = this.options.k;
+    // Brackets end a PDF string, so they are percent-encoded, which means the same in a URL.
+    const url = target.href.replace(/[()\\]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+    this.doc.link(x * k, y * k, w * k, h * k, { url });
   }
 
   private setFill(color: string): void {

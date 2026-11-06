@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { OPS, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { BitmapCache } from '../../src/canvas/BitmapCache';
+import type { CardPainter } from '../../src/canvas/CardPainter';
 import { BrushRegistry } from '../../src/canvas/brushes/BrushRegistry';
 import { PencilGrain } from '../../src/canvas/brushes/PencilGrain';
 import { PagePainter } from '../../src/canvas/PagePainter';
@@ -84,7 +85,8 @@ function fixturePage(overrides: Partial<Page> = {}): Page {
 function exporter(): PdfExporter {
   const strokes = new StrokePainter(new BrushRegistry(), new PencilGrain());
   const bitmaps = { get: () => null } as unknown as BitmapCache;
-  const painter = new PagePainter(new PatternPainter(), strokes, new TextLayout(measurer), bitmaps);
+  const cards = { emit: () => undefined } as unknown as CardPainter;
+  const painter = new PagePainter(new PatternPainter(), strokes, new TextLayout(measurer), bitmaps, cards);
   const photo = new Blob([base64Bytes(PHOTO_JPEG)], { type: 'image/jpeg' });
   const blobs = {
     get: (id: string) => Promise.resolve(id === 'photo' ? photo : null),
@@ -157,7 +159,7 @@ describe('vector PDF export', () => {
     const messages: string[] = [];
     const strokes = new StrokePainter(new BrushRegistry(), new PencilGrain());
     const failing = new PdfExporter({
-      painter: new PagePainter(new PatternPainter(), strokes, new TextLayout(measurer), {} as BitmapCache),
+      painter: new PagePainter(new PatternPainter(), strokes, new TextLayout(measurer), {} as BitmapCache, {} as CardPainter),
       rasterizer: {} as PageRasterizer,
       images: new PdfImages({ get: () => Promise.resolve(null) } as unknown as BlobRepository),
       font: new PdfFont(() => Promise.reject(new Error('offline'))),

@@ -10,6 +10,7 @@ import { PatternPainter } from '../../src/canvas/PatternPainter';
 import { StrokePainter } from '../../src/canvas/StrokePainter';
 import { TextLayout } from '../../src/canvas/TextLayout';
 import type { BitmapCache } from '../../src/canvas/BitmapCache';
+import type { CardPainter } from '../../src/canvas/CardPainter';
 import { BRUSH_KINDS, MM, TEXT_LINE_HEIGHT } from '../../src/core/constants';
 import type { Stroke } from '../../src/core/types';
 import { page } from './fixtures';
@@ -57,7 +58,8 @@ function painterParts(): { painter: PagePainter; strokes: StrokePainter; texts: 
   const strokes = new StrokePainter(new BrushRegistry(), new PencilGrain());
   const texts = new TextLayout(measurer);
   const bitmaps = { get: () => null } as unknown as BitmapCache;
-  return { painter: new PagePainter(new PatternPainter(), strokes, texts, bitmaps), strokes, texts };
+  const cards = { emit: () => undefined } as unknown as CardPainter;
+  return { painter: new PagePainter(new PatternPainter(), strokes, texts, bitmaps, cards), strokes, texts };
 }
 
 function points(n: number): number[] {

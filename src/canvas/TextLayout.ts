@@ -1,5 +1,5 @@
 import { TEXT_LINE_HEIGHT } from '../core/constants';
-import type { Box, TextItem } from '../core/types';
+import type { Box, LinkTarget, TextItem } from '../core/types';
 import { RichText } from '../domain/RichText';
 import { RichTextLayout, type LaidGlyph, type LaidText, type TextMeasurer } from '../domain/RichTextLayout';
 import type { TextRun } from './draw/DrawSink';
@@ -18,6 +18,7 @@ const FALLBACK_EM_ASCENT = 970 / 1275;
 export interface TextSink {
   text(run: TextRun): void;
   fillRect(x: number, y: number, w: number, h: number, color: string): void;
+  link?(x: number, y: number, w: number, h: number, target: LinkTarget): void;
 }
 
 /**
@@ -169,7 +170,34 @@ export class TextLayout {
   /** Emits a text item's lines (drawn as text, never as markup). */
   emit(sink: TextSink, item: TextItem): void {
     for (const run of this.runs(item)) sink.text(run);
-    if (item.paras) this.emitDecorations(sink, item);
+    if (item.paras) {
+      this.emitDecorations(sink, item);
+      this.emitLinks(sink, item);
+    }
+  }
+
+  /** Where a linked word under a page point leads, if there is one. */
+  linkAt(item: TextItem, x: number, y: number): LinkTarget | null {
+    if (!item.paras) return null;
+    const localX = x - item.x;
+    const localY = y - item.y;
+    for (const line of this.laid(item).lines) {
+      if (localY < line.top || localY > line.top + line.height) continue;
+      for (const run of line.runs) {
+        if (run.style.link && localX >= run.x && localX <= run.x + run.width) return run.style.link;
+      }
+    }
+    return null;
+  }
+
+  private emitLinks(sink: TextSink, item: TextItem): void {
+    if (!sink.link) return;
+    for (const line of this.laid(item).lines) {
+      for (const run of line.runs) {
+        if (!run.style.link || !run.text.trim()) continue;
+        sink.link(item.x + run.x, item.y + line.top, run.width, line.height, run.style.link);
+      }
+    }
   }
 
   private richRuns(item: TextItem): TextRun[] {

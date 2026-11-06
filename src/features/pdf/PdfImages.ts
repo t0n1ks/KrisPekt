@@ -16,6 +16,7 @@ export class PdfImages {
   /** Images used on a page by blob id; null for one that is missing or unreadable. */
   async forPage(page: Page): Promise<Map<string, PdfImage | null>> {
     const ids = [...(page.bgBlob ? [page.bgBlob] : []), ...page.images.map((im) => im.blob)];
+    for (const card of page.cards) if (card.kind === 'pdf' && card.thumb) ids.push(card.thumb);
     const out = new Map<string, PdfImage | null>();
     for (const id of ids) out.set(id, await this.get(id));
     return out;
