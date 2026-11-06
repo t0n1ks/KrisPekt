@@ -137,11 +137,27 @@ for (const viewport of TABLETS) {
         const spot = await centre(page, '#tray [data-item="hand"]');
         for (const tool of ['hand', 'lasso', 'hand']) {
           await input.tap(kind, spot);
-          await expect(slot(page)).toHaveAttribute('data-tool', tool);
-          const separate = tool === 'hand' ? 'true' : 'false';
-          await expect(separateHand(page)).toHaveAttribute('aria-pressed', separate);
+          await expect(slot(page)).toHaveAttribute('data-tool', 'lasso');
+          await expect(activeTool(page)).toHaveAttribute('data-tool', tool);
+          await expect(page.locator('#tray button[aria-pressed="true"]')).toHaveCount(1);
         }
         await expect(page.locator('.popover')).toHaveCount(0);
+      });
+
+      test('with the separate Hand button, the combined one stays the Lasso', async ({ page }) => {
+        const input = await open(page, viewport);
+        await showSeparateHand(page);
+        const spot = await centre(page, '#tray [data-item="lasso"]');
+        await input.tap(kind, await centre(page, '#tray [data-item="hand"]'));
+        await expect(separateHand(page)).toHaveAttribute('aria-pressed', 'true');
+        await expect(slot(page)).toHaveAttribute('aria-pressed', 'false');
+        await expect(slot(page)).toHaveAttribute('aria-label', 'Лассо');
+
+        await input.tap(kind, await centre(page, '#tray [data-item="pen"]'));
+        await expect(slot(page)).toHaveAttribute('data-tool', 'lasso');
+        await input.tap(kind, spot);
+        await expect(slot(page)).toHaveAttribute('aria-pressed', 'true');
+        await expect(separateHand(page)).toHaveAttribute('aria-pressed', 'false');
       });
     });
   }
@@ -176,6 +192,24 @@ for (const viewport of TABLETS) {
       await input.tap('touch', { x: lasso.x + lasso.width / 2, y: lasso.y + lasso.height / 2 });
       await expect(slot(page)).toHaveAttribute('data-tool', 'lasso');
       await expect(page.locator('.menu')).toHaveCount(0);
+    });
+
+    test('hiding the separate Hand button makes the combined one show the Hand again', async ({ page }) => {
+      const input = await open(page, viewport);
+      await showSeparateHand(page);
+      await input.tap('touch', await centre(page, '#tray [data-item="hand"]'));
+      await expect(slot(page)).toHaveAttribute('data-tool', 'lasso');
+
+      await page.click('#btnEdMore');
+      await page.locator('.menu__item', { hasText: 'Настроить панель' }).click();
+      await page
+        .locator('.toolbar-custom__row', { hasText: 'Рука' })
+        .getByRole('button', { name: /Скрыть/ })
+        .click();
+      await page.keyboard.press('Escape');
+      await expect(separateHand(page)).toHaveCount(0);
+      await expect(slot(page)).toHaveAttribute('data-tool', 'hand');
+      await expect(slot(page)).toHaveAttribute('aria-pressed', 'true');
     });
 
     test('an open tool popover does not swallow the tap', async ({ page }) => {
