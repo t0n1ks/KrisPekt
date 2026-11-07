@@ -41,6 +41,7 @@ import { Toast } from '../ui/dialogs/Toast';
 import { EditorView } from '../ui/editor/EditorView';
 import { BackupFlow } from '../ui/library/BackupFlow';
 import { LibraryView } from '../ui/library/LibraryView';
+import { SystemBarColors } from '../ui/SystemBarColors';
 import { ShelfActions } from '../ui/library/ShelfActions';
 import { EventBus } from './EventBus';
 
@@ -63,6 +64,7 @@ export class App {
   private readonly i18n: I18n;
   private readonly sizes: PageSizes;
   private readonly toast = new Toast();
+  private readonly systemBars = new SystemBarColors(document);
   private readonly popovers: PopoverManager;
   private readonly menu: Menu;
   private readonly dialogs: DialogFactory;
@@ -246,7 +248,7 @@ export class App {
       makeId: uid,
       onStorageError: () => this.storageError(),
       actions: {
-        closed: () => this.libraryView.show(),
+        closed: () => this.showLibrary(),
         editNotebook: (nb) => this.notebookDialog.open(nb),
         exportNotebook: (nb) => this.exportNotebook(nb),
         setLanguage: (l) => this.setLanguage(l),
@@ -349,7 +351,8 @@ export class App {
         /* the shelf stays empty */
       }
     }
-    this.libraryView.show();
+    this.systemBars.start();
+    this.showLibrary();
     this.watchLifecycle();
     this.autoBackup.appOpened();
     setTimeout(() => {
@@ -402,7 +405,14 @@ export class App {
   private async openNotebook(nb: Notebook): Promise<void> {
     this.menu.close();
     this.libraryView.hide();
-    if (!(await this.editor.open(nb))) this.libraryView.show();
+    this.systemBars.show('editor');
+    if (!(await this.editor.open(nb))) this.showLibrary();
+  }
+
+  /** Shows the shelf, with the system bars in its colour. */
+  private showLibrary(): void {
+    this.libraryView.show();
+    this.systemBars.show('library');
   }
 
   /** Asks how to export a notebook (open or closed), then exports it. */

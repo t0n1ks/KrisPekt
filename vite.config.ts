@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
+import { DesignTokens, type ColorScheme } from './src/domain/DesignTokens';
 
 /** The site lives at https://<user>.github.io/KrisPekt/. */
 const BASE = '/KrisPekt/';
@@ -37,6 +38,36 @@ function cspMeta(): Plugin {
         injectTo: 'head-prepend',
       },
     ],
+  };
+}
+
+/** The app's background in each colour scheme, read from the design tokens. */
+const TOKENS_CSS = readFileSync('src/styles/tokens.css', 'utf8');
+function deskColor(scheme: ColorScheme): string {
+  const color = DesignTokens.read(TOKENS_CSS, scheme, '--desk');
+  if (!color) throw new Error(`tokens.css has no --desk for the ${scheme} scheme`);
+  return color;
+}
+
+/**
+ * One `<meta name="theme-color">` per colour scheme, so the status bar (Android) and the title bar
+ * (installed desktop app) take the app's background from the first paint, before any script runs.
+ * SystemBarColors then keeps them equal to the screen that is actually shown.
+ */
+function themeColorMeta(): Plugin {
+  const schemes: ColorScheme[] = ['light', 'dark'];
+  return {
+    name: 'krispekt-theme-color',
+    transformIndexHtml: () =>
+      schemes.map((scheme) => ({
+        tag: 'meta',
+        attrs: {
+          name: 'theme-color',
+          media: `(prefers-color-scheme: ${scheme})`,
+          content: deskColor(scheme),
+        },
+        injectTo: 'head' as const,
+      })),
   };
 }
 
@@ -77,6 +108,7 @@ export default defineConfig({
   },
   plugins: [
     cspMeta(),
+    themeColorMeta(),
     pdfjsAssets(),
     VitePWA({
       strategies: 'generateSW',
@@ -92,8 +124,11 @@ export default defineConfig({
         scope: './',
         display: 'standalone',
         orientation: 'any',
-        background_color: '#E3E7ED',
-        theme_color: '#2343B0',
+        // The manifest has one value for both schemes: the light background, the default theme.
+        // background_color paints the splash screen; theme_color the bars while the app starts
+        // and, from Chrome 153, the navigation bar of the installed app.
+        background_color: deskColor('light'),
+        theme_color: deskColor('light'),
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
