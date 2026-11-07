@@ -63,12 +63,51 @@
   gap: 4px;
   margin-left: auto;
 }
+.library__titles {
+  min-width: 0;
+}
 .library__actions {
   margin-left: auto;
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-wrap: wrap;
+}
+.library__create,
+.library__prefs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+/*
+ * Phones: language and ⋯ stay on the brand's row, top right; the two create buttons share the
+ * row below, so no button is ever left alone on a line.
+ */
+@media (max-width: 600px) {
+  .library__head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'titles prefs'
+      'create create';
+    align-items: start;
+    gap: 14px 8px;
+  }
+  .library__titles {
+    grid-area: titles;
+  }
+  .library__actions {
+    display: contents;
+  }
+  .library__prefs {
+    grid-area: prefs;
+  }
+  .library__create {
+    grid-area: create;
+  }
+  .library__create > .btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 .library__foot {
   margin-top: 40px;
@@ -148,6 +187,15 @@
   background: var(--subject-color);
   flex: none;
 }
+.subject__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+}
+/* One line, never broken inside a word: a name too long for the row ends in an ellipsis. */
 .subject__name {
   margin: 0;
   font-family: var(--f-display);
@@ -155,7 +203,9 @@
   font-size: 19px;
   letter-spacing: -0.01em;
   min-width: 0;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .subject__count {
   color: var(--muted);
@@ -165,6 +215,11 @@
 }
 .subject__more {
   margin-left: auto;
+}
+@media (max-width: 400px) {
+  .subject__head {
+    gap: 8px;
+  }
 }
 
 /* subject reordering */
@@ -301,7 +356,8 @@
   font-weight: 500;
   font-size: 12.5px;
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  /* breaks only between words; a word wider than the label ends in an ellipsis */
+  text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   line-clamp: 3;

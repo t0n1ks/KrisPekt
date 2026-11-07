@@ -14,16 +14,20 @@
       <section class="library" id="library">
         <div class="library__inner">
           <div class="library__head">
-            <div>
+            <div class="library__titles">
               <h1 class="library__brand">KrisPekt</h1>
               <p class="library__subtitle" id="libSub"></p>
               <p class="library__backup" id="libBackup"></p>
             </div>
             <div class="library__actions">
-              <button class="btn" id="btnAddSubject" type="button"></button>
-              <button class="btn btn--primary" id="btnAddNb" type="button"></button>
-              <button class="pill" id="btnLang" type="button"></button>
-              <button class="icon-btn" id="btnLibMore" type="button"></button>
+              <div class="library__create">
+                <button class="btn" id="btnAddSubject" type="button"></button>
+                <button class="btn btn--primary" id="btnAddNb" type="button"></button>
+              </div>
+              <div class="library__prefs">
+                <button class="pill" id="btnLang" type="button"></button>
+                <button class="icon-btn" id="btnLibMore" type="button"></button>
+              </div>
             </div>
           </div>
           <label class="search" for="q"

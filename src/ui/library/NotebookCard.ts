@@ -68,7 +68,7 @@ export class NotebookCard {
         'span',
         { class: 'notebook-card__label' },
         el('span', { class: 'notebook-card__kicker' }, i18n.t('notebook')),
-        el('span', { class: 'notebook-card__title' }, nb.title),
+        el('span', { class: 'notebook-card__title', attrs: { title: nb.title } }, nb.title),
         el('span', { class: 'notebook-card__subject' }, subject.name),
       ),
       nb.sample ? el('span', { class: 'notebook-card__badge' }, i18n.t('sample')) : null,

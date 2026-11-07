@@ -55,8 +55,13 @@ export class SubjectSection {
           class: 'subject__spine' + (light ? ' subject__spine--light' : ''),
           style: { '--subject-color': subject.color },
         }),
-        el('h2', { class: 'subject__name' }, subject.name),
-        el('span', { class: 'subject__count' }, i18n.plural(data.total, 'nb')),
+        // Name and count share one box: when both do not fit on a row, the count drops below.
+        el(
+          'div',
+          { class: 'subject__title' },
+          el('h2', { class: 'subject__name', attrs: { title: subject.name } }, subject.name),
+          el('span', { class: 'subject__count' }, i18n.plural(data.total, 'nb')),
+        ),
         more,
       ),
       this.shelf(),
