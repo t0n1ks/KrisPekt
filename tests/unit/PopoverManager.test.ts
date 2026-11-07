@@ -199,4 +199,27 @@ describe('PopoverPlacement', () => {
     expect(PopoverPlacement.maxHeight(VIEW)).toBe(584);
     expect(PopoverPlacement.maxHeight({ ...VIEW, height: 4 })).toBe(0);
   });
+
+  it('keeps clear of the status bar, the gesture bar and a side cutout', () => {
+    const insets = { top: 24, right: 0, bottom: 20, left: 40 };
+    const view = { left: 0, top: 0, width: 900, height: 400 };
+    expect(PopoverPlacement.safeArea(view, insets, { width: 900, height: 400 })).toEqual({
+      left: 40,
+      top: 24,
+      width: 860,
+      height: 356,
+    });
+  });
+
+  it('loses nothing on a side that is already away from the edge', () => {
+    const insets = { top: 24, right: 0, bottom: 20, left: 0 };
+    // the visual viewport ends above an on-screen keyboard
+    const view = { left: 0, top: 0, width: 400, height: 500 };
+    expect(PopoverPlacement.safeArea(view, insets, { width: 400, height: 900 })).toEqual({
+      left: 0,
+      top: 24,
+      width: 400,
+      height: 476,
+    });
+  });
 });

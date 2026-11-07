@@ -15,7 +15,8 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: calc(6px + env(safe-area-inset-top, 0px)) 8px 6px;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) calc(8px + env(safe-area-inset-right, 0px)) 6px
+    calc(8px + env(safe-area-inset-left, 0px));
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   min-height: 54px;
@@ -106,7 +107,8 @@
 .tool-tray {
   position: absolute;
   top: 12px;
-  left: 50%;
+  /* centred between the safe edges */
+  left: calc(50% + (env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 2);
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -117,7 +119,7 @@
   border-radius: var(--r-xl);
   box-shadow: 0 12px 30px -14px var(--shadow);
   z-index: 3;
-  max-width: calc(100% - 24px);
+  max-width: calc(100% - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -218,7 +220,7 @@
 /* the page's number or title: bottom left, across from the add-page button */
 .page-chip {
   position: absolute;
-  left: 12px;
+  left: calc(12px + env(safe-area-inset-left, 0px));
   bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   z-index: 3;
   min-height: 44px;
@@ -242,7 +244,7 @@
 }
 .fab {
   position: absolute;
-  right: 16px;
+  right: calc(16px + env(safe-area-inset-right, 0px));
   bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   width: 54px;
   height: 54px;
@@ -325,7 +327,8 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 72px 12px 12px;
+  padding: 72px calc(12px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px))
+    calc(12px + env(safe-area-inset-left, 0px));
   background: var(--scrim);
 }
 .toolbar-custom__card {
@@ -848,7 +851,6 @@
   z-index: 8;
   display: flex;
   flex-direction: column;
-  padding-top: env(safe-area-inset-top, 0px);
 }
 .pages-panel[hidden] {
   display: none;
@@ -857,7 +859,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 8px 10px 16px;
+  /* the head's background runs up under the status bar; its buttons stay below it */
+  padding: calc(10px + env(safe-area-inset-top, 0px)) calc(8px + env(safe-area-inset-right, 0px)) 10px
+    calc(16px + env(safe-area-inset-left, 0px));
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
@@ -881,7 +885,8 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
-  padding: 14px 24px calc(84px + env(safe-area-inset-bottom, 0px));
+  padding: 14px calc(24px + env(safe-area-inset-right, 0px)) calc(84px + env(safe-area-inset-bottom, 0px))
+    calc(24px + env(safe-area-inset-left, 0px));
   display: grid;
   grid-template-columns: repeat(auto-fill, 148px);
   justify-content: center;
@@ -895,7 +900,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 10px calc(16px + env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px))
+    calc(16px + env(safe-area-inset-left, 0px));
   background: var(--surface);
   border-top: 1px solid var(--line);
 }
@@ -1089,7 +1095,7 @@
 /* input diagnostics (hidden; long press on "Draw with finger" in ⋯) */
 .input-diag {
   position: absolute;
-  left: 8px;
+  left: calc(8px + env(safe-area-inset-left, 0px));
   bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   max-width: calc(100% - 96px);
   margin: 0;
@@ -1154,7 +1160,7 @@
 .back-chip {
   position: absolute;
   top: 72px;
-  left: 50%;
+  left: calc(50% + (env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 2);
   z-index: 4;
   display: flex;
   gap: 4px;

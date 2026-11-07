@@ -7,8 +7,9 @@
 .library__inner {
   max-width: 1160px;
   margin: 0 auto;
-  padding-inline: 16px;
-  padding-block: 22px 120px;
+  /* the shelf scrolls under the gesture bar; its last row can still scroll clear of it */
+  padding: 22px calc(16px + env(safe-area-inset-right, 0px)) calc(120px + env(safe-area-inset-bottom, 0px))
+    calc(16px + env(safe-area-inset-left, 0px));
 }
 .library__head {
   display: flex;

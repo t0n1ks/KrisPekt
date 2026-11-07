@@ -15,6 +15,14 @@ export interface AnchorBox {
   bottom: number;
 }
 
+/** The system insets (status bar, cutout, gesture bar), in client px. */
+export interface Insets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface MenuPlace {
   x: number;
   y: number;
@@ -31,6 +39,19 @@ const SHEET_SHARE = 0.6;
 
 /** Where a menu goes so that all of it stays on the screen. Pure. */
 export class PopoverPlacement {
+  /**
+   * What is left of `view` once the system insets of a `layout`-sized window are kept clear.
+   * The insets lie along the window's edges; a view that is already away from an edge (above an
+   * on-screen keyboard, say) loses nothing on that side.
+   */
+  static safeArea(view: ViewBox, insets: Insets, layout: { width: number; height: number }): ViewBox {
+    const left = Math.max(view.left, insets.left);
+    const top = Math.max(view.top, insets.top);
+    const right = Math.min(view.left + view.width, layout.width - insets.right);
+    const bottom = Math.min(view.top + view.height, layout.height - insets.bottom);
+    return { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+  }
+
   /** The tallest a menu may be; a longer one scrolls inside. */
   static maxHeight(view: ViewBox): number {
     return Math.max(0, view.height - MARGIN * 2);

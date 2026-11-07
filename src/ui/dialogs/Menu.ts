@@ -1,5 +1,5 @@
 import { el } from '../../core/utils/dom';
-import { PopoverPlacement, type ViewBox } from '../../domain/PopoverPlacement';
+import { PopoverPlacement, type Insets, type ViewBox } from '../../domain/PopoverPlacement';
 import { icon, type IconName } from '../icons';
 import { LongPress } from '../widgets/LongPress';
 import type { PopoverHandle, PopoverManager } from './PopoverManager';
@@ -31,6 +31,13 @@ function visibleArea(): ViewBox {
     width: view?.width ?? innerWidth,
     height: view?.height ?? innerHeight,
   };
+}
+
+/** The system insets, from the `--safe-*` properties that base.css fills with env(). */
+function safeInsets(): Insets {
+  const styles = getComputedStyle(document.documentElement);
+  const read = (side: keyof Insets): number => parseFloat(styles.getPropertyValue(`--safe-${side}`)) || 0;
+  return { top: read('top'), right: read('right'), bottom: read('bottom'), left: read('left') };
 }
 
 /**
@@ -92,9 +99,13 @@ export class Menu {
     const { node: menu, anchor } = this;
     if (!menu || !anchor) return;
     const view = visibleArea();
+    // A menu hanging from its button keeps clear of the system bars; a bottom sheet runs to the
+    // edges and pads its own items (dialogs.css).
+    const layout = { width: document.documentElement.clientWidth, height: innerHeight };
+    const safe = PopoverPlacement.safeArea(view, safeInsets(), layout);
     menu.classList.remove('menu--sheet');
     menu.style.width = '';
-    menu.style.maxHeight = PopoverPlacement.maxHeight(view) + 'px';
+    menu.style.maxHeight = PopoverPlacement.maxHeight(safe) + 'px';
     const content = menu.classList.contains('menu--content');
     const sheet = PopoverPlacement.isSheet(menu.offsetHeight, view, content);
     if (sheet) {
@@ -104,7 +115,7 @@ export class Menu {
     const size = { w: menu.offsetWidth, h: menu.offsetHeight };
     const at = sheet
       ? PopoverPlacement.sheet(size.h, view)
-      : PopoverPlacement.anchored(anchor.getBoundingClientRect(), size, view);
+      : PopoverPlacement.anchored(anchor.getBoundingClientRect(), size, safe);
     menu.style.left = at.x + 'px';
     menu.style.top = at.y + 'px';
   }
