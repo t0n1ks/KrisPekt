@@ -19,6 +19,7 @@ Handwritten notes organised by subject: a shelf of notebooks, stylus writing, PD
 - **Import and export:** PDF pages as backgrounds; export as vector PDF with selectable text and an outline, raster PDF (300 or 600 dpi), or PNG (2×, 4×, 6×; several pages as a ZIP).
 - **Customisable toolbar:** up to 12 pinned tool presets, reordering, and an overflow for what does not fit.
 - **Responsive:** from a 320 px phone to a wide desktop, in portrait and landscape, with 44 px touch targets.
+- **Edge to edge:** the status bar, the navigation bar and the title bar of the installed app take the app's own background, in light and dark mode; controls stay clear of the clock, camera cutouts, rounded corners and the gesture bar.
 - **Languages:** Ukrainian, Russian, German and English.
 
 ### Install on a phone or tablet
@@ -153,6 +154,13 @@ Scribbling a zigzag over writing with the pen erases it. There is no handwriting
 ### Rendering and export
 
 The screen and the vector PDF are drawn from the same commands (`src/canvas/draw/`), executed by `Canvas2DBackend` and `PdfVectorBackend`. Two differences: in a PDF the highlighter lies under the ink with transparency, because jsPDF has no multiply blend, and pencil grain becomes an even tone of the same density. Onest has no italic, so italics are slanted everywhere.
+
+### System bars and safe areas
+
+- `index.html` gets one `<meta name="theme-color">` per colour scheme at build time, and the manifest's `theme_color` and `background_color` are the light background. All of them are read from `--desk` in `tokens.css` (`src/domain/DesignTokens.ts`), so the colours exist in one place.
+- At runtime `SystemBarColors` writes the colour at the top of the visible screen into those metas: `--desk` on the shelf, `--surface` in the editor (its top bar), following the system scheme and a forced `data-theme`.
+- Chrome on Android colours the status bar from the meta tag. From Chrome 153 it colours the navigation bar of an installed app from the manifest's `theme_color`. The manifest has one value for both schemes, so in dark mode that bar can stay light. A changed manifest reaches an installed app when Chrome next checks it: at most once a day, on launch.
+- With `viewport-fit=cover`, every surface pads its content by `env(safe-area-inset-*)` while its background runs to the edges. Menus read the same insets from the `--safe-*` properties in `base.css`.
 
 ## License
 
