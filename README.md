@@ -157,9 +157,9 @@ The screen and the vector PDF are drawn from the same commands (`src/canvas/draw
 
 ### System bars and safe areas
 
-- `index.html` gets one `<meta name="theme-color">` per colour scheme at build time, and the manifest's `theme_color` and `background_color` are the light background. All of them are read from `--desk` in `tokens.css` (`src/domain/DesignTokens.ts`), so the colours exist in one place.
+- `index.html` gets one `<meta name="theme-color">` per colour scheme at build time, and the manifest's `theme_color` and `background_color` are the dark background (the owner's theme). All of them are read from `--desk` in `tokens.css` (`src/domain/DesignTokens.ts`), so the colours exist in one place.
 - At runtime `SystemBarColors` writes the colour at the top of the visible screen into those metas: `--desk` on the shelf, `--surface` in the editor (its top bar), following the system scheme and a forced `data-theme`.
-- Chrome on Android colours the status bar from the meta tag. From Chrome 153 it colours the navigation bar of an installed app from the manifest's `theme_color`. The manifest has one value for both schemes, so in dark mode that bar can stay light. A changed manifest reaches an installed app when Chrome next checks it: at most once a day, on launch.
+- Chrome on Android colours the status bar from the meta tag. From Chrome 153 it colours the navigation bar of an installed app from the manifest's `theme_color`. The manifest has one value for both schemes, so in light mode that bar and the splash screen can stay dark. A changed manifest reaches an installed app when Chrome next checks it: at most once a day, on launch.
 - With `viewport-fit=cover`, every surface pads its content by `env(safe-area-inset-*)` while its background runs to the edges. Menus read the same insets from the `--safe-*` properties in `base.css`.
 
 ## License

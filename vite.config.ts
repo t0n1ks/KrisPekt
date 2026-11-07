@@ -124,11 +124,11 @@ export default defineConfig({
         scope: './',
         display: 'standalone',
         orientation: 'any',
-        // The manifest has one value for both schemes: the light background, the default theme.
+        // The manifest has one value for both schemes: the dark background, the owner's theme.
         // background_color paints the splash screen; theme_color the bars while the app starts
         // and, from Chrome 153, the navigation bar of the installed app.
-        background_color: deskColor('light'),
-        theme_color: deskColor('light'),
+        background_color: deskColor('dark'),
+        theme_color: deskColor('dark'),
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },

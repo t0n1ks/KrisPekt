@@ -53,10 +53,12 @@ test('index.html carries one theme colour per scheme, equal to the background to
   expect(html).not.toMatch(/#2343b0/i);
 });
 
-test('the manifest paints the splash screen and the bars in the background colour', async ({ request }) => {
+test('the manifest paints the splash screen and the bars in the dark background', async ({ request }) => {
   const manifest = (await (await request.get('manifest.webmanifest')).json()) as Record<string, unknown>;
-  expect(String(manifest.background_color).toLowerCase()).toBe(token('light', '--desk'));
-  expect(String(manifest.theme_color).toLowerCase()).toBe(token('light', '--desk'));
+  // The owner's choice: the dark theme's background, read from the same token as the dark meta.
+  expect(token('dark', '--desk')).toBe('#111418');
+  expect(String(manifest.background_color).toLowerCase()).toBe(token('dark', '--desk'));
+  expect(String(manifest.theme_color).toLowerCase()).toBe(token('dark', '--desk'));
   expect(manifest.display).toBe('standalone');
 });
 
